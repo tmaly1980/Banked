@@ -33,8 +33,13 @@ export default function HomeScreen() {
 
   useEffect(() => {
     // Separate deferred and regular bills
-    const regularBills = bills.filter(bill => !bill.deferred_flag).map(b => b.toBill());
-    const deferred = bills.filter(bill => bill.deferred_flag).map(b => b.toBill());
+    // Bills without due dates are automatically deferred
+    const regularBills = bills.filter(bill => 
+      !bill.deferred_flag && (bill.due_date || bill.due_day)
+    ).map(b => b.toBill());
+    const deferred = bills.filter(bill => 
+      bill.deferred_flag || (!bill.due_date && !bill.due_day)
+    ).map(b => b.toBill());
     
     setDeferredBills(deferred);
 
@@ -123,6 +128,7 @@ export default function HomeScreen() {
       {/* Main Content */}
       <ScrollView
         style={styles.content}
+        contentContainerStyle={styles.contentContainer}
         refreshControl={
           <RefreshControl refreshing={loading} onRefresh={refreshData} />
         }
@@ -137,15 +143,15 @@ export default function HomeScreen() {
             onDeleteBill={handleDeleteBill}
           />
         ))}
-
-        {/* Deferred Bills */}
-        <DeferredBillsAccordion
-          deferredBills={deferredBills}
-          onViewBill={handleViewBill}
-          onEditBill={handleEditBill}
-          onDeleteBill={handleDeleteBill}
-        />
       </ScrollView>
+
+      {/* Deferred Bills - Fixed Footer */}
+      <DeferredBillsAccordion
+        deferredBills={deferredBills}
+        onViewBill={handleViewBill}
+        onEditBill={handleEditBill}
+        onDeleteBill={handleDeleteBill}
+      />
 
       {/* Add Item Modal */}
       <BillFormModal
@@ -209,5 +215,8 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+  },
+  contentContainer: {
+    paddingBottom: 80,
   },
 });

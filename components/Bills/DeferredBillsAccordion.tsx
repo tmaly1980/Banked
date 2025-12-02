@@ -9,8 +9,13 @@ import {
   Platform,
   UIManager,
   Alert,
+  ScrollView,
+  Dimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Bill } from '@/types';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 interface DeferredBillsAccordionProps {
   deferredBills: Bill[];
@@ -62,20 +67,22 @@ export default function DeferredBillsAccordion({
     <View style={styles.container}>
       {/* Header */}
       <TouchableOpacity style={styles.header} onPress={toggleAccordion}>
+        <Ionicons 
+          name={isExpanded ? "chevron-down" : "chevron-forward"} 
+          size={20} 
+          color="#6c757d" 
+        />
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Deferred</Text>
           <Text style={styles.headerCount}>
             ({deferredBills.length}) {formatAmount(totalDeferred)}
           </Text>
         </View>
-        <Text style={[styles.chevron, isExpanded && styles.chevronExpanded]}>
-          ▼
-        </Text>
       </TouchableOpacity>
 
-      {/* Content */}
+      {/* Content - Scrollable when expanded */}
       {isExpanded && (
-        <View style={styles.content}>
+        <ScrollView style={styles.content}>
           {deferredBills.map((bill) => (
             <TouchableOpacity
               key={bill.id}
@@ -127,7 +134,7 @@ export default function DeferredBillsAccordion({
               </View>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -135,28 +142,31 @@ export default function DeferredBillsAccordion({
 
 const styles = StyleSheet.create({
   container: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: 'white',
-    borderRadius: 12,
-    marginBottom: 16,
-    marginTop: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    overflow: 'hidden',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 10,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
     backgroundColor: '#f8f9fa',
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
   },
   headerTitle: {
     fontSize: 18,
@@ -168,15 +178,8 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     fontWeight: '500',
   },
-  chevron: {
-    fontSize: 14,
-    color: '#6c757d',
-    transform: [{ rotate: '0deg' }],
-  },
-  chevronExpanded: {
-    transform: [{ rotate: '180deg' }],
-  },
   content: {
+    maxHeight: SCREEN_HEIGHT * 0.4,
     backgroundColor: 'white',
   },
   billItem: {

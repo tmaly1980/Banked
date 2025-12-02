@@ -76,18 +76,11 @@ export default function BillFormModal({
       return false;
     }
 
-    if (type === 'bill') {
-      if (isRecurring) {
-        const dayNum = parseInt(dueDay);
-        if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) {
-          Toast.show({ type: 'error', text1: 'Please enter a valid due day (1-31)' });
-          return false;
-        }
-      } else {
-        if (!dueDate) {
-          Toast.show({ type: 'error', text1: 'Please enter a due date' });
-          return false;
-        }
+    if (type === 'bill' && isRecurring && dueDay) {
+      const dayNum = parseInt(dueDay);
+      if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) {
+        Toast.show({ type: 'error', text1: 'Please enter a valid due day (1-31)' });
+        return false;
       }
     }
 
@@ -110,14 +103,15 @@ export default function BillFormModal({
 
         if (error) throw error;
       } else {
+        const hasDueDate = isRecurring ? !!dueDay : !!dueDate;
         const billData = {
           name: name.trim(),
           amount: amountNum,
-          due_date: isRecurring ? undefined : dueDate,
-          due_day: isRecurring ? parseInt(dueDay) : undefined,
+          due_date: isRecurring ? undefined : (dueDate || undefined),
+          due_day: isRecurring ? (dueDay ? parseInt(dueDay) : undefined) : undefined,
           priority,
           loss_risk_flag: lossRiskFlag,
-          deferred_flag: deferredFlag,
+          deferred_flag: !hasDueDate ? true : deferredFlag,
           notes: notes.trim() || undefined,
         };
 

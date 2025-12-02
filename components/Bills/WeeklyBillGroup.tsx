@@ -42,36 +42,40 @@ export default function WeeklyBillGroup({
 
   return (
     <View style={styles.container}>
-      {/* Week Header */}
-      <View style={styles.header}>
-        <Text style={styles.weekLabel}>
-          {formatWeekLabel(group.startDate, group.endDate)}
-        </Text>
-        <View style={styles.totalsContainer}>
-          <Text style={styles.totalsText}>
-            {formatAmount(group.totalPaychecks)} / {formatAmount(group.totalBills)}
-          </Text>
-        </View>
-      </View>
+      {/* Week Header - moved outside card */}
+      <Text style={styles.weekLabel}>
+        {formatWeekLabel(group.startDate, group.endDate)}
+      </Text>
 
-      {/* Progress Bar */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBackground}>
-          <View 
-            style={[
-              styles.progressBar, 
-              { width: `${progressPercentage}%` }
-            ]} 
-          />
+      <View style={styles.card}>
+        {/* Progress Bar with Embedded Totals */}
+        <View style={styles.progressContainer}>
+          <View style={styles.progressWrapper}>
+            <View style={styles.progressBackground}>
+              <View 
+                style={[
+                  styles.progressBar, 
+                  { width: `${progressPercentage}%` }
+                ]} 
+              />
+            </View>
+            {/* Paychecks - always on left */}
+            <Text style={[styles.paychecksText, styles.paychecksOverlay]}>
+              {formatAmount(group.totalPaychecks)}
+            </Text>
+            {/* Payments - positioned based on progress */}
+            <Text style={[
+              styles.paymentsText,
+              progressPercentage >= 50 ? styles.paymentsInside : styles.paymentsOutside
+            ]}>
+              {formatAmount(group.totalBills)}
+            </Text>
+          </View>
         </View>
-        <Text style={styles.progressText}>
-          {progressPercentage.toFixed(0)}%
-        </Text>
-      </View>
 
-      {/* Bills List */}
-      {group.bills.length > 0 ? (
-        <View style={styles.billsList}>
+        {/* Bills List */}
+        {group.bills.length > 0 ? (
+          <View style={styles.billsList}>
           {group.bills.map((bill) => {
             const dueDate = getBillDueDate(bill);
             return (
@@ -128,73 +132,99 @@ export default function WeeklyBillGroup({
           <Text style={styles.emptyText}>No bills this week</Text>
         </View>
       )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'white',
-    borderRadius: 12,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   weekLabel: {
     fontSize: 18,
     fontWeight: '600',
     color: '#2c3e50',
+    marginBottom: 8,
+    paddingHorizontal: 4,
   },
-  totalsContainer: {
-    alignItems: 'flex-end',
-  },
-  totalsText: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    fontWeight: '500',
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    padding: 16,
   },
   progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    marginBottom: 16,
+  },
+  progressWrapper: {
+    position: 'relative',
+    height: 40,
   },
   progressBackground: {
-    flex: 1,
-    height: 8,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '100%',
     backgroundColor: '#ecf0f1',
-    borderRadius: 4,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
     backgroundColor: '#27ae60',
-    borderRadius: 4,
+    borderRadius: 8,
   },
-  progressText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#7f8c8d',
-    minWidth: 35,
-    textAlign: 'right',
+  paychecksText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e8449',
+  },
+  paychecksOverlay: {
+    position: 'absolute',
+    left: 12,
+    top: 0,
+    bottom: 0,
+    textAlignVertical: 'center',
+    lineHeight: 40,
+    zIndex: 2,
+  },
+  paymentsText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  paymentsInside: {
+    position: 'absolute',
+    right: 12,
+    top: 0,
+    bottom: 0,
+    textAlignVertical: 'center',
+    lineHeight: 40,
+    color: 'white',
+    zIndex: 2,
+  },
+  paymentsOutside: {
+    position: 'absolute',
+    right: 12,
+    top: 0,
+    bottom: 0,
+    textAlignVertical: 'center',
+    lineHeight: 40,
+    color: '#e74c3c',
+    zIndex: 1,
   },
   billsList: {
-    paddingBottom: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    marginTop: 8,
+    paddingTop: 8,
   },
   billItem: {
-    paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f8f9fa',
@@ -250,8 +280,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   emptyState: {
-    padding: 24,
+    paddingVertical: 16,
     alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    marginTop: 8,
   },
   emptyText: {
     fontSize: 14,
