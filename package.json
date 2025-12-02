@@ -1,0 +1,42 @@
+{
+  "name": "banked",
+  "version": "0.1.1",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
+    "@react-native-async-storage/async-storage": "^2.0.0",
+    "@react-native-picker/picker": "2.11.1",
+    "@supabase/supabase-js": "^2.39.0",
+    "date-fns": "^3.0.0",
+    "expo": "~54.0.0",
+    "expo-constants": "~18.0.10",
+    "expo-linking": "~8.0.9",
+    "expo-router": "~6.0.15",
+    "expo-status-bar": "~3.0.8",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-calendars": "^1.1313.0",
+    "react-native-dotenv": "^3.4.9",
+    "react-native-elements": "^3.4.3",
+    "react-native-paper": "^5.14.5",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-screens": "~4.16.0",
+    "react-native-toast-message": "^2.3.3",
+    "react-native-url-polyfill": "^2.0.0",
+    "react-native-vector-icons": "^10.3.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@types/react": "~19.1.10",
+    "@types/react-native": "^0.73.0",
+    "babel-plugin-module-resolver": "^5.0.0",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}

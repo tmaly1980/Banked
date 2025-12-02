@@ -1,0 +1,99 @@
+# OSX
+#
+.DS_Store
+
+# Xcode
+#
+build/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata
+*.xccheckout
+*.moved-aside
+DerivedData
+*.hmap
+*.ipa
+*.xcuserstate
+project.xcworkspace
+ios/.xcode.env.local
+
+# Android/IntelliJ
+#
+build/
+.idea
+.gradle
+local.properties
+*.iml
+*.hprof
+.cxx/
+*.keystore
+!debug.keystore
+
+# Node
+#
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Bundle artifacts
+#
+*.jsbundle
+
+# CocoaPods
+#
+ios/Pods/
+
+# Expo
+#
+.expo/
+.expo-shared/
+dist/
+web-build/
+
+# Environment variables
+#
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+#
+*.log
+logs/
+
+# Metro
+#
+.metro-health-check*
+
+# Temporary files created by Metro to check the health of the file watcher
+.metro-health-check*
+
+# Debug
+#
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Misc
+#
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# TypeScript
+#
+*.tsbuildinfo
+
+# React Native
+#
+.react-native-async-storage/
