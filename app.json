@@ -11,7 +11,8 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.banked.app"
+      "bundleIdentifier": "com.banked.app",
+      "appleTeamId": "35DJ6B8GNM"
     },
     "android": {
       "package": "com.banked.app"
