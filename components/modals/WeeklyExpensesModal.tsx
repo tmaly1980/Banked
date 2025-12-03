@@ -12,7 +12,7 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import Toast from 'react-native-toast-message';
+import { useToast } from '@/components/CustomToast';
 import { format } from 'date-fns';
 
 interface ExpenseRow {
@@ -42,6 +42,7 @@ export default function WeeklyExpensesModal({
   existingWeeklyExpenses,
   onSave,
 }: WeeklyExpensesModalProps) {
+  const toast = useToast();
   const [rows, setRows] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -99,7 +100,7 @@ export default function WeeklyExpensesModal({
     });
 
     if (validRows.length === 0) {
-      Toast.show({
+      toast.show({
         type: 'error',
         text1: 'No expenses to save',
         text2: 'Add at least one expense with a name and amount',
@@ -111,7 +112,7 @@ export default function WeeklyExpensesModal({
     for (const row of validRows) {
       const amount = parseFloat(row.amount);
       if (isNaN(amount) || amount <= 0) {
-        Toast.show({
+        toast.show({
           type: 'error',
           text1: 'Invalid amount',
           text2: `Please enter a valid amount for ${row.expenseTypeName}`,
@@ -130,7 +131,7 @@ export default function WeeklyExpensesModal({
 
       await onSave(expenses);
       
-      Toast.show({
+      toast.show({
         type: 'success',
         text1: 'Weekly expenses saved',
       });
@@ -138,7 +139,7 @@ export default function WeeklyExpensesModal({
       onClose();
     } catch (error) {
       console.error('[WeeklyExpensesModal] Save error:', error);
-      Toast.show({
+      toast.show({
         type: 'error',
         text1: 'Error saving expenses',
         text2: error instanceof Error ? error.message : 'An error occurred',

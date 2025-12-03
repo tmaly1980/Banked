@@ -2,9 +2,9 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import Toast from 'react-native-toast-message';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { BillsProvider } from '@/contexts/BillsContext';
+import { ToastProvider } from '@/components/CustomToast';
 
 function RootLayoutNav() {
   const { session, loading } = useAuth();
@@ -37,8 +37,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <BillsProvider>
-          <RootLayoutNav />
-          <Toast />
+          <ToastProvider>
+            <RootLayoutNav />
+          </ToastProvider>
         </BillsProvider>
       </AuthProvider>
     </GestureHandlerRootView>

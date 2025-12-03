@@ -16,6 +16,7 @@ import BillFormModal from '@/components/modals/BillFormModal';
 import BillDetailsModal from '@/components/modals/BillDetailsModal';
 import PaycheckWeekModal from '@/components/modals/PaycheckWeekModal';
 import PaycheckFormModal from '@/components/modals/PaycheckFormModal';
+import PaycheckDetailsModal from '@/components/modals/PaycheckDetailsModal';
 import WeeklyBillGroup from '@/components/Bills/WeeklyBillGroup';
 import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
 import { format } from 'date-fns';
@@ -31,7 +32,9 @@ export default function HomeScreen() {
   const [paycheckWeekModalVisible, setPaycheckWeekModalVisible] = useState(false);
   const [selectedWeekPaychecks, setSelectedWeekPaychecks] = useState<WeeklyPaycheckGroup | null>(null);
   const [paycheckFormVisible, setPaycheckFormVisible] = useState(false);
+  const [paycheckDetailsVisible, setPaycheckDetailsVisible] = useState(false);
   const [editingPaycheck, setEditingPaycheck] = useState<Paycheck | null>(null);
+  const [selectedPaycheck, setSelectedPaycheck] = useState<Paycheck | null>(null);
   const [selectedWeekForExpenses, setSelectedWeekForExpenses] = useState<WeeklyGroup | null>(null);
 
   useEffect(() => {
@@ -140,13 +143,19 @@ export default function HomeScreen() {
   };
 
   const handleViewPaycheck = (paycheck: Paycheck) => {
-    setEditingPaycheck(paycheck);
-    setPaycheckFormVisible(true);
+    setPaycheckWeekModalVisible(false);
+    setTimeout(() => {
+      setEditingPaycheck(paycheck);
+      setPaycheckFormVisible(true);
+    }, 100);
   };
 
   const handleEditPaycheck = (paycheck: Paycheck) => {
-    setEditingPaycheck(paycheck);
-    setPaycheckFormVisible(true);
+    setPaycheckWeekModalVisible(false);
+    setTimeout(() => {
+      setEditingPaycheck(paycheck);
+      setPaycheckFormVisible(true);
+    }, 100);
   };
 
   const handleDeletePaycheck = async (paycheck: Paycheck) => {
@@ -301,6 +310,16 @@ export default function HomeScreen() {
           setEditingPaycheck(null);
         }}
         editingPaycheck={editingPaycheck}
+      />
+
+      {/* Paycheck Details Modal */}
+      <PaycheckDetailsModal
+        visible={paycheckDetailsVisible}
+        onClose={() => {
+          setPaycheckDetailsVisible(false);
+          setSelectedPaycheck(null);
+        }}
+        paycheck={selectedPaycheck}
       />
     </View>
   );

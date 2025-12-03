@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import Toast from 'react-native-toast-message';
+import { useToast } from '@/components/CustomToast';
 import { useBills } from '@/contexts/BillsContext';
 import { BillPayment } from '@/types';
 import { BillModel } from '@/models/BillModel';
@@ -7,6 +7,7 @@ import { dateToTimestamp, timestampToDate, localDate } from '@/lib/dateUtils';
 import { Alert } from 'react-native';
 
 export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
+  const toast = useToast();
   const { loadBillPayments, addBillPayment, updateBillPayment, deleteBillPayment, markPaymentAsPaid } = useBills();
   const [payments, setPayments] = useState<BillPayment[]>([]);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -64,17 +65,17 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
 
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
-      Toast.show({ type: 'error', text1: 'Please enter a valid payment amount' });
+      toast.show({ type: 'error', text1: 'Please enter a valid payment amount' });
       return;
     }
 
     if (!paymentDate) {
-      Toast.show({ type: 'error', text1: 'Please enter a payment date' });
+      toast.show({ type: 'error', text1: 'Please enter a payment date' });
       return;
     }
 
     if (!appliedDate) {
-      Toast.show({ type: 'error', text1: 'Please enter an applied date' });
+      toast.show({ type: 'error', text1: 'Please enter an applied date' });
       return;
     }
 
@@ -90,7 +91,7 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
           false
         );
         if (error) throw error;
-        Toast.show({ type: 'success', text1: 'Payment updated successfully' });
+        toast.show({ type: 'success', text1: 'Payment updated successfully' });
       } else {
         // Create new payment
         const { error } = await addBillPayment(
@@ -101,14 +102,14 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
           false
         );
         if (error) throw error;
-        Toast.show({ type: 'success', text1: 'Payment saved successfully' });
+        toast.show({ type: 'success', text1: 'Payment saved successfully' });
       }
 
       setShowPaymentForm(false);
       loadPayments();
       onSuccess();
     } catch (error) {
-      Toast.show({
+      toast.show({
         type: 'error',
         text1: 'Error',
         text2: error instanceof Error ? error.message : 'An error occurred',
@@ -130,9 +131,9 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
           onPress: async () => {
             const { error } = await deleteBillPayment(paymentId);
             if (error) {
-              Toast.show({ type: 'error', text1: 'Failed to delete payment' });
+              toast.show({ type: 'error', text1: 'Failed to delete payment' });
             } else {
-              Toast.show({ type: 'success', text1: 'Payment deleted' });
+              toast.show({ type: 'success', text1: 'Payment deleted' });
               loadPayments();
               onSuccess();
             }
@@ -145,9 +146,9 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
   const handleMarkAsPaid = async (paymentId: string, onSuccess: () => void) => {
     const { error } = await markPaymentAsPaid(paymentId);
     if (error) {
-      Toast.show({ type: 'error', text1: 'Failed to mark as paid' });
+      toast.show({ type: 'error', text1: 'Failed to mark as paid' });
     } else {
-      Toast.show({ type: 'success', text1: 'Payment marked as paid' });
+      toast.show({ type: 'success', text1: 'Payment marked as paid' });
       loadPayments();
       onSuccess();
     }

@@ -30,7 +30,7 @@ export default function WeeklyPaycheckGroup({
 }: WeeklyPaycheckGroupProps) {
   const formatWeekLabel = (startDate: Date, endDate: Date): string => {
     const start = format(startDate, 'MMM d');
-    const end = format(endDate, 'MMM d, yyyy');
+    const end = format(endDate, 'MMM d');
     return `${start} - ${end}`;
   };
 

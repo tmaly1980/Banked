@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -11,11 +11,12 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import Toast from 'react-native-toast-message';
 import { useBills } from '@/contexts/BillsContext';
 import { Paycheck } from '@/types';
 import DateInput from '@/components/DateInput';
 import { timestampToDate, dateToTimestamp } from '@/lib/dateUtils';
+import { InlineAlert } from '@/components/InlineAlert';
+import { useInlineAlert } from '@/hooks/useInlineAlert';
 
 interface PaycheckFormModalProps {
   visible: boolean;
@@ -30,12 +31,20 @@ export default function PaycheckFormModal({
   onSuccess,
   editingPaycheck,
 }: PaycheckFormModalProps) {
+  const { alert, showError, showSuccess, hideAlert } = useInlineAlert();
   const { createPaycheck, updatePaycheck, deletePaycheck } = useBills();
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Auto-hide alert when form values change
+  useEffect(() => {
+    if (alert.visible) {
+      hideAlert();
+    }
+  }, [name, amount, date, notes]);
 
   const resetForm = () => {
     setName('');
@@ -52,12 +61,12 @@ export default function PaycheckFormModal({
   const validateForm = () => {
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      Toast.show({ type: 'error', text1: 'Please enter a valid amount' });
+      showError('Please enter a valid amount');
       return false;
     }
 
     if (!date) {
-      Toast.show({ type: 'error', text1: 'Please enter a date' });
+      showError('Please enter a date');
       return false;
     }
 
@@ -93,21 +102,14 @@ export default function PaycheckFormModal({
         if (error) throw error;
       }
 
-      Toast.show({
-        type: 'success',
-        text1: `Paycheck ${editingPaycheck ? 'updated' : 'added'} successfully`,
-      });
+      showSuccess(`Paycheck ${editingPaycheck ? 'updated' : 'added'} successfully`);
       
       resetForm();
       onSuccess();
       onClose();
     } catch (error) {
       console.error('[PaycheckFormModal] Error:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error saving paycheck',
-        text2: error instanceof Error ? error.message : 'An error occurred',
-      });
+      showError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -135,21 +137,14 @@ export default function PaycheckFormModal({
               const { error } = await deletePaycheck(editingPaycheck.id);
               if (error) throw error;
 
-              Toast.show({
-                type: 'success',
-                text1: 'Paycheck deleted successfully',
-              });
+              showSuccess('Paycheck deleted successfully');
 
               resetForm();
               onSuccess();
               onClose();
             } catch (error) {
               console.error('[PaycheckFormModal] Delete error:', error);
-              Toast.show({
-                type: 'error',
-                text1: 'Error deleting paycheck',
-                text2: error instanceof Error ? error.message : 'An error occurred',
-              });
+              showError(error instanceof Error ? error.message : 'An error occurred');
             } finally {
               setLoading(false);
             }
@@ -191,6 +186,13 @@ export default function PaycheckFormModal({
         </View>
 
         <ScrollView style={styles.form} contentContainerStyle={styles.formContent}>
+          <InlineAlert
+            type={alert.type}
+            message={alert.message}
+            visible={alert.visible}
+            onDismiss={hideAlert}
+          />
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Name</Text>
             <TextInput

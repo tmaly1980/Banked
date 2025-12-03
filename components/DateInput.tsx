@@ -79,6 +79,11 @@ export default function DateInput({
     setShowCalendar(false);
   };
 
+  const handleClear = () => {
+    setDisplayValue('');
+    onChangeDate('');
+  };
+
   // Initialize and sync display value from prop
   React.useEffect(() => {
     if (value) {
@@ -92,14 +97,24 @@ export default function DateInput({
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
       <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={displayValue}
-          onChangeText={handleTextChange}
-          placeholder={placeholder}
-          keyboardType="number-pad"
-          maxLength={10}
-        />
+        <View style={styles.inputWrapper}>
+          <TextInput
+            style={styles.input}
+            value={displayValue}
+            onChangeText={handleTextChange}
+            placeholder={placeholder}
+            keyboardType="number-pad"
+            maxLength={10}
+          />
+          {displayValue && (
+            <TouchableOpacity
+              style={styles.clearButton}
+              onPress={handleClear}
+            >
+              <Ionicons name="close-circle" size={20} color="#95a5a6" />
+            </TouchableOpacity>
+          )}
+        </View>
         <TouchableOpacity
           style={styles.iconButton}
           onPress={() => setShowCalendar(true)}
@@ -167,14 +182,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  input: {
+  inputWrapper: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    paddingLeft: 12,
+    paddingRight: 8,
     backgroundColor: '#f9f9f9',
+  },
+  input: {
+    flex: 1,
+    height: 48,
+    fontSize: 16,
+  },
+  clearButton: {
+    padding: 4,
   },
   iconButton: {
     padding: 8,

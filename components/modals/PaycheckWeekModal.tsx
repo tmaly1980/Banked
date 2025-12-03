@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Paycheck } from '@/types';
 import WeeklyPaycheckGroup from '@/components/Paychecks/WeeklyPaycheckGroup';
-import Toast from 'react-native-toast-message';
+import { useToast } from '@/components/CustomToast';
 
 interface ExpenseRow {
   id: string;
@@ -51,6 +51,7 @@ export default function PaycheckWeekModal({
   onEditPaycheck,
   onDeletePaycheck,
 }: PaycheckWeekModalProps) {
+  const toast = useToast();
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -109,7 +110,7 @@ export default function PaycheckWeekModal({
     for (const row of validRows) {
       const amount = parseFloat(row.amount);
       if (isNaN(amount) || amount <= 0) {
-        Toast.show({
+        toast.show({
           type: 'error',
           text1: 'Invalid amount',
           text2: `Please enter a valid amount for ${row.expenseTypeName}`,
@@ -128,7 +129,7 @@ export default function PaycheckWeekModal({
 
       await onSaveExpenses(expenses);
       
-      Toast.show({
+      toast.show({
         type: 'success',
         text1: 'Weekly expenses saved',
       });
@@ -136,7 +137,7 @@ export default function PaycheckWeekModal({
       setHasChanges(false);
     } catch (error) {
       console.error('[PaycheckWeekModal] Save error:', error);
-      Toast.show({
+      toast.show({
         type: 'error',
         text1: 'Error saving expenses',
         text2: error instanceof Error ? error.message : 'An error occurred',

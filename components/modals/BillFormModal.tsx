@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -11,7 +11,8 @@ import {
   ScrollView,
   Switch,
 } from 'react-native';
-import Toast from 'react-native-toast-message';
+import { InlineAlert } from '@/components/InlineAlert';
+import { useInlineAlert } from '@/hooks/useInlineAlert';
 import { Chip } from 'react-native-paper';
 import { useBills } from '@/contexts/BillsContext';
 import { BillModel } from '@/models/BillModel';
@@ -32,6 +33,7 @@ export default function BillFormModal({
   onSuccess,
   editingBill,
 }: BillFormModalProps) {
+  const { alert, showError, showSuccess, hideAlert } = useInlineAlert();
   const { createBill, updateBill } = useBills();
   const [name, setName] = useState(editingBill?.name || '');
   const [amount, setAmount] = useState(editingBill?.amount?.toString() || '');
@@ -45,6 +47,13 @@ export default function BillFormModal({
   const [notes, setNotes] = useState(editingBill?.notes || '');
   const [isRecurring, setIsRecurring] = useState(!!editingBill?.due_day);
   const [loading, setLoading] = useState(false);
+
+  // Auto-hide alert when form values change
+  useEffect(() => {
+    if (alert.visible) {
+      hideAlert();
+    }
+  }, [name, amount, dueDate, dueDay, priority, lossRiskFlag, deferredFlag, notes, isRecurring]);
 
   const resetForm = () => {
     setName('');
@@ -65,20 +74,20 @@ export default function BillFormModal({
 
   const validateForm = () => {
     if (!name.trim()) {
-      Toast.show({ type: 'error', text1: 'Please enter a name' });
+      showError('Please enter a name');
       return false;
     }
     
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      Toast.show({ type: 'error', text1: 'Please enter a valid amount' });
+      showError('Please enter a valid amount');
       return false;
     }
 
     if (isRecurring && dueDay) {
       const dayNum = parseInt(dueDay);
       if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) {
-        Toast.show({ type: 'error', text1: 'Please enter a valid due day (1-31)' });
+        showError('Please enter a valid due day (1-31)');
         return false;
       }
     }
@@ -112,20 +121,13 @@ export default function BillFormModal({
         if (error) throw error;
       }
 
-      Toast.show({
-        type: 'success',
-        text1: `Bill ${editingBill ? 'updated' : 'added'} successfully`,
-      });
+      showSuccess(`Bill ${editingBill ? 'updated' : 'added'} successfully`);
       
       resetForm();
       onSuccess();
       onClose();
     } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error instanceof Error ? error.message : 'An error occurred',
-      });
+      showError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -166,6 +168,13 @@ export default function BillFormModal({
         </View>
 
         <ScrollView style={styles.form}>
+          <InlineAlert
+            type={alert.type}
+            message={alert.message}
+            visible={alert.visible}
+            onDismiss={hideAlert}
+          />
+
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Bill Name</Text>
             <TextInput
