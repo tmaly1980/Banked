@@ -16,11 +16,13 @@ import BillFormModal from '@/components/modals/BillFormModal';
 import BillDetailsModal from '@/components/modals/BillDetailsModal';
 import PaycheckWeekModal from '@/components/modals/PaycheckWeekModal';
 import PaycheckFormModal from '@/components/modals/PaycheckFormModal';
+import WeeklyExpensesModal from '@/components/modals/WeeklyExpensesModal';
 import WeeklyBillGroup from '@/components/Bills/WeeklyBillGroup';
 import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
+import { format } from 'date-fns';
 
 export default function HomeScreen() {
-  const { bills, paychecks, loading, refreshData, deleteBill, deletePaycheck } = useBills();
+  const { bills, paychecks, expenseTypes, weeklyExpenses, loading, refreshData, deleteBill, deletePaycheck, saveWeeklyExpenses } = useBills();
   const [weeklyGroups, setWeeklyGroups] = useState<WeeklyGroup[]>([]);
   const [deferredBills, setDeferredBills] = useState<BillModel[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -31,6 +33,8 @@ export default function HomeScreen() {
   const [selectedWeekPaychecks, setSelectedWeekPaychecks] = useState<WeeklyPaycheckGroup | null>(null);
   const [paycheckFormVisible, setPaycheckFormVisible] = useState(false);
   const [editingPaycheck, setEditingPaycheck] = useState<Paycheck | null>(null);
+  const [weeklyExpensesModalVisible, setWeeklyExpensesModalVisible] = useState(false);
+  const [selectedWeekForExpenses, setSelectedWeekForExpenses] = useState<WeeklyGroup | null>(null);
 
   useEffect(() => {
     refreshData();
@@ -54,6 +58,9 @@ export default function HomeScreen() {
     // Calculate paycheck totals and running balances for each week
     let runningBalance = 0;
     groups.forEach(group => {
+      const weekStartDate = format(group.startDate, 'yyyy-MM-dd');
+      
+      // Get paychecks for this week
       const weekPaychecks = paychecks.filter(paycheck => {
         const paycheckDate = new Date(paycheck.date);
         return paycheckDate >= group.startDate && paycheckDate <= group.endDate;
@@ -61,9 +68,14 @@ export default function HomeScreen() {
       
       const weekPaycheckTotal = weekPaychecks.reduce((sum, pc) => sum + pc.amount, 0);
       
+      // Get weekly expenses for this week
+      const weekExpenses = weeklyExpenses.filter(exp => exp.week_start_date === weekStartDate);
+      const weekExpensesTotal = weekExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+      
       // Add carryover from previous week
       group.carryoverBalance = runningBalance;
-      group.totalPaychecks = weekPaycheckTotal + runningBalance;
+      // Total available = paychecks + carryover - expenses
+      group.totalPaychecks = weekPaycheckTotal + runningBalance - weekExpensesTotal;
       
       // Calculate new running balance for next week
       const weekRemainder = group.totalPaychecks - group.totalBills;
@@ -71,7 +83,7 @@ export default function HomeScreen() {
     });
 
     setWeeklyGroups(groups);
-  }, [bills, paychecks]);
+  }, [bills, paychecks, weeklyExpenses]);
 
   const handleAddBill = () => {
     setEditingBill(null);
@@ -162,6 +174,21 @@ export default function HomeScreen() {
     );
   };
 
+  const handleWeekLabelPress = (group: WeeklyGroup) => {
+    setSelectedWeekForExpenses(group);
+    setWeeklyExpensesModalVisible(true);
+  };
+
+  const handleSaveWeeklyExpenses = async (
+    expenses: Array<{ expense_type_id: string | null; expense_type_name: string; amount: number }>
+  ) => {
+    if (!selectedWeekForExpenses) return;
+
+    const weekStartDate = format(selectedWeekForExpenses.startDate, 'yyyy-MM-dd');
+    await saveWeeklyExpenses(weekStartDate, expenses);
+    await refreshData();
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -192,6 +219,7 @@ export default function HomeScreen() {
             onEditBill={handleEditBill}
             onDeleteBill={handleDeleteBill}
             onPaycheckTotalPress={() => handlePaycheckTotalPress(group)}
+            onWeekLabelPress={() => handleWeekLabelPress(group)}
           />
         ))}
       </ScrollView>
@@ -268,6 +296,23 @@ export default function HomeScreen() {
           setEditingPaycheck(null);
         }}
         editingPaycheck={editingPaycheck}
+      />
+
+      {/* Weekly Expenses Modal */}
+      <WeeklyExpensesModal
+        visible={weeklyExpensesModalVisible}
+        onClose={() => setWeeklyExpensesModalVisible(false)}
+        weekStartDate={selectedWeekForExpenses?.startDate || null}
+        weekEndDate={selectedWeekForExpenses?.endDate || null}
+        existingExpenseTypes={expenseTypes}
+        existingWeeklyExpenses={
+          selectedWeekForExpenses
+            ? weeklyExpenses.filter(exp => 
+                exp.week_start_date === format(selectedWeekForExpenses.startDate, 'yyyy-MM-dd')
+              )
+            : []
+        }
+        onSave={handleSaveWeeklyExpenses}
       />
     </View>
   );

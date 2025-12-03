@@ -14,3 +14,6 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
     detectSessionInUrl: false,
   },
 });
+
+// Database schema is located in lib/schema.sql
+// Run that SQL file in your Supabase SQL editor to create all tables

@@ -38,6 +38,24 @@ export interface Paycheck {
   created_at: string;
 }
 
+export interface ExpenseType {
+  id: string;
+  user_id: string;
+  name: string;
+  default_amount?: number;
+  created_at: string;
+}
+
+export interface WeeklyExpense {
+  id: string;
+  user_id: string;
+  expense_type_id: string;
+  week_start_date: string;
+  amount: number;
+  notes?: string;
+  created_at: string;
+}
+
 import { BillModel } from '@/models/BillModel';
 
 export interface WeeklyGroup {

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { BillPayment, Paycheck } from '@/types';
+import { BillPayment, Paycheck, ExpenseType, WeeklyExpense } from '@/types';
 import { BillModel, Bill } from '@/models/BillModel';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
@@ -7,6 +7,8 @@ import { useAuth } from './AuthContext';
 interface BillsContextType {
   bills: BillModel[];
   paychecks: Paycheck[];
+  expenseTypes: ExpenseType[];
+  weeklyExpenses: WeeklyExpense[];
   loading: boolean;
   error: string | null;
   loadBills: () => Promise<void>;
@@ -20,6 +22,10 @@ interface BillsContextType {
   deletePaycheck: (id: string) => Promise<{ error: Error | null }>;
   addBillPayment: (billId: string, amount: number, paymentDate: string) => Promise<{ data: BillPayment | null; error: Error | null }>;
   updateBillPayment: (paymentId: string, amount: number, paymentDate: string) => Promise<{ data: BillPayment | null; error: Error | null }>;
+  loadExpenseTypes: () => Promise<void>;
+  loadWeeklyExpenses: () => Promise<void>;
+  createOrUpdateExpenseType: (name: string, defaultAmount?: number) => Promise<{ data: ExpenseType | null; error: Error | null }>;
+  saveWeeklyExpenses: (weekStartDate: string, expenses: Array<{ expense_type_id: string | null; expense_type_name: string; amount: number }>) => Promise<void>;
   refreshData: () => Promise<void>;
 }
 
@@ -29,6 +35,8 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [bills, setBills] = useState<BillModel[]>([]);
   const [paychecks, setPaychecks] = useState<Paycheck[]>([]);
+  const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
+  const [weeklyExpenses, setWeeklyExpenses] = useState<WeeklyExpense[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -334,12 +342,152 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
   }, [user, loadBills]);
 
   const refreshData = useCallback(async () => {
-    await Promise.all([loadBills(), loadPaychecks()]);
+    await Promise.all([loadBills(), loadPaychecks(), loadExpenseTypes(), loadWeeklyExpenses()]);
   }, [loadBills, loadPaychecks]);
+
+  const loadExpenseTypes = useCallback(async () => {
+    if (!user) {
+      setExpenseTypes([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('expense_types')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setExpenseTypes(data || []);
+    } catch (err) {
+      console.error('[BillsContext] Error loading expense types:', err);
+    }
+  }, [user]);
+
+  const loadWeeklyExpenses = useCallback(async () => {
+    if (!user) {
+      setWeeklyExpenses([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('weekly_expenses')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('week_start_date', { ascending: false });
+
+      if (error) throw error;
+      setWeeklyExpenses(data || []);
+    } catch (err) {
+      console.error('[BillsContext] Error loading weekly expenses:', err);
+    }
+  }, [user]);
+
+  const createOrUpdateExpenseType = useCallback(async (
+    name: string,
+    defaultAmount?: number
+  ) => {
+    if (!user) return { data: null, error: new Error('User not authenticated') };
+
+    try {
+      // Check if expense type already exists
+      const { data: existing } = await supabase
+        .from('expense_types')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('name', name)
+        .single();
+
+      if (existing) {
+        // Update existing
+        const { data, error } = await supabase
+          .from('expense_types')
+          .update({ default_amount: defaultAmount })
+          .eq('id', existing.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        await loadExpenseTypes();
+        return { data, error: null };
+      } else {
+        // Create new
+        const { data, error } = await supabase
+          .from('expense_types')
+          .insert({
+            user_id: user.id,
+            name,
+            default_amount: defaultAmount,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        await loadExpenseTypes();
+        return { data, error: null };
+      }
+    } catch (err) {
+      return { data: null, error: err as Error };
+    }
+  }, [user, loadExpenseTypes]);
+
+  const saveWeeklyExpenses = useCallback(async (
+    weekStartDate: string,
+    expenses: Array<{ expense_type_id: string | null; expense_type_name: string; amount: number }>
+  ) => {
+    if (!user) throw new Error('User not authenticated');
+
+    try {
+      // First, create any new expense types
+      const expenseTypeMap = new Map<string, string>();
+      
+      for (const expense of expenses) {
+        if (!expense.expense_type_id) {
+          // Create new expense type
+          const { data, error } = await createOrUpdateExpenseType(expense.expense_type_name);
+          if (error) throw error;
+          if (data) {
+            expenseTypeMap.set(expense.expense_type_name, data.id);
+          }
+        } else {
+          expenseTypeMap.set(expense.expense_type_name, expense.expense_type_id);
+        }
+      }
+
+      // Delete existing weekly expenses for this week
+      await supabase
+        .from('weekly_expenses')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('week_start_date', weekStartDate);
+
+      // Insert new weekly expenses
+      const weeklyExpensesData = expenses.map(expense => ({
+        user_id: user.id,
+        expense_type_id: expense.expense_type_id || expenseTypeMap.get(expense.expense_type_name)!,
+        week_start_date: weekStartDate,
+        amount: expense.amount,
+      }));
+
+      const { error: insertError } = await supabase
+        .from('weekly_expenses')
+        .insert(weeklyExpensesData);
+
+      if (insertError) throw insertError;
+
+      await loadWeeklyExpenses();
+    } catch (err) {
+      throw err;
+    }
+  }, [user, createOrUpdateExpenseType, loadWeeklyExpenses]);
 
   const value = {
     bills,
     paychecks,
+    expenseTypes,
+    weeklyExpenses,
     loading,
     error,
     loadBills,
@@ -353,6 +501,10 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     deletePaycheck,
     addBillPayment,
     updateBillPayment,
+    loadExpenseTypes,
+    loadWeeklyExpenses,
+    createOrUpdateExpenseType,
+    saveWeeklyExpenses,
     refreshData,
   };
 

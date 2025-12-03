@@ -19,6 +19,7 @@ interface WeeklyBillGroupProps {
   onEditBill: (bill: BillModel) => void;
   onDeleteBill: (bill: BillModel) => void;
   onPaycheckTotalPress?: () => void;
+  onWeekLabelPress?: () => void;
 }
 
 const getProgressBarColor = (progressPercentage: number) => {
@@ -41,6 +42,7 @@ export default function WeeklyBillGroup({
   onEditBill,
   onDeleteBill,
   onPaycheckTotalPress,
+  onWeekLabelPress,
 }: WeeklyBillGroupProps) {
   const progressPercentage = group.totalBills > 0 
     ? Math.min((group.totalPaychecks / group.totalBills) * 100, 100)
@@ -100,9 +102,15 @@ export default function WeeklyBillGroup({
     <View style={styles.container}>
       {/* Week Header - moved outside card */}
       <View style={styles.headerRow}>
-        <Text style={styles.weekLabel}>
-          {formatWeekLabel(group.startDate, group.endDate)}
-        </Text>
+        <TouchableOpacity 
+          onPress={onWeekLabelPress}
+          activeOpacity={onWeekLabelPress ? 0.7 : 1}
+          disabled={!onWeekLabelPress}
+        >
+          <Text style={styles.weekLabel}>
+            {formatWeekLabel(group.startDate, group.endDate)}
+          </Text>
+        </TouchableOpacity>
         {daysToGo !== null && group.totalPaychecks < group.totalBills && (
           <Text style={styles.daysToGo}>
             {daysToGo === 0 ? 'Today' : daysToGo === 1 ? '1 day to go' : `${daysToGo} days to go`}
