@@ -9,10 +9,10 @@
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-		B32576A1FE97FB8B4A6ED9D2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 7E60619A99DB2478925E49FF /* PrivacyInfo.xcprivacy */; };
+		608584643863E4763A599496 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5507498A08B9ECFB669EBAAA /* ExpoModulesProvider.swift */; };
+		6482EC5056A3290D6FF2217A /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = DCB0976F8644CA2797E0D452 /* PrivacyInfo.xcprivacy */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
-		D0243C3F09B79606478C0008 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35B269143868B8B0C31BF751 /* ExpoModulesProvider.swift */; };
-		D549F48AC920D94F64E6024F /* libPods-Banked.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 680B02A0414456D3246BA7B4 /* libPods-Banked.a */; };
+		E7F829B810F3B5F21638F59E /* libPods-Banked.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 522B56A531FE2068EA44C0E9 /* libPods-Banked.a */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 /* End PBXBuildFile section */
 
@@ -20,13 +20,13 @@
 		13B07F961A680F5B00A75B9A /* Banked.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Banked.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Banked/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Banked/Info.plist; sourceTree = "<group>"; };
-		1622A6BAE98AD29B5E87ABDA /* Pods-Banked.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Banked.release.xcconfig"; path = "Target Support Files/Pods-Banked/Pods-Banked.release.xcconfig"; sourceTree = "<group>"; };
-		35B269143868B8B0C31BF751 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Banked/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
-		680B02A0414456D3246BA7B4 /* libPods-Banked.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Banked.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		7E60619A99DB2478925E49FF /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Banked/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		522B56A531FE2068EA44C0E9 /* libPods-Banked.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Banked.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		5507498A08B9ECFB669EBAAA /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Banked/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		82D50A91AF972D6E480D1705 /* Pods-Banked.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Banked.debug.xcconfig"; path = "Target Support Files/Pods-Banked/Pods-Banked.debug.xcconfig"; sourceTree = "<group>"; };
+		A33E8FD52B6D3ED815BB5B90 /* Pods-Banked.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Banked.release.xcconfig"; path = "Target Support Files/Pods-Banked/Pods-Banked.release.xcconfig"; sourceTree = "<group>"; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Banked/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-		D2338F8B9E964B2A9A47F5EF /* Pods-Banked.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Banked.debug.xcconfig"; path = "Target Support Files/Pods-Banked/Pods-Banked.debug.xcconfig"; sourceTree = "<group>"; };
+		DCB0976F8644CA2797E0D452 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = Banked/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Banked/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* Banked-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Banked-Bridging-Header.h"; path = "Banked/Banked-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -37,7 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D549F48AC920D94F64E6024F /* libPods-Banked.a in Frameworks */,
+				E7F829B810F3B5F21638F59E /* libPods-Banked.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -53,33 +53,33 @@
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
-				7E60619A99DB2478925E49FF /* PrivacyInfo.xcprivacy */,
+				DCB0976F8644CA2797E0D452 /* PrivacyInfo.xcprivacy */,
 			);
 			name = Banked;
+			sourceTree = "<group>";
+		};
+		1BD6D4D98204C6EAB772D32D /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				B8FEB11F4DF486A43E4E16DC /* Banked */,
+			);
+			name = ExpoModulesProviders;
 			sourceTree = "<group>";
 		};
 		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				680B02A0414456D3246BA7B4 /* libPods-Banked.a */,
+				522B56A531FE2068EA44C0E9 /* libPods-Banked.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
-		44CCC81A55A414C8442AB869 /* Banked */ = {
+		7BA75144064E3D7DDCCBBC63 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				35B269143868B8B0C31BF751 /* ExpoModulesProvider.swift */,
-			);
-			name = Banked;
-			sourceTree = "<group>";
-		};
-		50E1D22C555883DF55A8787B /* Pods */ = {
-			isa = PBXGroup;
-			children = (
-				D2338F8B9E964B2A9A47F5EF /* Pods-Banked.debug.xcconfig */,
-				1622A6BAE98AD29B5E87ABDA /* Pods-Banked.release.xcconfig */,
+				82D50A91AF972D6E480D1705 /* Pods-Banked.debug.xcconfig */,
+				A33E8FD52B6D3ED815BB5B90 /* Pods-Banked.release.xcconfig */,
 			);
 			name = Pods;
 			path = Pods;
@@ -99,8 +99,8 @@
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
-				50E1D22C555883DF55A8787B /* Pods */,
-				AAD1982ABDD312C5CAC23911 /* ExpoModulesProviders */,
+				7BA75144064E3D7DDCCBBC63 /* Pods */,
+				1BD6D4D98204C6EAB772D32D /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -115,12 +115,12 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		AAD1982ABDD312C5CAC23911 /* ExpoModulesProviders */ = {
+		B8FEB11F4DF486A43E4E16DC /* Banked */ = {
 			isa = PBXGroup;
 			children = (
-				44CCC81A55A414C8442AB869 /* Banked */,
+				5507498A08B9ECFB669EBAAA /* ExpoModulesProvider.swift */,
 			);
-			name = ExpoModulesProviders;
+			name = Banked;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -140,13 +140,13 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "Banked" */;
 			buildPhases = (
 				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
-				BB39EE6473F3D2BF1FF724B2 /* [Expo] Configure project */,
+				DFAF9CE22EB408DC68CFA88E /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
-				7C6AA34B85A5EFF22938809B /* [CP] Embed Pods Frameworks */,
+				6E2C677584386D8A5B2F000E /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -167,8 +167,6 @@
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1250;
-						DevelopmentTeam = "35DJ6B8GNM";
-						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -198,7 +196,7 @@
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
-				B32576A1FE97FB8B4A6ED9D2 /* PrivacyInfo.xcprivacy in Resources */,
+				6482EC5056A3290D6FF2217A /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -244,7 +242,7 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		7C6AA34B85A5EFF22938809B /* [CP] Embed Pods Frameworks */ = {
+		6E2C677584386D8A5B2F000E /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -276,7 +274,6 @@
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/EXConstants.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/ExpoConstants_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoLocalization/ExpoLocalization_privacy.bundle",
 				"${PODS_CONFIGURATION_BUILD_DIR}/RNCAsyncStorage/RNCAsyncStorage_resources.bundle",
 				"${PODS_ROOT}/../../node_modules/react-native-vector-icons/Fonts/AntDesign.ttf",
 				"${PODS_ROOT}/../../node_modules/react-native-vector-icons/Fonts/Entypo.ttf",
@@ -305,7 +302,6 @@
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXConstants.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoConstants_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoFileSystem_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoLocalization_privacy.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNCAsyncStorage_resources.bundle",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AntDesign.ttf",
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Entypo.ttf",
@@ -334,7 +330,7 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Banked/Pods-Banked-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		BB39EE6473F3D2BF1FF724B2 /* [Expo] Configure project */ = {
+		DFAF9CE22EB408DC68CFA88E /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -366,7 +362,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-				D0243C3F09B79606478C0008 /* ExpoModulesProvider.swift in Sources */,
+				608584643863E4763A599496 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -375,12 +371,13 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = D2338F8B9E964B2A9A47F5EF /* Pods-Banked.debug.xcconfig */;
+			baseConfigurationReference = 82D50A91AF972D6E480D1705 /* Pods-Banked.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Banked/Banked.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 35DJ6B8GNM;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -406,20 +403,18 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
-				DEVELOPMENT_TEAM = "35DJ6B8GNM";
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 			};
 			name = Debug;
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 1622A6BAE98AD29B5E87ABDA /* Pods-Banked.release.xcconfig */;
+			baseConfigurationReference = A33E8FD52B6D3ED815BB5B90 /* Pods-Banked.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Banked/Banked.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 35DJ6B8GNM;
 				INFOPLIST_FILE = Banked/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -439,9 +434,6 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
-				DEVELOPMENT_TEAM = "35DJ6B8GNM";
-				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
 			};
 			name = Release;
 		};

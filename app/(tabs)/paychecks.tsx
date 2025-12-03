@@ -9,17 +9,11 @@ import {
   Alert,
 } from 'react-native';
 import { useBills } from '@/contexts/BillsContext';
-import { Paycheck } from '@/types';
+import { Paycheck, WeeklyPaycheckGroup } from '@/types';
 import PaycheckFormModal from '@/components/modals/PaycheckFormModal';
 import PaycheckDetailsModal from '@/components/modals/PaycheckDetailsModal';
+import WeeklyPaycheckGroupComponent from '@/components/Paychecks/WeeklyPaycheckGroup';
 import { format, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
-
-interface WeeklyPaycheckGroup {
-  startDate: Date;
-  endDate: Date;
-  paychecks: Paycheck[];
-  total: number;
-}
 
 export default function PaychecksScreen() {
   const { paychecks, loading, refreshData, deletePaycheck } = useBills();
@@ -69,12 +63,6 @@ export default function PaychecksScreen() {
     return Array.from(weeksMap.values()).sort(
       (a, b) => a.startDate.getTime() - b.startDate.getTime()
     );
-  };
-
-  const formatWeekLabel = (startDate: Date, endDate: Date): string => {
-    const start = format(startDate, 'MMM d');
-    const end = format(endDate, 'MMM d, yyyy');
-    return `${start} - ${end}`;
   };
 
   const formatAmount = (amount: number) => {
@@ -141,55 +129,16 @@ export default function PaychecksScreen() {
       >
         {weeklyGroups.length > 0 ? (
           weeklyGroups.map((group, index) => (
-            <View key={index} style={styles.weekContainer}>
-              {/* Week Header */}
-              <Text style={styles.weekLabel}>
-                {formatWeekLabel(group.startDate, group.endDate)}
-              </Text>
-
-              {/* Card */}
-              <View style={styles.card}>
-                {/* Week Total */}
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Total:</Text>
-                  <Text style={styles.totalAmount}>
-                    {formatAmount(group.total)}
-                  </Text>
-                </View>
-
-                {/* Paychecks List */}
-                <View style={styles.paychecksList}>
-                  {group.paychecks.map((paycheck) => (
-                    <TouchableOpacity
-                      key={paycheck.id}
-                      style={styles.paycheckItem}
-                      onPress={() => handleViewPaycheck(paycheck)}
-                      onLongPress={() => Alert.alert(
-                        'Paycheck Actions',
-                        'Choose an action:',
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          { text: 'Edit', onPress: () => handleEditPaycheck(paycheck) },
-                          { text: 'Delete', style: 'destructive', onPress: () => handleDeletePaycheck(paycheck) },
-                        ]
-                      )}
-                    >
-                      <View style={styles.paycheckRow}>
-                        <Text style={styles.paycheckDate}>
-                          {format(new Date(paycheck.date), 'MMM d')}
-                        </Text>
-                        <Text style={styles.paycheckName} numberOfLines={1}>
-                          {paycheck.name || 'Paycheck'}
-                        </Text>
-                        <Text style={styles.paycheckAmount}>
-                          {formatAmount(paycheck.amount)}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View>
+            <WeeklyPaycheckGroupComponent
+              key={index}
+              startDate={group.startDate}
+              endDate={group.endDate}
+              paychecks={group.paychecks}
+              total={group.total}
+              onViewPaycheck={handleViewPaycheck}
+              onEditPaycheck={handleEditPaycheck}
+              onDeletePaycheck={handleDeletePaycheck}
+            />
           ))
         ) : (
           <View style={styles.emptyState}>
@@ -260,75 +209,6 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingBottom: 20,
-  },
-  weekContainer: {
-    marginBottom: 16,
-  },
-  weekLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    padding: 16,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: 12,
-    marginBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-  },
-  totalAmount: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#27ae60',
-  },
-  paychecksList: {
-    gap: 0,
-  },
-  paycheckItem: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f8f9fa',
-  },
-  paycheckRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  paycheckDate: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#2c3e50',
-    width: 50,
-  },
-  paycheckName: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#2c3e50',
-    flex: 1,
-  },
-  paycheckAmount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#27ae60',
   },
   emptyState: {
     flex: 1,

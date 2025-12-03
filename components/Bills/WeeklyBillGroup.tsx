@@ -18,6 +18,7 @@ interface WeeklyBillGroupProps {
   onViewBill: (bill: BillModel) => void;
   onEditBill: (bill: BillModel) => void;
   onDeleteBill: (bill: BillModel) => void;
+  onPaycheckTotalPress?: () => void;
 }
 
 const getProgressBarColor = (progressPercentage: number) => {
@@ -39,6 +40,7 @@ export default function WeeklyBillGroup({
   onViewBill,
   onEditBill,
   onDeleteBill,
+  onPaycheckTotalPress,
 }: WeeklyBillGroupProps) {
   const progressPercentage = group.totalBills > 0 
     ? Math.min((group.totalPaychecks / group.totalBills) * 100, 100)
@@ -63,15 +65,50 @@ export default function WeeklyBillGroup({
   };
 
   const formatAmount = (amount: number) => {
-    return `$${amount.toFixed(2)}`;
+    const absAmount = Math.abs(amount);
+    const formattedAmount = absAmount.toFixed(0);
+    return amount < 0 ? `-$${formattedAmount}` : `$${formattedAmount}`;
   };
+
+  const getDaysToGo = () => {
+    if (group.bills.length === 0) return null;
+
+    // Find the last bill due date in this week
+    const billDates = group.bills
+      .map(bill => bill.next_date || getBillDueDate(bill, group.startDate))
+      .filter(date => date !== null) as Date[];
+    
+    if (billDates.length === 0) return null;
+
+    const lastBillDate = new Date(Math.max(...billDates.map(d => d.getTime())));
+    
+    // Calculate from today or start of week (whichever is later)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const weekStart = new Date(group.startDate);
+    weekStart.setHours(0, 0, 0, 0);
+    
+    const startDate = today > weekStart ? today : weekStart;
+    const daysToGo = Math.ceil((lastBillDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    return daysToGo;
+  };
+
+  const daysToGo = getDaysToGo();
 
   return (
     <View style={styles.container}>
       {/* Week Header - moved outside card */}
-      <Text style={styles.weekLabel}>
-        {formatWeekLabel(group.startDate, group.endDate)}
-      </Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.weekLabel}>
+          {formatWeekLabel(group.startDate, group.endDate)}
+        </Text>
+        {daysToGo !== null && (
+          <Text style={styles.daysToGo}>
+            {daysToGo === 0 ? 'Today' : daysToGo === 1 ? '1 day to go' : `${daysToGo} days to go`}
+          </Text>
+        )}
+      </View>
 
       <View style={styles.card}>
         {/* Progress Bar with Embedded Totals */}
@@ -85,13 +122,20 @@ export default function WeeklyBillGroup({
                 ]} 
               />
             </View>
-            {/* Paychecks - always on left */}
-            <Text style={styles.paychecksText}>
-              {formatAmount(group.totalPaychecks)}
-            </Text>
+            {/* Paychecks - always on left, touchable */}
+            <TouchableOpacity 
+              style={styles.paychecksTextWrapper}
+              onPress={onPaycheckTotalPress}
+              activeOpacity={onPaycheckTotalPress ? 0.7 : 1}
+              disabled={!onPaycheckTotalPress}
+            >
+              <Text style={styles.paychecksText}>
+                {formatAmount(group.totalPaychecks)}
+              </Text>
+            </TouchableOpacity>
             {/* Payments - always on right */}
             <Text style={styles.paymentsText}>
-              {formatAmount(group.totalBills)}
+              {formatAmount(group.totalPaychecks - group.totalBills)}
             </Text>
           </View>
         </View>
@@ -157,12 +201,22 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: 16,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
   weekLabel: {
     fontSize: 18,
     fontWeight: '600',
     color: '#2c3e50',
-    marginBottom: 8,
-    paddingHorizontal: 4,
+  },
+  daysToGo: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#7f8c8d',
   },
   card: {
     backgroundColor: 'white',
@@ -197,17 +251,19 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 8,
   },
-  paychecksText: {
+  paychecksTextWrapper: {
     position: 'absolute',
-    left: 12,
+    left: 0,
     top: 0,
     bottom: 0,
+    paddingLeft: 12,
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  paychecksText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#000000',
-    textAlignVertical: 'center',
-    lineHeight: 40,
-    zIndex: 2,
   },
   paymentsText: {
     position: 'absolute',
@@ -216,7 +272,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     fontSize: 16,
     fontWeight: '700',
-    color: '#000000',
+    color: '#ff0000',
     textAlignVertical: 'center',
     lineHeight: 40,
     zIndex: 2,

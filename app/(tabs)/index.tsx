@@ -10,21 +10,27 @@ import {
 } from 'react-native';
 import { useBills } from '@/contexts/BillsContext';
 import { groupBillsByWeek } from '@/lib/utils';
-import { WeeklyGroup } from '@/types';
+import { WeeklyGroup, Paycheck, WeeklyPaycheckGroup } from '@/types';
 import { BillModel } from '@/models/BillModel';
 import BillFormModal from '@/components/modals/BillFormModal';
 import BillDetailsModal from '@/components/modals/BillDetailsModal';
+import PaycheckWeekModal from '@/components/modals/PaycheckWeekModal';
+import PaycheckFormModal from '@/components/modals/PaycheckFormModal';
 import WeeklyBillGroup from '@/components/Bills/WeeklyBillGroup';
 import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
 
 export default function HomeScreen() {
-  const { bills, paychecks, loading, refreshData, deleteBill } = useBills();
+  const { bills, paychecks, loading, refreshData, deleteBill, deletePaycheck } = useBills();
   const [weeklyGroups, setWeeklyGroups] = useState<WeeklyGroup[]>([]);
   const [deferredBills, setDeferredBills] = useState<BillModel[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingBill, setEditingBill] = useState<BillModel | null>(null);
   const [billDetailsVisible, setBillDetailsVisible] = useState(false);
   const [selectedBill, setSelectedBill] = useState<BillModel | null>(null);
+  const [paycheckWeekModalVisible, setPaycheckWeekModalVisible] = useState(false);
+  const [selectedWeekPaychecks, setSelectedWeekPaychecks] = useState<WeeklyPaycheckGroup | null>(null);
+  const [paycheckFormVisible, setPaycheckFormVisible] = useState(false);
+  const [editingPaycheck, setEditingPaycheck] = useState<Paycheck | null>(null);
 
   useEffect(() => {
     refreshData();
@@ -95,6 +101,58 @@ export default function HomeScreen() {
     );
   };
 
+  const handlePaycheckTotalPress = (group: WeeklyGroup) => {
+    // Filter paychecks for this week
+    const weekPaychecks = paychecks.filter(paycheck => {
+      const paycheckDate = new Date(paycheck.date);
+      return paycheckDate >= group.startDate && paycheckDate <= group.endDate;
+    });
+
+    const total = weekPaychecks.reduce((sum, pc) => sum + pc.amount, 0);
+
+    setSelectedWeekPaychecks({
+      startDate: group.startDate,
+      endDate: group.endDate,
+      paychecks: weekPaychecks,
+      total,
+    });
+    setPaycheckWeekModalVisible(true);
+  };
+
+  const handleViewPaycheck = (paycheck: Paycheck) => {
+    setEditingPaycheck(paycheck);
+    setPaycheckFormVisible(true);
+  };
+
+  const handleEditPaycheck = (paycheck: Paycheck) => {
+    setEditingPaycheck(paycheck);
+    setPaycheckFormVisible(true);
+  };
+
+  const handleDeletePaycheck = async (paycheck: Paycheck) => {
+    const formatAmount = (amount: number) => `$${amount.toFixed(2)}`;
+    Alert.alert(
+      'Delete Paycheck',
+      `Are you sure you want to delete this paycheck of ${formatAmount(paycheck.amount)}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const { error } = await deletePaycheck(paycheck.id);
+            if (error) {
+              Alert.alert('Error', error.message);
+            } else {
+              Alert.alert('Success', 'Paycheck deleted successfully');
+              refreshData();
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -124,6 +182,7 @@ export default function HomeScreen() {
             onViewBill={handleViewBill}
             onEditBill={handleEditBill}
             onDeleteBill={handleDeleteBill}
+            onPaycheckTotalPress={() => handlePaycheckTotalPress(group)}
           />
         ))}
       </ScrollView>
@@ -172,6 +231,34 @@ export default function HomeScreen() {
           setModalVisible(true);
         }}
         bill={selectedBill}
+      />
+
+      {/* Paycheck Week Modal */}
+      <PaycheckWeekModal
+        visible={paycheckWeekModalVisible}
+        onClose={() => setPaycheckWeekModalVisible(false)}
+        startDate={selectedWeekPaychecks?.startDate || null}
+        endDate={selectedWeekPaychecks?.endDate || null}
+        paychecks={selectedWeekPaychecks?.paychecks || []}
+        total={selectedWeekPaychecks?.total || 0}
+        onViewPaycheck={handleViewPaycheck}
+        onEditPaycheck={handleEditPaycheck}
+        onDeletePaycheck={handleDeletePaycheck}
+      />
+
+      {/* Paycheck Form Modal */}
+      <PaycheckFormModal
+        visible={paycheckFormVisible}
+        onClose={() => {
+          setPaycheckFormVisible(false);
+          setEditingPaycheck(null);
+        }}
+        onSuccess={() => {
+          refreshData();
+          setPaycheckFormVisible(false);
+          setEditingPaycheck(null);
+        }}
+        editingPaycheck={editingPaycheck}
       />
     </View>
   );

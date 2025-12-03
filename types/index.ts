@@ -47,3 +47,10 @@ export interface WeeklyGroup {
   totalBills: number;
   totalPaychecks: number;
 }
+
+export interface WeeklyPaycheckGroup {
+  startDate: Date;
+  endDate: Date;
+  paychecks: Paycheck[];
+  total: number;
+}

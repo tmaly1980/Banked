@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useBills } from '@/contexts/BillsContext';
@@ -29,7 +30,7 @@ export default function PaycheckFormModal({
   onSuccess,
   editingPaycheck,
 }: PaycheckFormModalProps) {
-  const { createPaycheck, updatePaycheck } = useBills();
+  const { createPaycheck, updatePaycheck, deletePaycheck } = useBills();
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -112,6 +113,52 @@ export default function PaycheckFormModal({
     }
   };
 
+  const handleDelete = () => {
+    if (!editingPaycheck) return;
+
+    const formatAmount = (amount: number) => `$${amount.toFixed(2)}`;
+    
+    Alert.alert(
+      'Delete Paycheck',
+      `Are you sure you want to delete this paycheck of ${formatAmount(editingPaycheck.amount)}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const { error } = await deletePaycheck(editingPaycheck.id);
+              if (error) throw error;
+
+              Toast.show({
+                type: 'success',
+                text1: 'Paycheck deleted successfully',
+              });
+
+              resetForm();
+              onSuccess();
+              onClose();
+            } catch (error) {
+              console.error('[PaycheckFormModal] Delete error:', error);
+              Toast.show({
+                type: 'error',
+                text1: 'Error deleting paycheck',
+                text2: error instanceof Error ? error.message : 'An error occurred',
+              });
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   React.useEffect(() => {
     if (visible && editingPaycheck) {
       setName(editingPaycheck.name || '');
@@ -143,7 +190,7 @@ export default function PaycheckFormModal({
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.form}>
+        <ScrollView style={styles.form} contentContainerStyle={styles.formContent}>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Name</Text>
             <TextInput
@@ -184,6 +231,18 @@ export default function PaycheckFormModal({
             />
           </View>
         </ScrollView>
+
+        {editingPaycheck && (
+          <View style={styles.deleteButtonContainer}>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={handleDelete}
+              disabled={loading}
+            >
+              <Text style={styles.deleteButtonText}>Delete Paycheck</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -221,7 +280,10 @@ const styles = StyleSheet.create({
   },
   form: {
     flex: 1,
+  },
+  formContent: {
     padding: 20,
+    paddingBottom: 40,
   },
   inputGroup: {
     marginBottom: 20,
@@ -243,5 +305,23 @@ const styles = StyleSheet.create({
   textArea: {
     height: 100,
     paddingTop: 12,
+  },
+  deleteButtonContainer: {
+    padding: 20,
+    paddingTop: 12,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#e1e8ed',
+  },
+  deleteButton: {
+    backgroundColor: '#ff3b30',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
