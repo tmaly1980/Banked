@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { Bill, BillPayment, Paycheck } from '@/types';
-import { BillModel } from '@/models/BillModel';
+import { BillPayment, Paycheck } from '@/types';
+import { BillModel, Bill } from '@/models/BillModel';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 
@@ -18,7 +18,8 @@ interface BillsContextType {
   createPaycheck: (paycheck: Omit<Paycheck, 'id' | 'user_id' | 'created_at'>) => Promise<{ data: Paycheck | null; error: Error | null }>;
   updatePaycheck: (id: string, updates: Partial<Paycheck>) => Promise<{ error: Error | null }>;
   deletePaycheck: (id: string) => Promise<{ error: Error | null }>;
-  addBillPayment: (billId: string, amount: number, appliedDate: string) => Promise<{ data: BillPayment | null; error: Error | null }>;
+  addBillPayment: (billId: string, amount: number, paymentDate: string) => Promise<{ data: BillPayment | null; error: Error | null }>;
+  updateBillPayment: (paymentId: string, amount: number, paymentDate: string) => Promise<{ data: BillPayment | null; error: Error | null }>;
   refreshData: () => Promise<void>;
 }
 
@@ -117,7 +118,7 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
         .select('*')
         .eq('bill_id', billId)
         .eq('user_id', user.id)
-        .order('applied_date', { ascending: false });
+        .order('payment_date', { ascending: false });
 
       if (error) throw error;
 
@@ -275,7 +276,7 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
   const addBillPayment = useCallback(async (
     billId: string,
     amount: number,
-    appliedDate: string
+    paymentDate: string
   ) => {
     if (!user) return { data: null, error: new Error('User not authenticated') };
 
@@ -286,8 +287,38 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
           bill_id: billId,
           user_id: user.id,
           amount,
-          applied_date: appliedDate,
+          payment_date: paymentDate,
         })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Refresh bills to update payment totals
+      await loadBills();
+
+      return { data, error: null };
+    } catch (err) {
+      return { data: null, error: err as Error };
+    }
+  }, [user, loadBills]);
+
+  const updateBillPayment = useCallback(async (
+    paymentId: string,
+    amount: number,
+    paymentDate: string
+  ) => {
+    if (!user) return { data: null, error: new Error('User not authenticated') };
+
+    try {
+      const { data, error } = await supabase
+        .from('bill_payments')
+        .update({
+          amount,
+          payment_date: paymentDate,
+        })
+        .eq('id', paymentId)
+        .eq('user_id', user.id)
         .select()
         .single();
 
@@ -321,6 +352,7 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     updatePaycheck,
     deletePaycheck,
     addBillPayment,
+    updateBillPayment,
     refreshData,
   };
 

@@ -13,17 +13,17 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Bill } from '@/types';
+import { BillModel } from '@/models/BillModel';
 import { format } from 'date-fns';
 import { getBillDueDate } from '@/lib/utils';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 interface DeferredBillsAccordionProps {
-  deferredBills: Bill[];
-  onViewBill: (bill: Bill) => void;
-  onEditBill: (bill: Bill) => void;
-  onDeleteBill: (bill: Bill) => void;
+  deferredBills: BillModel[];
+  onViewBill: (bill: BillModel) => void;
+  onEditBill: (bill: BillModel) => void;
+  onDeleteBill: (bill: BillModel) => void;
 }
 
 // Enable LayoutAnimation on Android
@@ -101,6 +101,7 @@ export default function DeferredBillsAccordion({
               <TouchableOpacity
                 key={bill.id}
                 style={styles.billItem}
+                activeOpacity={0.7}
                 onPress={() => onViewBill(bill)}
                 onLongPress={() => Alert.alert(
                   'Bill Actions',
@@ -119,9 +120,6 @@ export default function DeferredBillsAccordion({
                     color={priorityColor}
                     style={styles.priorityIcon}
                   />
-                  <Text style={[styles.billDate, { color: priorityColor }]}>
-                    {dueDate ? format(dueDate, 'MMM d') : 'No date'}
-                  </Text>
                   <Text style={[styles.billName, { color: priorityColor }]} numberOfLines={1}>
                     {bill.name}
                   </Text>
@@ -195,11 +193,6 @@ const styles = StyleSheet.create({
   },
   priorityIcon: {
     width: 16,
-  },
-  billDate: {
-    fontSize: 14,
-    fontWeight: '500',
-    width: 50,
   },
   billName: {
     fontSize: 14,

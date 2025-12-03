@@ -1,5 +1,6 @@
 import { startOfWeek, endOfWeek, addWeeks, format, isSameWeek, parseISO } from 'date-fns';
-import { Bill, WeeklyGroup } from '../types';
+import { WeeklyGroup } from '../types';
+import { BillModel } from '@/models/BillModel';
 
 export const getWeekRange = (date: Date) => ({
   start: startOfWeek(date, { weekStartsOn: 0 }), // Sunday
@@ -30,46 +31,90 @@ export const formatWeekLabel = (startDate: Date, endDate: Date): string => {
   return `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d')}`;
 };
 
-export const getBillDueDate = (bill: Bill): Date | null => {
+export const getBillDueDate = (bill: BillModel, startingDate?: Date): Date | null => {
   if (bill.due_date) {
     return parseISO(bill.due_date);
   }
   
   if (bill.due_day) {
-    const today = new Date();
-    const currentMonth = today.getMonth();
-    const currentYear = today.getFullYear();
+    const referenceDate = startingDate || new Date();
+    const refMonth = referenceDate.getMonth();
+    const refYear = referenceDate.getFullYear();
     
     // Try current month first
-    const thisMonth = new Date(currentYear, currentMonth, bill.due_day);
-    if (thisMonth >= today) {
+    const thisMonth = new Date(refYear, refMonth, bill.due_day);
+    if (thisMonth >= referenceDate) {
       return thisMonth;
     }
     
     // If past due this month, try next month
-    const nextMonth = new Date(currentYear, currentMonth + 1, bill.due_day);
+    const nextMonth = new Date(refYear, refMonth + 1, bill.due_day);
     return nextMonth;
   }
   
   return null;
 };
 
-export const groupBillsByWeek = (bills: Bill[]): WeeklyGroup[] => {
+export const groupBillsByWeek = (bills: BillModel[]): WeeklyGroup[] => {
   const weeks = getNext6Weeks();
   
   bills.forEach(bill => {
     if (bill.deferred_flag) return; // Skip deferred bills
     
-    const dueDate = getBillDueDate(bill);
-    if (!dueDate) return;
+    // Use next_date which considers deferred payments
+    const nextDate = bill.next_date;
+    if (!nextDate) return;
     
-    const weekIndex = weeks.findIndex(week => 
-      dueDate >= week.startDate && dueDate <= week.endDate
-    );
-    
-    if (weekIndex >= 0) {
-      weeks[weekIndex].bills.push(bill);
-      weeks[weekIndex].totalBills += bill.amount;
+    // Handle bills with specific due_date (one-time bills)
+    if (bill.due_date) {
+      const dueDate = parseISO(bill.due_date);
+      const weekIndex = weeks.findIndex(week => 
+        dueDate >= week.startDate && dueDate <= week.endDate
+      );
+      
+      if (weekIndex >= 0) {
+        weeks[weekIndex].bills.push(bill);
+        weeks[weekIndex].totalBills += bill.amount;
+      }
+    }
+    // Handle recurring bills with due_day
+    else if (bill.due_day) {
+      // Add this bill to each week where the due_day falls within the week range
+      weeks.forEach(week => {
+        const weekStartDay = week.startDate.getDate();
+        const weekEndDay = week.endDate.getDate();
+        const weekStartMonth = week.startDate.getMonth();
+        const weekEndMonth = week.endDate.getMonth();
+        const weekStartYear = week.startDate.getFullYear();
+        const weekEndYear = week.endDate.getFullYear();
+        
+        // Check if the due_day falls within this week
+        // Handle case where week spans across months
+        if (weekStartMonth === weekEndMonth) {
+          // Week is within same month
+          const dueDay = bill.due_day!; // Already checked due_day exists above
+          if (dueDay >= weekStartDay && dueDay <= weekEndDay) {
+            const dueDate = new Date(weekStartYear, weekStartMonth, dueDay);
+            // Only add if the due date is actually within the week range (edge case for month boundaries)
+            if (dueDate >= week.startDate && dueDate <= week.endDate) {
+              week.bills.push(bill);
+              week.totalBills += bill.amount;
+            }
+          }
+        } else {
+          // Week spans two months
+          const dueDay = bill.due_day!; // Already checked due_day exists above
+          const startMonthDueDate = new Date(weekStartYear, weekStartMonth, dueDay);
+          const endMonthDueDate = new Date(weekEndYear, weekEndMonth, dueDay);
+          
+          // Check if due date falls in either month within the week range
+          if ((startMonthDueDate >= week.startDate && startMonthDueDate <= week.endDate) ||
+              (endMonthDueDate >= week.startDate && endMonthDueDate <= week.endDate)) {
+            week.bills.push(bill);
+            week.totalBills += bill.amount;
+          }
+        }
+      });
     }
   });
   

@@ -14,16 +14,16 @@ import {
 import Toast from 'react-native-toast-message';
 import { Chip } from 'react-native-paper';
 import { useBills } from '@/contexts/BillsContext';
-import { Bill } from '@/types';
+import { BillModel } from '@/models/BillModel';
 import DateInput from '@/components/DateInput';
 import DayOfMonthInput from '@/components/DayOfMonthInput';
-import { dateToTimestamp } from '@/lib/dateUtils';
+import { dateToTimestamp, timestampToDate } from '@/lib/dateUtils';
 
 interface BillFormModalProps {
   visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  editingBill?: Bill | null;
+  editingBill?: BillModel | null;
 }
 
 export default function BillFormModal({

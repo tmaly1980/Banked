@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useBills } from '@/contexts/BillsContext';
 import { groupBillsByWeek } from '@/lib/utils';
-import { Bill, WeeklyGroup } from '@/types';
+import { WeeklyGroup } from '@/types';
 import { BillModel } from '@/models/BillModel';
 import BillFormModal from '@/components/modals/BillFormModal';
 import BillDetailsModal from '@/components/modals/BillDetailsModal';
@@ -20,11 +20,11 @@ import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
 export default function HomeScreen() {
   const { bills, paychecks, loading, refreshData, deleteBill } = useBills();
   const [weeklyGroups, setWeeklyGroups] = useState<WeeklyGroup[]>([]);
-  const [deferredBills, setDeferredBills] = useState<Bill[]>([]);
+  const [deferredBills, setDeferredBills] = useState<BillModel[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingBill, setEditingBill] = useState<Bill | null>(null);
+  const [editingBill, setEditingBill] = useState<BillModel | null>(null);
   const [billDetailsVisible, setBillDetailsVisible] = useState(false);
-  const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+  const [selectedBill, setSelectedBill] = useState<BillModel | null>(null);
 
   useEffect(() => {
     refreshData();
@@ -35,10 +35,10 @@ export default function HomeScreen() {
     // Bills without due dates are automatically deferred
     const regularBills = bills.filter(bill => 
       !bill.deferred_flag && (bill.due_date || bill.due_day)
-    ).map(b => b.toBill());
+    );
     const deferred = bills.filter(bill => 
       bill.deferred_flag || (!bill.due_date && !bill.due_day)
-    ).map(b => b.toBill());
+    );
     
     setDeferredBills(deferred);
 
@@ -63,17 +63,17 @@ export default function HomeScreen() {
     setModalVisible(true);
   };
 
-  const handleEditBill = (bill: Bill) => {
+  const handleEditBill = (bill: BillModel) => {
     setEditingBill(bill);
     setModalVisible(true);
   };
 
-  const handleViewBill = (bill: Bill) => {
+  const handleViewBill = (bill: BillModel) => {
     setSelectedBill(bill);
     setBillDetailsVisible(true);
   };
 
-  const handleDeleteBill = async (bill: Bill) => {
+  const handleDeleteBill = async (bill: BillModel) => {
     Alert.alert(
       'Delete Bill',
       `Are you sure you want to delete "${bill.name}"?`,
@@ -139,8 +139,25 @@ export default function HomeScreen() {
       {/* Add/Edit Bill Modal */}
       <BillFormModal
         visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onSuccess={refreshData}
+        onClose={() => {
+          setModalVisible(false);
+          // If we were editing a bill, reopen details modal
+          if (editingBill) {
+            setSelectedBill(editingBill);
+            setBillDetailsVisible(true);
+          }
+          setEditingBill(null);
+        }}
+        onSuccess={() => {
+          refreshData();
+          // If we were editing a bill, reopen details modal with refreshed data
+          if (editingBill) {
+            setSelectedBill(editingBill);
+            setBillDetailsVisible(true);
+          }
+          setModalVisible(false);
+          setEditingBill(null);
+        }}
         editingBill={editingBill}
       />
 
@@ -149,6 +166,11 @@ export default function HomeScreen() {
         visible={billDetailsVisible}
         onClose={() => setBillDetailsVisible(false)}
         onSuccess={refreshData}
+        onEdit={() => {
+          setBillDetailsVisible(false);
+          setEditingBill(selectedBill);
+          setModalVisible(true);
+        }}
         bill={selectedBill}
       />
     </View>

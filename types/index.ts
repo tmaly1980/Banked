@@ -24,7 +24,7 @@ export interface BillPayment {
   bill_id: string;
   user_id: string;
   amount: number;
-  applied_date: string;
+  payment_date: string;
   created_at: string;
 }
 
@@ -38,10 +38,12 @@ export interface Paycheck {
   created_at: string;
 }
 
+import { BillModel } from '@/models/BillModel';
+
 export interface WeeklyGroup {
   startDate: Date;
   endDate: Date;
-  bills: Bill[];
+  bills: BillModel[];
   totalBills: number;
   totalPaychecks: number;
 }

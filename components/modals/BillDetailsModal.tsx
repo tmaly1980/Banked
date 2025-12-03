@@ -11,31 +11,35 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { useBills } from '@/contexts/BillsContext';
-import { Bill, BillPayment } from '@/types';
+import { BillPayment } from '@/types';
+import { BillModel } from '@/models/BillModel';
 import { getBillDueDate } from '@/lib/utils';
 import { format } from 'date-fns';
 import DateInput from '@/components/DateInput';
-import { dateToTimestamp } from '@/lib/dateUtils';
+import { dateToTimestamp, timestampToDate, localDate } from '@/lib/dateUtils';
 
 interface BillDetailsModalProps {
   visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  bill: Bill | null;
+  onEdit?: () => void;
+  bill: BillModel | null;
 }
-
 export default function BillDetailsModal({
   visible,
   onClose,
   onSuccess,
+  onEdit,
   bill,
 }: BillDetailsModalProps) {
-  const { loadBillPayments, addBillPayment } = useBills();
+  const { loadBillPayments, addBillPayment, updateBillPayment } = useBills();
   const [payments, setPayments] = useState<BillPayment[]>([]);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentDate, setPaymentDate] = useState(localDate(new Date()));
+  const [scheduledPaymentId, setScheduledPaymentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
 
@@ -44,7 +48,11 @@ export default function BillDetailsModal({
 
     try {
       const data = await loadBillPayments(bill.id);
-      setPayments(data);
+      // Sort payments in reverse chronological order (newest first)
+      const sortedPayments = data.sort((a, b) => {
+        return new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime();
+      });
+      setPayments(sortedPayments);
     } catch (error) {
       console.error('Error loading payments:', error);
     }
@@ -53,11 +61,34 @@ export default function BillDetailsModal({
   useEffect(() => {
     if (visible && bill) {
       loadPayments();
-      setPaymentAmount(bill.amount.toString());
-      setPaymentDate(new Date().toISOString().split('T')[0]);
       setShowPaymentForm(false);
+      loadScheduledPayment();
     }
   }, [visible, bill]);
+
+  const loadScheduledPayment = () => {
+    if (!bill) return;
+    
+    // Check for existing scheduled payment (payment_date > today)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const scheduledPayment = bill.payments.find(payment => {
+      const paymentDate = new Date(payment.payment_date);
+      paymentDate.setHours(0, 0, 0, 0);
+      return paymentDate > today;
+    });
+    
+    if (scheduledPayment) {
+      setScheduledPaymentId(scheduledPayment.id);
+      setPaymentAmount(scheduledPayment.amount.toString());
+      setPaymentDate(timestampToDate(scheduledPayment.payment_date));
+    } else {
+      setScheduledPaymentId(null);
+      setPaymentAmount(bill.amount.toString());
+      setPaymentDate(localDate(new Date()));
+    }
+  };
 
   const handleAddPayment = async () => {
     if (!bill) return;
@@ -75,10 +106,26 @@ export default function BillDetailsModal({
 
     setLoading(true);
     try {
-      const { error } = await addBillPayment(bill.id, amount, dateToTimestamp(paymentDate));
-      if (error) throw error;
+      if (scheduledPaymentId) {
+        // Update existing scheduled payment
+        const { error } = await updateBillPayment(
+          scheduledPaymentId,
+          amount,
+          dateToTimestamp(paymentDate)
+        );
+        if (error) throw error;
+        Toast.show({ type: 'success', text1: 'Payment updated successfully' });
+      } else {
+        // Create new payment
+        const { error } = await addBillPayment(
+          bill.id,
+          amount,
+          dateToTimestamp(paymentDate)
+        );
+        if (error) throw error;
+        Toast.show({ type: 'success', text1: 'Payment saved successfully' });
+      }
 
-      Toast.show({ type: 'success', text1: 'Payment added successfully' });
       setShowPaymentForm(false);
       loadPayments();
       onSuccess();
@@ -137,14 +184,71 @@ export default function BillDetailsModal({
     }
   };
 
+  const getPriorityIcon = (priority: string): 'signal-cellular-1' | 'signal-cellular-2' | 'signal-cellular-3' => {
+    switch (priority) {
+      case 'high': return 'signal-cellular-3';
+      case 'medium': return 'signal-cellular-2';
+      case 'low': return 'signal-cellular-1';
+      default: return 'signal-cellular-1';
+    }
+  };
+
   const formatAmount = (amount: number) => {
     return `$${amount.toFixed(2)}`;
   };
 
-  const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const remainingAmount = Math.max(0, (bill?.amount || 0) - totalPaid);
-  const lastPaymentDate = payments.length > 0 ? payments[0].applied_date : null;
-  const dueDate = bill ? getBillDueDate(bill) : null;
+  // Determine payment button state based on payment date
+  const getPaymentButtonState = () => {
+    if (!bill || !paymentDate) return { text: 'Make Payment', color: '#27ae60' };
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const selectedDate = new Date(dateToTimestamp(paymentDate));
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    const nextDueDate = bill.nextDueDate;
+    
+    // Make Payment (green) - today or in past
+    if (selectedDate <= today) {
+      return { text: 'Make Payment', color: '#27ae60' };
+    }
+    
+    // Defer Payment (orange) - beyond next due date
+    if (nextDueDate) {
+      const dueDate = new Date(nextDueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      
+      if (selectedDate > dueDate) {
+        return { text: 'Defer Payment', color: '#f39c12' };
+      }
+    }
+    
+    // Schedule Payment (blue) - between now and due date
+    return { text: 'Schedule', color: '#3498db' };
+  };
+
+  const dueDate = bill ? bill.next_date : null;
+  const buttonState = getPaymentButtonState();
+
+  // Separate scheduled payments from payment history
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const scheduledPayments = payments.filter(payment => {
+    const paymentDate = new Date(payment.payment_date);
+    paymentDate.setHours(0, 0, 0, 0);
+    return paymentDate > today;
+  });
+
+  const paymentHistory = payments.filter(payment => {
+    const paymentDate = new Date(payment.payment_date);
+    paymentDate.setHours(0, 0, 0, 0);
+    return paymentDate <= today;
+  });
+
+  // Get last payment (only from payment history, not scheduled)
+  const lastPaymentDate = paymentHistory.length > 0 ? paymentHistory[0].payment_date : null;
 
   if (!bill) return null;
 
@@ -159,15 +263,41 @@ export default function BillDetailsModal({
             <Text style={styles.closeButton}>Close</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Bill Details</Text>
-          <View style={{ width: 50 }} />
+          {onEdit && (
+            <TouchableOpacity onPress={onEdit}>
+              <Text style={styles.editButton}>Edit</Text>
+            </TouchableOpacity>
+          )}
+          {!onEdit && <View style={{ width: 50 }} />}
         </View>
 
         <ScrollView style={styles.content}>
           {/* Bill Info */}
           <View style={styles.section}>
-            <Text style={styles.billName}>{bill.name}</Text>
-            <Text style={styles.billAmount}>{formatAmount(bill.amount)}</Text>
-            
+            <View style={styles.headerRow}>
+              <View style={styles.headerTitle}>            
+                <Text style={styles.billName}>{bill.name}</Text>
+                <Text style={styles.billAmount}>{formatAmount(bill.amount)}</Text>
+              </View>
+              <View style={styles.headerTags}>
+                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(bill.priority) }]}>
+                  <MaterialCommunityIcons 
+                    name={getPriorityIcon(bill.priority)} 
+                    size={14} 
+                    color="white" 
+                    style={styles.priorityIcon}
+                  />
+                  <Text style={styles.priorityText}>{bill.priority.toUpperCase()}</Text>
+                </View>
+                {bill.loss_risk_flag && (
+                  <View style={styles.lossRiskBadge}>
+                    <Text style={styles.lossRiskText}>⚠️ Loss Risk</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+
             <View style={styles.infoGrid}>
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>Due Date</Text>
@@ -175,20 +305,6 @@ export default function BillDetailsModal({
                   {dueDate ? format(dueDate, 'MMM d, yyyy') : 'No due date'}
                 </Text>
               </View>
-              
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Priority</Text>
-                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(bill.priority) }]}>
-                  <Text style={styles.priorityText}>{bill.priority.toUpperCase()}</Text>
-                </View>
-              </View>
-              
-              {bill.due_day && (
-                <View style={styles.infoItem}>
-                  <Text style={styles.infoLabel}>Recurring</Text>
-                  <Text style={styles.infoValue}>Monthly on day {bill.due_day}</Text>
-                </View>
-              )}
               
               {lastPaymentDate && (
                 <View style={styles.infoItem}>
@@ -199,71 +315,43 @@ export default function BillDetailsModal({
                 </View>
               )}
             </View>
+          </View>
 
-            {/* Flags */}
-            <View style={styles.flagsContainer}>
-              {bill.loss_risk_flag && (
-                <View style={styles.flag}>
-                  <Text style={styles.flagText}>⚠️ Loss Risk</Text>
-                </View>
-              )}
-              {bill.deferred_flag && (
-                <View style={styles.flag}>
-                  <Text style={styles.flagText}>📅 Deferred</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Notes */}
-            {bill.notes && (
+          {/* Notes */}
+          {bill.notes && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Notes</Text>
               <View style={styles.notesContainer}>
-                <Text style={styles.notesLabel}>Notes</Text>
                 <Text style={styles.notesText}>{bill.notes}</Text>
               </View>
-            )}
-          </View>
-
-          {/* Payment Summary */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Payment Summary</Text>
-            <View style={styles.paymentSummary}>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Total Amount:</Text>
-                <Text style={styles.summaryValue}>{formatAmount(bill.amount)}</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Total Paid:</Text>
-                <Text style={[styles.summaryValue, { color: '#27ae60' }]}>
-                  {formatAmount(totalPaid)}
-                </Text>
-              </View>
-              {lastPaymentDate && (
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Last Paid:</Text>
-                  <Text style={styles.summaryValue}>
-                    {format(new Date(lastPaymentDate), 'MMM d, yyyy')}
-                  </Text>
-                </View>
-              )}
-              <View style={[styles.summaryRow, styles.summaryRowTotal]}>
-                <Text style={styles.summaryLabelTotal}>Remaining:</Text>
-                <Text style={[styles.summaryValueTotal, { color: remainingAmount > 0 ? '#e74c3c' : '#27ae60' }]}>
-                  {formatAmount(remainingAmount)}
-                </Text>
-              </View>
             </View>
-          </View>
+          )}
+
+          {/* Scheduled Payments */}
+          {scheduledPayments.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Scheduled Payments</Text>
+              {scheduledPayments.map((payment) => (
+                <View key={payment.id} style={styles.scheduledPaymentItem}>
+                  <Text style={styles.scheduledPaymentDate}>
+                    {format(new Date(payment.payment_date), 'MMM d, yyyy')}
+                  </Text>
+                  <Text style={styles.scheduledPaymentAmount}>{formatAmount(payment.amount)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Payment History */}
-          {payments.length > 0 && (
+          {paymentHistory.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Payment History</Text>
-              {payments.map((payment) => (
+              {paymentHistory.map((payment) => (
                 <View key={payment.id} style={styles.paymentItem}>
-                  <Text style={styles.paymentAmount}>{formatAmount(payment.amount)}</Text>
                   <Text style={styles.paymentDate}>
-                    {format(new Date(payment.applied_date), 'MMM d, yyyy')}
+                    {format(new Date(payment.payment_date), 'MMM d, yyyy')}
                   </Text>
+                  <Text style={styles.paymentAmount}>{formatAmount(payment.amount)}</Text>
                 </View>
               ))}
             </View>
@@ -272,23 +360,30 @@ export default function BillDetailsModal({
           {/* Payment Form */}
           {showPaymentForm && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Add Payment</Text>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Payment Amount</Text>
-                <TextInput
-                  style={styles.input}
-                  value={paymentAmount}
-                  onChangeText={setPaymentAmount}
-                  placeholder="0.00"
-                  keyboardType="decimal-pad"
-                />
+              <Text style={styles.sectionTitle}>
+                {scheduledPaymentId ? 'Edit/Make Payment' : 'Make/Schedule Payment'}
+              </Text>
+
+              <View style={styles.inputRow}>
+                <View style={styles.inputGroup}>
+                  <DateInput
+                    label="Payment Date"
+                    value={paymentDate}
+                    onChangeDate={setPaymentDate}
+                  />
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Payment Amount</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={paymentAmount}
+                    onChangeText={setPaymentAmount}
+                    placeholder="0.00"
+                    keyboardType="decimal-pad"
+                  />
+                </View>
               </View>
-              
-              <DateInput
-                label="Payment Date"
-                value={paymentDate}
-                onChangeDate={setPaymentDate}
-              />
 
               <View style={styles.formButtons}>
                 <TouchableOpacity
@@ -299,12 +394,12 @@ export default function BillDetailsModal({
                 </TouchableOpacity>
                 
                 <TouchableOpacity
-                  style={[styles.submitButton, loading && styles.disabledButton]}
+                  style={[styles.submitButton, { backgroundColor: buttonState.color }, loading && styles.disabledButton]}
                   onPress={handleAddPayment}
                   disabled={loading}
                 >
                   <Text style={styles.submitButtonText}>
-                    {loading ? 'Adding...' : 'Add Payment'}
+                    {loading ? 'Saving...' : buttonState.text}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -317,7 +412,10 @@ export default function BillDetailsModal({
           <View style={styles.bottomActions}>
             <TouchableOpacity
               style={styles.makePaymentButton}
-              onPress={() => setShowPaymentForm(true)}
+              onPress={() => {
+                loadScheduledPayment();
+                setShowPaymentForm(true);
+              }}
             >
               <Text style={styles.makePaymentButtonText}>Make a Payment</Text>
             </TouchableOpacity>
@@ -350,6 +448,11 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontSize: 16,
   },
+  editButton: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   content: {
     flex: 1,
     padding: 20,
@@ -357,11 +460,41 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerTitle: {
+    flex: 2,
+  },
+  headerTags: {
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 12,
+  },
   billName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#2c3e50',
     marginBottom: 4,
+  },
+  lossRiskBadge: {
+    backgroundColor: '#fff3cd',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffc107',
+  },
+  lossRiskText: {
+    fontSize: 14,
+    color: '#856404',
+    fontWeight: '600',
   },
   billAmount: {
     fontSize: 32,
@@ -392,10 +525,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: 'flex-end',
+  },
+  priorityIcon: {
+    marginRight: 2,
   },
   priorityText: {
     fontSize: 12,
@@ -423,40 +562,27 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
     marginBottom: 12,
   },
-  paymentSummary: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 16,
-  },
-  summaryRow: {
+  scheduledPaymentItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 8,
     marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#3498db',
   },
-  summaryRowTotal: {
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#dee2e6',
-    marginTop: 4,
-    marginBottom: 0,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#6c757d',
-  },
-  summaryLabelTotal: {
-    fontSize: 16,
-    color: '#2c3e50',
-    fontWeight: '600',
-  },
-  summaryValue: {
+  scheduledPaymentDate: {
     fontSize: 14,
     color: '#2c3e50',
     fontWeight: '500',
   },
-  summaryValueTotal: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  scheduledPaymentAmount: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3498db',
   },
   paymentItem: {
     flexDirection: 'row',
@@ -468,17 +594,34 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
   },
+  paymentDate: {
+    fontSize: 14,
+    color: '#6c757d',
+    fontWeight: '500',
+  },
   paymentAmount: {
     fontSize: 16,
     fontWeight: '600',
     color: '#27ae60',
   },
-  paymentDate: {
+  emptyPayments: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+  },
+  emptyPaymentsText: {
     fontSize: 14,
-    color: '#6c757d',
+    color: '#95a5a6',
+    fontStyle: 'italic',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
   },
   inputGroup: {
-    marginBottom: 16,
+    flex: 1,
   },
   label: {
     fontSize: 14,
@@ -556,19 +699,11 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   notesContainer: {
-    marginTop: 16,
     padding: 12,
     backgroundColor: '#f8f9fa',
     borderRadius: 8,
     borderLeftWidth: 3,
     borderLeftColor: '#3498db',
-  },
-  notesLabel: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    fontWeight: '600',
   },
   notesText: {
     fontSize: 14,

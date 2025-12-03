@@ -1,4 +1,19 @@
-import { Bill, BillPayment } from '@/types';
+import { BillPayment } from '@/types';
+
+export interface Bill {
+  id: string;
+  user_id: string;
+  name: string;
+  amount: number;
+  due_date?: string;
+  due_day?: number;
+  priority: 'low' | 'medium' | 'high';
+  loss_risk_flag: boolean;
+  deferred_flag: boolean;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export class BillModel {
   id: string;
@@ -10,6 +25,7 @@ export class BillModel {
   priority: 'low' | 'medium' | 'high';
   loss_risk_flag: boolean;
   deferred_flag: boolean;
+  notes?: string;
   created_at: string;
   updated_at: string;
   payments: BillPayment[];
@@ -24,6 +40,7 @@ export class BillModel {
     this.priority = bill.priority;
     this.loss_risk_flag = bill.loss_risk_flag;
     this.deferred_flag = bill.deferred_flag;
+    this.notes = bill.notes;
     this.created_at = bill.created_at;
     this.updated_at = bill.updated_at;
     this.payments = payments;
@@ -79,6 +96,26 @@ export class BillModel {
     return null;
   }
 
+  // Get the next date (scheduled payment date or due date)
+  get next_date(): Date | null {
+    // Check for scheduled payment (payment_date > today)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const scheduledPayment = this.payments.find(payment => {
+      const paymentDate = new Date(payment.payment_date);
+      paymentDate.setHours(0, 0, 0, 0);
+      return paymentDate > today;
+    });
+    
+    if (scheduledPayment?.payment_date) {
+      return new Date(scheduledPayment.payment_date);
+    }
+    
+    // Fall back to regular due date
+    return this.nextDueDate;
+  }
+
   // Check if bill is overdue
   get isOverdue(): boolean {
     const nextDue = this.nextDueDate;
@@ -110,23 +147,6 @@ export class BillModel {
       default:
         return '#6b7280'; // gray
     }
-  }
-
-  // Convert back to plain Bill object
-  toBill(): Bill {
-    return {
-      id: this.id,
-      user_id: this.user_id,
-      name: this.name,
-      amount: this.amount,
-      due_date: this.due_date,
-      due_day: this.due_day,
-      priority: this.priority,
-      loss_risk_flag: this.loss_risk_flag,
-      deferred_flag: this.deferred_flag,
-      created_at: this.created_at,
-      updated_at: this.updated_at,
-    };
   }
 
   // Add a payment to this bill

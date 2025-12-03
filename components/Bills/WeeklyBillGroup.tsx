@@ -7,16 +7,17 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { WeeklyGroup, Bill } from '@/types';
+import { WeeklyGroup } from '@/types';
+import { BillModel } from '@/models/BillModel';
 import { formatWeekLabel, getBillDueDate } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Colors } from '@/constants/Colors';
 
 interface WeeklyBillGroupProps {
   group: WeeklyGroup;
-  onViewBill: (bill: Bill) => void;
-  onEditBill: (bill: Bill) => void;
-  onDeleteBill: (bill: Bill) => void;
+  onViewBill: (bill: BillModel) => void;
+  onEditBill: (bill: BillModel) => void;
+  onDeleteBill: (bill: BillModel) => void;
 }
 
 const getProgressBarColor = (progressPercentage: number) => {
@@ -99,7 +100,8 @@ export default function WeeklyBillGroup({
         {group.bills.length > 0 ? (
           <View style={styles.billsList}>
           {group.bills.map((bill) => {
-            const dueDate = getBillDueDate(bill);
+            // Use next_date which considers deferred payments, fallback to getBillDueDate for recurring bills in this week
+            const displayDate = bill.next_date || getBillDueDate(bill, group.startDate);
             const priorityColor = getPriorityColor(bill.priority);
             const priorityIcon = getPriorityIcon(bill.priority);
             return (
@@ -125,7 +127,7 @@ export default function WeeklyBillGroup({
                     style={styles.priorityIcon}
                   />
                   <Text style={[styles.billDate, { color: priorityColor }]}>
-                    {dueDate ? format(dueDate, 'MMM d') : 'No date'}
+                    {displayDate ? format(displayDate, 'MMM d') : 'No date'}
                   </Text>
                   <Text style={[styles.billName, { color: priorityColor }]} numberOfLines={1}>
                     {bill.name}

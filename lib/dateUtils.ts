@@ -33,3 +33,13 @@ export function dateToTimestamp(dateString: string): string {
   });
   return result;
 }
+
+/**
+ * Convert a Date object to YYYY-MM-DD format in device timezone
+ * @param date - Date object
+ * @returns Date string in YYYY-MM-DD format
+ */
+export function localDate(date: Date): string {
+    const timezone = Localization.getCalendars()[0]?.timeZone || 'America/New_York';
+    return moment(date).tz(timezone).format('YYYY-MM-DD');
+}
