@@ -21,6 +21,7 @@ export const getNext6Weeks = (): WeeklyGroup[] => {
       bills: [],
       totalBills: 0,
       totalPaychecks: 0,
+      carryoverBalance: 0,
     });
   }
   

@@ -46,6 +46,7 @@ export interface WeeklyGroup {
   bills: BillModel[];
   totalBills: number;
   totalPaychecks: number;
+  carryoverBalance: number;
 }
 
 export interface WeeklyPaycheckGroup {

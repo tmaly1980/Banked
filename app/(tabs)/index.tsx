@@ -51,14 +51,23 @@ export default function HomeScreen() {
     // Group regular bills by week and add paycheck totals
     const groups = groupBillsByWeek(regularBills);
     
-    // Calculate paycheck totals for each week
+    // Calculate paycheck totals and running balances for each week
+    let runningBalance = 0;
     groups.forEach(group => {
       const weekPaychecks = paychecks.filter(paycheck => {
         const paycheckDate = new Date(paycheck.date);
         return paycheckDate >= group.startDate && paycheckDate <= group.endDate;
       });
       
-      group.totalPaychecks = weekPaychecks.reduce((sum, pc) => sum + pc.amount, 0);
+      const weekPaycheckTotal = weekPaychecks.reduce((sum, pc) => sum + pc.amount, 0);
+      
+      // Add carryover from previous week
+      group.carryoverBalance = runningBalance;
+      group.totalPaychecks = weekPaycheckTotal + runningBalance;
+      
+      // Calculate new running balance for next week
+      const weekRemainder = group.totalPaychecks - group.totalBills;
+      runningBalance = weekRemainder > 0 ? weekRemainder : 0;
     });
 
     setWeeklyGroups(groups);

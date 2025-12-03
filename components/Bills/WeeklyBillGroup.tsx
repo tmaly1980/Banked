@@ -103,7 +103,7 @@ export default function WeeklyBillGroup({
         <Text style={styles.weekLabel}>
           {formatWeekLabel(group.startDate, group.endDate)}
         </Text>
-        {daysToGo !== null && (
+        {daysToGo !== null && group.totalPaychecks < group.totalBills && (
           <Text style={styles.daysToGo}>
             {daysToGo === 0 ? 'Today' : daysToGo === 1 ? '1 day to go' : `${daysToGo} days to go`}
           </Text>
@@ -134,8 +134,13 @@ export default function WeeklyBillGroup({
               </Text>
             </TouchableOpacity>
             {/* Payments - always on right */}
-            <Text style={styles.paymentsText}>
-              {formatAmount(group.totalPaychecks - group.totalBills)}
+            <Text style={[
+              styles.paymentsText,
+              (group.totalPaychecks - group.totalBills) >= 0 && styles.paymentsTextNonNegative
+            ]}>
+              {group.totalPaychecks - group.totalBills >= 0 
+                ? '$0' 
+                : formatAmount(group.totalPaychecks - group.totalBills)}
             </Text>
           </View>
         </View>
@@ -276,6 +281,9 @@ const styles = StyleSheet.create({
     textAlignVertical: 'center',
     lineHeight: 40,
     zIndex: 2,
+  },
+  paymentsTextNonNegative: {
+    color: '#000000',
   },
   billsList: {
     borderTopWidth: 1,
