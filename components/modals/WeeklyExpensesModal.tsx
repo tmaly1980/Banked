@@ -176,53 +176,31 @@ export default function WeeklyExpensesModal({
 
         <ScrollView style={styles.form} contentContainerStyle={styles.formContent}>
           <Text style={styles.instructions}>
-            Add or update your weekly expenses. Tap + to add a new expense type.
+            Add or update your weekly expenses.
           </Text>
 
           {rows.map((row, index) => (
             <View key={row.id} style={styles.expenseRow}>
-              <View style={styles.rowNumber}>
-                <Text style={styles.rowNumberText}>{index + 1}</Text>
-              </View>
+              <TextInput
+                style={[styles.nameInput, !row.isNewType && styles.inputDisabled]}
+                value={row.expenseTypeName}
+                onChangeText={(value) => handleUpdateRow(row.id, 'expenseTypeName', value)}
+                placeholder="Food, Gas, etc."
+                editable={row.isNewType}
+              />
               
-              <View style={styles.rowContent}>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Expense Type</Text>
-                  <TextInput
-                    style={[styles.input, !row.isNewType && styles.inputDisabled]}
-                    value={row.expenseTypeName}
-                    onChangeText={(value) => handleUpdateRow(row.id, 'expenseTypeName', value)}
-                    placeholder="Food, Gas, Entertainment, etc."
-                    editable={row.isNewType}
-                  />
-                </View>
-
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Amount</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={row.amount}
-                    onChangeText={(value) => handleUpdateRow(row.id, 'amount', value)}
-                    placeholder="0.00"
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-              </View>
-
-              {row.isNewType && (
-                <TouchableOpacity
-                  style={styles.deleteRowButton}
-                  onPress={() => handleDeleteRow(row.id)}
-                >
-                  <MaterialCommunityIcons name="close-circle" size={24} color="#ff3b30" />
-                </TouchableOpacity>
-              )}
+              <TextInput
+                style={styles.amountInput}
+                value={row.amount}
+                onChangeText={(value) => handleUpdateRow(row.id, 'amount', value)}
+                placeholder="0.00"
+                keyboardType="decimal-pad"
+              />
             </View>
           ))}
 
           <TouchableOpacity style={styles.addButton} onPress={handleAddRow}>
-            <MaterialCommunityIcons name="plus-circle" size={24} color="#007AFF" />
-            <Text style={styles.addButtonText}>Add Expense Type</Text>
+            <Text style={styles.addButtonText}>Add Expense</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -302,21 +280,24 @@ const styles = StyleSheet.create({
   rowNumberText: {
     color: 'white',
     fontSize: 14,
-    fontWeight: '600',
   },
-  rowContent: {
-    flex: 1,
-  },
-  inputGroup: {
+  expenseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
+    gap: 12,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 6,
-    color: '#333',
+  nameInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: 'white',
   },
-  input: {
+  amountInput: {
+    width: 100,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
@@ -328,25 +309,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
     color: '#666',
   },
-  deleteRowButton: {
-    marginLeft: 8,
-    marginTop: 24,
-  },
   addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 8,
     padding: 16,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#007AFF',
     borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    borderStyle: 'dashed',
+    alignItems: 'center',
   },
   addButtonText: {
-    color: '#007AFF',
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 8,
   },
 });
