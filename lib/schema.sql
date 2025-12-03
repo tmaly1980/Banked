@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS bill_payments (
   user_id UUID REFERENCES auth.users NOT NULL,
   amount NUMERIC NOT NULL,
   payment_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  applied_date DATE,
+  is_paid BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

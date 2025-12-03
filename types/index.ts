@@ -25,6 +25,8 @@ export interface BillPayment {
   user_id: string;
   amount: number;
   payment_date: string;
+  applied_date?: string;
+  is_paid: boolean;
   created_at: string;
 }
 
