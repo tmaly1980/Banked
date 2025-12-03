@@ -8,7 +8,13 @@ import * as Localization from 'expo-localization';
  */
 export function timestampToDate(timestamp: string): string {
   const timezone = Localization.getCalendars()[0]?.timeZone || 'America/New_York';
-  return moment(timestamp).tz(timezone).format('YYYY-MM-DD');
+  const result = moment(timestamp).tz(timezone).format('YYYY-MM-DD');
+  console.log('[timestampToDate]', {
+    input: timestamp,
+    timezone,
+    output: result,
+  });
+  return result;
 }
 
 /**
@@ -19,5 +25,11 @@ export function timestampToDate(timestamp: string): string {
 export function dateToTimestamp(dateString: string): string {
   const timezone = Localization.getCalendars()[0]?.timeZone || 'America/New_York';
   // Set time to noon to avoid day boundary issues
-  return moment.tz(dateString + ' 12:00:00', 'YYYY-MM-DD HH:mm:ss', timezone).toISOString();
+  const result = moment.tz(dateString + ' 12:00:00', 'YYYY-MM-DD HH:mm:ss', timezone).toISOString();
+  console.log('[dateToTimestamp]', {
+    input: dateString,
+    timezone,
+    output: result,
+  });
+  return result;
 }

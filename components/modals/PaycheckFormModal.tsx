@@ -77,11 +77,18 @@ export default function PaycheckFormModal({
         notes: notes.trim() || undefined,
       };
 
+      console.log('[PaycheckFormModal] Submitting:', {
+        editingPaycheck: editingPaycheck?.id,
+        paycheckData,
+      });
+
       if (editingPaycheck) {
         const { error } = await updatePaycheck(editingPaycheck.id, paycheckData);
+        console.log('[PaycheckFormModal] Update result:', { error });
         if (error) throw error;
       } else {
         const { error } = await createPaycheck(paycheckData);
+        console.log('[PaycheckFormModal] Create result:', { error });
         if (error) throw error;
       }
 
@@ -94,9 +101,10 @@ export default function PaycheckFormModal({
       onSuccess();
       onClose();
     } catch (error) {
+      console.error('[PaycheckFormModal] Error:', error);
       Toast.show({
         type: 'error',
-        text1: 'Error',
+        text1: 'Error saving paycheck',
         text2: error instanceof Error ? error.message : 'An error occurred',
       });
     } finally {

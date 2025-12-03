@@ -10,6 +10,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { WeeklyGroup, Bill } from '@/types';
 import { formatWeekLabel, getBillDueDate } from '@/lib/utils';
 import { format } from 'date-fns';
+import { Colors } from '@/constants/Colors';
 
 interface WeeklyBillGroupProps {
   group: WeeklyGroup;
@@ -17,6 +18,20 @@ interface WeeklyBillGroupProps {
   onEditBill: (bill: Bill) => void;
   onDeleteBill: (bill: Bill) => void;
 }
+
+const getProgressBarColor = (progressPercentage: number) => {
+  const getColor = () => {
+    if (progressPercentage >= 100) return Colors.progressSuccess;
+    if (progressPercentage >= 75) return Colors.progressModerate;
+    if (progressPercentage >= 50) return Colors.progressInfo;
+    if (progressPercentage >= 25) return Colors.progressWarning;
+    return Colors.progressDanger;
+  }
+
+  const color = getColor();
+  // console.log(`Progress: ${progressPercentage}%, Color: ${color}`);
+  return color;
+};
 
 export default function WeeklyBillGroup({
   group,
@@ -30,10 +45,10 @@ export default function WeeklyBillGroup({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return '#e74c3c';
-      case 'medium': return '#f39c12';
-      case 'low': return '#000000';
-      default: return '#95a5a6';
+      case 'high': return Colors.danger;
+      case 'medium': return Colors.warning;
+      case 'low': return Colors.text;
+      default: return Colors.secondary;
     }
   };
 
@@ -65,19 +80,16 @@ export default function WeeklyBillGroup({
               <View 
                 style={[
                   styles.progressBar, 
-                  { width: `${progressPercentage}%` }
+                  { width: `${progressPercentage}%`, backgroundColor: getProgressBarColor(progressPercentage) }
                 ]} 
               />
             </View>
             {/* Paychecks - always on left */}
-            <Text style={[styles.paychecksText, styles.paychecksOverlay]}>
+            <Text style={styles.paychecksText}>
               {formatAmount(group.totalPaychecks)}
             </Text>
-            {/* Payments - positioned based on progress */}
-            <Text style={[
-              styles.paymentsText,
-              progressPercentage >= 50 ? styles.paymentsInside : styles.paymentsOutside
-            ]}>
+            {/* Payments - always on right */}
+            <Text style={styles.paymentsText}>
               {formatAmount(group.totalBills)}
             </Text>
           </View>
@@ -166,6 +178,8 @@ const styles = StyleSheet.create({
   progressWrapper: {
     position: 'relative',
     height: 40,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   progressBackground: {
     position: 'absolute',
@@ -179,50 +193,34 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#27ae60',
     borderRadius: 8,
   },
   paychecksText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1e8449',
-  },
-  paychecksOverlay: {
     position: 'absolute',
     left: 12,
     top: 0,
     bottom: 0,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000000',
     textAlignVertical: 'center',
     lineHeight: 40,
     zIndex: 2,
   },
   paymentsText: {
+    position: 'absolute',
+    right: 12,
+    top: 0,
+    bottom: 0,
     fontSize: 16,
     fontWeight: '700',
-  },
-  paymentsInside: {
-    position: 'absolute',
-    right: 12,
-    top: 0,
-    bottom: 0,
+    color: '#000000',
     textAlignVertical: 'center',
     lineHeight: 40,
-    color: 'white',
     zIndex: 2,
-  },
-  paymentsOutside: {
-    position: 'absolute',
-    right: 12,
-    top: 0,
-    bottom: 0,
-    textAlignVertical: 'center',
-    lineHeight: 40,
-    color: '#e74c3c',
-    zIndex: 1,
   },
   billsList: {
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
     marginTop: 8,
     paddingTop: 8,
   },
