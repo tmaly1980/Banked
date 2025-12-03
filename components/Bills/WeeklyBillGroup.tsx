@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { WeeklyGroup, Bill } from '@/types';
 import { formatWeekLabel, getBillDueDate } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -31,8 +32,17 @@ export default function WeeklyBillGroup({
     switch (priority) {
       case 'high': return '#e74c3c';
       case 'medium': return '#f39c12';
-      case 'low': return '#27ae60';
+      case 'low': return '#000000';
       default: return '#95a5a6';
+    }
+  };
+
+  const getPriorityIcon = (priority: string): 'signal-cellular-1' | 'signal-cellular-2' | 'signal-cellular-3' => {
+    switch (priority) {
+      case 'high': return 'signal-cellular-3';
+      case 'medium': return 'signal-cellular-2';
+      case 'low': return 'signal-cellular-1';
+      default: return 'signal-cellular-1';
     }
   };
 
@@ -78,6 +88,8 @@ export default function WeeklyBillGroup({
           <View style={styles.billsList}>
           {group.bills.map((bill) => {
             const dueDate = getBillDueDate(bill);
+            const priorityColor = getPriorityColor(bill.priority);
+            const priorityIcon = getPriorityIcon(bill.priority);
             return (
               <TouchableOpacity
                 key={bill.id}
@@ -93,35 +105,25 @@ export default function WeeklyBillGroup({
                   ]
                 )}
               >
-                <View style={styles.billInfo}>
-                  <View style={styles.billHeader}>
-                    <Text style={styles.billName}>{bill.name}</Text>
-                    <Text style={styles.billAmount}>
-                      {formatAmount(bill.amount)}
-                    </Text>
-                  </View>
-                  <View style={styles.billDetails}>
-                    <Text style={styles.billDueDate}>
-                      {dueDate ? format(dueDate, 'MMM d') : 'No due date'}
-                    </Text>
-                    <View style={styles.billFlags}>
-                      <View 
-                        style={[
-                          styles.priorityBadge, 
-                          { backgroundColor: getPriorityColor(bill.priority) }
-                        ]}
-                      >
-                        <Text style={styles.priorityText}>
-                          {bill.priority.toUpperCase()}
-                        </Text>
-                      </View>
-                      {bill.loss_risk_flag && (
-                        <View style={styles.riskBadge}>
-                          <Text style={styles.riskText}>⚠️</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
+                <View style={styles.billRow}>
+                  <MaterialCommunityIcons 
+                    name={priorityIcon} 
+                    size={16} 
+                    color={priorityColor} 
+                    style={styles.priorityIcon}
+                  />
+                  <Text style={[styles.billDate, { color: priorityColor }]}>
+                    {dueDate ? format(dueDate, 'MMM d') : 'No date'}
+                  </Text>
+                  <Text style={[styles.billName, { color: priorityColor }]} numberOfLines={1}>
+                    {bill.name}
+                  </Text>
+                  {bill.loss_risk_flag && (
+                    <Text style={styles.urgentIcon}>⚠️</Text>
+                  )}
+                  <Text style={[styles.billAmount, { color: priorityColor }]}>
+                    {formatAmount(bill.amount)}
+                  </Text>
                 </View>
               </TouchableOpacity>
             );
@@ -225,59 +227,35 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   billItem: {
-    paddingVertical: 12,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#f8f9fa',
   },
-  billInfo: {
-    flex: 1,
-  },
-  billHeader: {
+  billRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    gap: 8,
+  },
+  priorityIcon: {
+    width: 16,
+  },
+  billDate: {
+    fontSize: 14,
+    fontWeight: '500',
+    width: 50,
   },
   billName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
-    color: '#2c3e50',
     flex: 1,
   },
+  urgentIcon: {
+    fontSize: 14,
+  },
   billAmount: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#e74c3c',
-  },
-  billDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  billDueDate: {
-    fontSize: 12,
-    color: '#7f8c8d',
-  },
-  billFlags: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center',
-  },
-  priorityBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  priorityText: {
-    fontSize: 10,
-    color: 'white',
-    fontWeight: '600',
-  },
-  riskBadge: {
-    padding: 2,
-  },
-  riskText: {
-    fontSize: 12,
+    marginLeft: 'auto',
   },
   emptyState: {
     paddingVertical: 16,

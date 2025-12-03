@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   return (
@@ -21,6 +21,15 @@ export default function TabLayout() {
           title: 'Home',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="paychecks"
+        options={{
+          title: 'Paychecks',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="currency-usd" size={size} color={color} />
           ),
         }}
       />

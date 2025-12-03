@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS bills (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   name TEXT NOT NULL,
   amount DECIMAL(10,2) NOT NULL,
-  due_date DATE,
+  due_date TIMESTAMPTZ,
   due_day INTEGER CHECK (due_day >= 1 AND due_day <= 31),
   priority TEXT CHECK (priority IN ('low', 'medium', 'high')) DEFAULT 'medium',
   loss_risk_flag BOOLEAN DEFAULT false,
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS bill_payments (
   bill_id UUID REFERENCES bills(id) ON DELETE CASCADE NOT NULL,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   amount DECIMAL(10,2) NOT NULL,
-  applied_date DATE NOT NULL,
+  applied_date TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -39,8 +39,9 @@ CREATE TABLE IF NOT EXISTS bill_payments (
 CREATE TABLE IF NOT EXISTS paychecks (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  name TEXT,
   amount DECIMAL(10,2) NOT NULL,
-  date DATE NOT NULL,
+  date TIMESTAMPTZ NOT NULL,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -68,6 +69,17 @@ BEGIN
     WHERE table_name='paychecks' AND column_name='notes'
   ) THEN
     ALTER TABLE paychecks ADD COLUMN notes TEXT;
+  END IF;
+END $$;
+
+-- Add name column to paychecks if it doesn't exist
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name='paychecks' AND column_name='name'
+  ) THEN
+    ALTER TABLE paychecks ADD COLUMN name TEXT;
   END IF;
 END $$;
 

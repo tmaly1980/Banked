@@ -17,6 +17,7 @@ import { Bill, BillPayment } from '@/types';
 import { getBillDueDate } from '@/lib/utils';
 import { format } from 'date-fns';
 import DateInput from '@/components/DateInput';
+import { dateToTimestamp } from '@/lib/dateUtils';
 
 interface BillDetailsModalProps {
   visible: boolean;
@@ -74,7 +75,7 @@ export default function BillDetailsModal({
 
     setLoading(true);
     try {
-      const { error } = await addBillPayment(bill.id, amount, paymentDate);
+      const { error } = await addBillPayment(bill.id, amount, dateToTimestamp(paymentDate));
       if (error) throw error;
 
       Toast.show({ type: 'success', text1: 'Payment added successfully' });
@@ -105,7 +106,7 @@ export default function BillDetailsModal({
           onPress: async () => {
             setLoading(true);
             try {
-              const { error } = await addBillPayment(bill.id, bill.amount, paymentDate);
+              const { error } = await addBillPayment(bill.id, bill.amount, dateToTimestamp(paymentDate));
               if (error) throw error;
 
               Toast.show({ type: 'success', text1: 'Bill marked as paid' });

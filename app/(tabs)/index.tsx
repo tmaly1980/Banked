@@ -22,7 +22,6 @@ export default function HomeScreen() {
   const [weeklyGroups, setWeeklyGroups] = useState<WeeklyGroup[]>([]);
   const [deferredBills, setDeferredBills] = useState<Bill[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [modalType, setModalType] = useState<'bill' | 'paycheck'>('bill');
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
   const [billDetailsVisible, setBillDetailsVisible] = useState(false);
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -60,19 +59,11 @@ export default function HomeScreen() {
   }, [bills, paychecks]);
 
   const handleAddBill = () => {
-    setModalType('bill');
-    setEditingBill(null);
-    setModalVisible(true);
-  };
-
-  const handleAddPaycheck = () => {
-    setModalType('paycheck');
     setEditingBill(null);
     setModalVisible(true);
   };
 
   const handleEditBill = (bill: Bill) => {
-    setModalType('bill');
     setEditingBill(bill);
     setModalVisible(true);
   };
@@ -109,20 +100,12 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Banked</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: '#27ae60' }]}
-            onPress={handleAddPaycheck}
-          >
-            <Text style={styles.addButtonText}>+ Paycheck</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: '#3498db' }]}
-            onPress={handleAddBill}
-          >
-            <Text style={styles.addButtonText}>+ Bill</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={[styles.addButton, { backgroundColor: '#3498db' }]}
+          onPress={handleAddBill}
+        >
+          <Text style={styles.addButtonText}>+ Bill</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Main Content */}
@@ -153,12 +136,11 @@ export default function HomeScreen() {
         onDeleteBill={handleDeleteBill}
       />
 
-      {/* Add Item Modal */}
+      {/* Add/Edit Bill Modal */}
       <BillFormModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         onSuccess={refreshData}
-        type={modalType}
         editingBill={editingBill}
       />
 
@@ -196,11 +178,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#2c3e50',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
   },
   addButton: {
     paddingHorizontal: 12,

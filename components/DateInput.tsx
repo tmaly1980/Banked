@@ -79,10 +79,12 @@ export default function DateInput({
     setShowCalendar(false);
   };
 
-  // Initialize display value from prop
+  // Initialize and sync display value from prop
   React.useEffect(() => {
-    if (value && !displayValue) {
+    if (value) {
       setDisplayValue(formatDisplayDate(value));
+    } else {
+      setDisplayValue('');
     }
   }, [value]);
 

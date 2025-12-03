@@ -17,12 +17,12 @@ import { useBills } from '@/contexts/BillsContext';
 import { Bill } from '@/types';
 import DateInput from '@/components/DateInput';
 import DayOfMonthInput from '@/components/DayOfMonthInput';
+import { dateToTimestamp } from '@/lib/dateUtils';
 
 interface BillFormModalProps {
   visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  type: 'bill' | 'paycheck';
   editingBill?: Bill | null;
 }
 
@@ -30,10 +30,9 @@ export default function BillFormModal({
   visible,
   onClose,
   onSuccess,
-  type,
   editingBill,
 }: BillFormModalProps) {
-  const { createBill, updateBill, createPaycheck } = useBills();
+  const { createBill, updateBill } = useBills();
   const [name, setName] = useState(editingBill?.name || '');
   const [amount, setAmount] = useState(editingBill?.amount?.toString() || '');
   const [dueDate, setDueDate] = useState(editingBill?.due_date || '');
@@ -76,7 +75,7 @@ export default function BillFormModal({
       return false;
     }
 
-    if (type === 'bill' && isRecurring && dueDay) {
+    if (isRecurring && dueDay) {
       const dayNum = parseInt(dueDay);
       if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) {
         Toast.show({ type: 'error', text1: 'Please enter a valid due day (1-31)' });
@@ -93,42 +92,29 @@ export default function BillFormModal({
     
     try {
       const amountNum = parseFloat(amount);
+      const hasDueDate = isRecurring ? !!dueDay : !!dueDate;
+      const billData = {
+        name: name.trim(),
+        amount: amountNum,
+        due_date: isRecurring ? undefined : (dueDate ? dateToTimestamp(dueDate) : undefined),
+        due_day: isRecurring ? (dueDay ? parseInt(dueDay) : undefined) : undefined,
+        priority,
+        loss_risk_flag: lossRiskFlag,
+        deferred_flag: !hasDueDate ? true : deferredFlag,
+        notes: notes.trim() || undefined,
+      };
 
-      if (type === 'paycheck') {
-        const { error } = await createPaycheck({
-          amount: amountNum,
-          date: dueDate || new Date().toISOString().split('T')[0],
-          notes: notes.trim() || undefined,
-        });
-
+      if (editingBill) {
+        const { error } = await updateBill(editingBill.id, billData);
         if (error) throw error;
       } else {
-        const hasDueDate = isRecurring ? !!dueDay : !!dueDate;
-        const billData = {
-          name: name.trim(),
-          amount: amountNum,
-          due_date: isRecurring ? undefined : (dueDate || undefined),
-          due_day: isRecurring ? (dueDay ? parseInt(dueDay) : undefined) : undefined,
-          priority,
-          loss_risk_flag: lossRiskFlag,
-          deferred_flag: !hasDueDate ? true : deferredFlag,
-          notes: notes.trim() || undefined,
-        };
-
-        if (editingBill) {
-          const { error } = await updateBill(editingBill.id, billData);
-          if (error) throw error;
-        } else {
-          const { error } = await createBill(billData);
-          if (error) throw error;
-        }
+        const { error } = await createBill(billData);
+        if (error) throw error;
       }
 
       Toast.show({
         type: 'success',
-        text1: `${type === 'paycheck' ? 'Paycheck' : 'Bill'} ${
-          editingBill ? 'updated' : 'added'
-        } successfully`,
+        text1: `Bill ${editingBill ? 'updated' : 'added'} successfully`,
       });
       
       resetForm();
@@ -149,7 +135,7 @@ export default function BillFormModal({
     if (visible && editingBill) {
       setName(editingBill.name);
       setAmount(editingBill.amount.toString());
-      setDueDate(editingBill.due_date || '');
+      setDueDate(editingBill.due_date ? timestampToDate(editingBill.due_date) : '');
       setDueDay(editingBill.due_day?.toString() || '');
       setPriority(editingBill.priority);
       setLossRiskFlag(editingBill.loss_risk_flag);
@@ -170,7 +156,7 @@ export default function BillFormModal({
             <Text style={styles.cancelButton}>Cancel</Text>
           </TouchableOpacity>
           <Text style={styles.title}>
-            {editingBill ? 'Edit' : 'Add'} {type === 'paycheck' ? 'Paycheck' : 'Bill'}
+            {editingBill ? 'Edit' : 'Add'} Bill
           </Text>
           <TouchableOpacity onPress={handleSubmit} disabled={loading}>
             <Text style={[styles.saveButton, loading && styles.disabledButton]}>
@@ -181,24 +167,14 @@ export default function BillFormModal({
 
         <ScrollView style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>
-              {type === 'paycheck' ? 'Description' : 'Bill Name'}
-            </Text>
+            <Text style={styles.label}>Bill Name</Text>
             <TextInput
               style={styles.input}
               value={name}
               onChangeText={setName}
-              placeholder={type === 'paycheck' ? 'Salary, Side job, etc.' : 'Electric Bill, Rent, etc.'}
+              placeholder="Electric Bill, Rent, etc."
             />
           </View>
-
-          {type === 'paycheck' && (
-            <DateInput
-              label="Date"
-              value={dueDate}
-              onChangeDate={setDueDate}
-            />
-          )}
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Amount</Text>
@@ -211,99 +187,80 @@ export default function BillFormModal({
             />
           </View>
 
-          {type === 'paycheck' && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Notes</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={notes}
-                onChangeText={setNotes}
-                placeholder="Add any notes or reminders..."
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
+          <View style={styles.switchGroup}>
+            <Text style={styles.label}>Recurring Monthly</Text>
+            <Switch value={isRecurring} onValueChange={setIsRecurring} />
+          </View>
+
+          {isRecurring ? (
+            <DayOfMonthInput
+              label="Day of Month"
+              value={dueDay}
+              onChangeDay={setDueDay}
+            />
+          ) : (
+            <DateInput
+              label="Due Date"
+              value={dueDate}
+              onChangeDate={setDueDate}
+            />
+          )}
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Priority</Text>
+            <View style={styles.chipContainer}>
+              <Chip
+                mode={priority === 'low' ? 'flat' : 'outlined'}
+                selected={priority === 'low'}
+                onPress={() => setPriority('low')}
+                style={[styles.chip, priority === 'low' && styles.chipSelectedLow]}
+                textStyle={priority === 'low' ? styles.chipTextSelected : styles.chipText}
+              >
+                Low
+              </Chip>
+              <Chip
+                mode={priority === 'medium' ? 'flat' : 'outlined'}
+                selected={priority === 'medium'}
+                onPress={() => setPriority('medium')}
+                style={[styles.chip, priority === 'medium' && styles.chipSelectedMedium]}
+                textStyle={priority === 'medium' ? styles.chipTextSelected : styles.chipText}
+              >
+                Medium
+              </Chip>
+              <Chip
+                mode={priority === 'high' ? 'flat' : 'outlined'}
+                selected={priority === 'high'}
+                onPress={() => setPriority('high')}
+                style={[styles.chip, priority === 'high' && styles.chipSelectedHigh]}
+                textStyle={priority === 'high' ? styles.chipTextSelected : styles.chipText}
+              >
+                High
+              </Chip>
             </View>
-          )}
+          </View>
 
-          {type === 'bill' && (
-            <>
-              <View style={styles.switchGroup}>
-                <Text style={styles.label}>Recurring Monthly</Text>
-                <Switch value={isRecurring} onValueChange={setIsRecurring} />
-              </View>
+          <View style={styles.switchGroup}>
+            <Text style={styles.label}>Loss Risk</Text>
+            <Switch value={lossRiskFlag} onValueChange={setLossRiskFlag} />
+          </View>
 
-              {isRecurring ? (
-                <DayOfMonthInput
-                  label="Day of Month"
-                  value={dueDay}
-                  onChangeDay={setDueDay}
-                />
-              ) : (
-                <DateInput
-                  label="Due Date"
-                  value={dueDate}
-                  onChangeDate={setDueDate}
-                />
-              )}
+          <View style={styles.switchGroup}>
+            <Text style={styles.label}>Deferred</Text>
+            <Switch value={deferredFlag} onValueChange={setDeferredFlag} />
+          </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Priority</Text>
-                <View style={styles.chipContainer}>
-                  <Chip
-                    mode={priority === 'low' ? 'flat' : 'outlined'}
-                    selected={priority === 'low'}
-                    onPress={() => setPriority('low')}
-                    style={[styles.chip, priority === 'low' && styles.chipSelectedLow]}
-                    textStyle={priority === 'low' ? styles.chipTextSelected : styles.chipText}
-                  >
-                    Low
-                  </Chip>
-                  <Chip
-                    mode={priority === 'medium' ? 'flat' : 'outlined'}
-                    selected={priority === 'medium'}
-                    onPress={() => setPriority('medium')}
-                    style={[styles.chip, priority === 'medium' && styles.chipSelectedMedium]}
-                    textStyle={priority === 'medium' ? styles.chipTextSelected : styles.chipText}
-                  >
-                    Medium
-                  </Chip>
-                  <Chip
-                    mode={priority === 'high' ? 'flat' : 'outlined'}
-                    selected={priority === 'high'}
-                    onPress={() => setPriority('high')}
-                    style={[styles.chip, priority === 'high' && styles.chipSelectedHigh]}
-                    textStyle={priority === 'high' ? styles.chipTextSelected : styles.chipText}
-                  >
-                    High
-                  </Chip>
-                </View>
-              </View>
-
-              <View style={styles.switchGroup}>
-                <Text style={styles.label}>Loss Risk</Text>
-                <Switch value={lossRiskFlag} onValueChange={setLossRiskFlag} />
-              </View>
-
-              <View style={styles.switchGroup}>
-                <Text style={styles.label}>Deferred</Text>
-                <Switch value={deferredFlag} onValueChange={setDeferredFlag} />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Notes</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={notes}
-                  onChangeText={setNotes}
-                  placeholder="Add any notes or reminders..."
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
-              </View>
-            </>
-          )}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Notes</Text>
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Add any notes or reminders..."
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
