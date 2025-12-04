@@ -62,7 +62,7 @@ export default function WeeklyExpensesModal({
         id: type.id,
         expenseTypeId: type.id,
         expenseTypeName: type.name,
-        amount: existingExpense ? existingExpense.amount.toString() : '',
+        amount: existingExpense ? existingExpense.allocated_amount.toString() : '',
         isNewType: false,
       };
     });

@@ -35,25 +35,38 @@ export interface Paycheck {
   user_id: string;
   name?: string;
   amount: number;
-  date: string;
+  date: string | null;
   notes?: string;
   created_at: string;
 }
 
 export interface ExpenseType {
   id: string;
-  user_id: string;
   name: string;
-  default_amount?: number;
+  order: number;
   created_at: string;
 }
 
-export interface WeeklyExpense {
+export interface ExpenseBudget {
   id: string;
   user_id: string;
   expense_type_id: string;
-  week_start_date: string;
+  start_date: string;
+  end_date?: string;
   amount: number;
+  created_at: string;
+}
+
+export interface ExpenseBudgetWithType extends ExpenseBudget {
+  expense_type_name: string;
+}
+
+export interface ExpensePurchase {
+  id: string;
+  user_id: string;
+  expense_type_id: string;
+  amount: number;
+  date: string;
   notes?: string;
   created_at: string;
 }
@@ -74,4 +87,44 @@ export interface WeeklyPaycheckGroup {
   endDate: Date;
   paychecks: Paycheck[];
   total: number;
+}
+
+export interface ExpenseBudgetGroup {
+  startDate: Date;
+  endDate: Date;
+  expenses: ExpenseBudgetWithType[];
+  totalSpent: number;
+  totalAllocated: number;
+}
+
+export interface Gig {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  start_date: string;
+  end_date: string;
+  total_hours?: number;
+  total_amount: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GigPaycheck {
+  id: string;
+  gig_id: string;
+  paycheck_id: string;
+  created_at: string;
+}
+
+export interface GigWithPaychecks extends Gig {
+  paychecks: Paycheck[];
+}
+
+export interface WeeklyGigGroup {
+  startDate: Date;
+  endDate: Date;
+  gigs: GigWithPaychecks[];
+  totalAmount: number;
+  totalHours: number;
 }

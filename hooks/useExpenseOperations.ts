@@ -1,48 +1,32 @@
 import { useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ExpenseType } from '@/types';
+import { ExpenseType, ExpenseBudget, ExpensePurchase } from '@/types';
 
 export const useExpenseOperations = (
   userId: string | undefined, 
   loadExpenseTypes: () => Promise<void>,
-  loadWeeklyExpenses: () => Promise<void>
+  loadExpenseBudgets: () => Promise<void>,
+  loadExpensePurchases: () => Promise<void>
 ) => {
   const createOrUpdateExpenseType = useCallback(async (
-    name: string,
-    defaultAmount?: number
+    name: string
   ) => {
-    if (!userId) return { data: null, error: new Error('User not authenticated') };
-
     try {
       // Check if expense type already exists
       const { data: existing } = await supabase
         .from('expense_types')
         .select('*')
-        .eq('user_id', userId)
         .eq('name', name)
         .single();
 
       if (existing) {
-        // Update existing
-        const { data, error } = await supabase
-          .from('expense_types')
-          .update({ default_amount: defaultAmount })
-          .eq('id', existing.id)
-          .select()
-          .single();
-
-        if (error) throw error;
-        await loadExpenseTypes();
-        return { data, error: null };
+        // Already exists, return it
+        return { data: existing, error: null };
       } else {
-        // Create new
+        // Create new (order will auto-increment via sequence)
         const { data, error } = await supabase
           .from('expense_types')
-          .insert({
-            user_id: userId,
-            name,
-            default_amount: defaultAmount,
-          })
+          .insert({ name })
           .select()
           .single();
 
@@ -53,60 +37,194 @@ export const useExpenseOperations = (
     } catch (err) {
       return { data: null, error: err as Error };
     }
-  }, [userId, loadExpenseTypes]);
+  }, [loadExpenseTypes]);
 
-  const saveWeeklyExpenses = useCallback(async (
-    weekStartDate: string,
-    expenses: Array<{ expense_type_id: string | null; expense_type_name: string; amount: number }>
+  const saveExpenseBudgets = useCallback(async (
+    startDate: string,
+    expenses: Array<{ expense_type_id: string; amount: number }>
   ) => {
     if (!userId) throw new Error('User not authenticated');
 
     try {
-      // First, create any new expense types
-      const expenseTypeMap = new Map<string, string>();
-      
-      for (const expense of expenses) {
-        if (!expense.expense_type_id) {
-          // Create new expense type
-          const { data, error } = await createOrUpdateExpenseType(expense.expense_type_name);
-          if (error) throw error;
-          if (data) {
-            expenseTypeMap.set(expense.expense_type_name, data.id);
-          }
-        } else {
-          expenseTypeMap.set(expense.expense_type_name, expense.expense_type_id);
-        }
-      }
-
-      // Delete existing weekly expenses for this week
+      // Delete existing expense budgets for this week
       await supabase
-        .from('weekly_expenses')
+        .from('expense_budgets')
         .delete()
         .eq('user_id', userId)
-        .eq('week_start_date', weekStartDate);
+        .eq('start_date', startDate);
 
-      // Insert new weekly expenses
-      const weeklyExpensesData = expenses.map(expense => ({
+      // Insert new expense budgets
+      const expenseBudgetsData = expenses.map(expense => ({
         user_id: userId,
-        expense_type_id: expense.expense_type_id || expenseTypeMap.get(expense.expense_type_name)!,
-        week_start_date: weekStartDate,
+        expense_type_id: expense.expense_type_id,
+        start_date: startDate,
         amount: expense.amount,
       }));
 
       const { error: insertError } = await supabase
-        .from('weekly_expenses')
-        .insert(weeklyExpensesData);
+        .from('expense_budgets')
+        .insert(expenseBudgetsData);
 
       if (insertError) throw insertError;
 
-      await loadWeeklyExpenses();
+      await loadExpenseBudgets();
     } catch (err) {
       throw err;
     }
-  }, [userId, createOrUpdateExpenseType, loadWeeklyExpenses]);
+  }, [userId, loadExpenseBudgets]);
+
+  const createExpenseBudget = useCallback(async (data: {
+    expense_type_id: string;
+    start_date: string;
+    end_date?: string;
+    amount: number;
+  }) => {
+    if (!userId) return { data: null, error: new Error('User not authenticated') };
+
+    try {
+      // Create the expense budget
+      const { data: expenseBudget, error } = await supabase
+        .from('expense_budgets')
+        .insert({
+          user_id: userId,
+          expense_type_id: data.expense_type_id,
+          start_date: data.start_date,
+          end_date: data.end_date,
+          amount: data.amount,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      await loadExpenseBudgets();
+      return { data: expenseBudget, error: null };
+    } catch (err) {
+      return { data: null, error: err as Error };
+    }
+  }, [userId, loadExpenseBudgets]);
+
+  const updateExpenseBudget = useCallback(async (
+    id: string,
+    updates: {
+      amount?: number;
+      end_date?: string;
+    }
+  ) => {
+    if (!userId) return { error: new Error('User not authenticated') };
+
+    try {
+      const { error } = await supabase
+        .from('expense_budgets')
+        .update(updates)
+        .eq('id', id)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      await loadExpenseBudgets();
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
+  }, [userId, loadExpenseBudgets]);
+
+  const deleteExpenseBudget = useCallback(async (id: string) => {
+    if (!userId) return { error: new Error('User not authenticated') };
+
+    try {
+      const { error } = await supabase
+        .from('expense_budgets')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      await loadExpenseBudgets();
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
+  }, [userId, loadExpenseBudgets]);
+
+  const createExpensePurchase = useCallback(async (data: {
+    expense_type_id: string;
+    amount: number;
+    date: string;
+    notes?: string;
+  }) => {
+    if (!userId) return { data: null, error: new Error('User not authenticated') };
+
+    try {
+      const { data: purchase, error } = await supabase
+        .from('expense_purchases')
+        .insert({
+          user_id: userId,
+          expense_type_id: data.expense_type_id,
+          amount: data.amount,
+          date: data.date,
+          notes: data.notes,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      await loadExpensePurchases();
+      return { data: purchase, error: null };
+    } catch (err) {
+      return { data: null, error: err as Error };
+    }
+  }, [userId, loadExpensePurchases]);
+
+  const updateExpensePurchase = useCallback(async (
+    id: string,
+    updates: {
+      amount?: number;
+      date?: string;
+      notes?: string;
+    }
+  ) => {
+    if (!userId) return { error: new Error('User not authenticated') };
+
+    try {
+      const { error } = await supabase
+        .from('expense_purchases')
+        .update(updates)
+        .eq('id', id)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      await loadExpensePurchases();
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
+  }, [userId, loadExpensePurchases]);
+
+  const deleteExpensePurchase = useCallback(async (id: string) => {
+    if (!userId) return { error: new Error('User not authenticated') };
+
+    try {
+      const { error } = await supabase
+        .from('expense_purchases')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      await loadExpensePurchases();
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
+  }, [userId, loadExpensePurchases]);
 
   return {
     createOrUpdateExpenseType,
-    saveWeeklyExpenses,
+    saveExpenseBudgets,
+    createExpenseBudget,
+    updateExpenseBudget,
+    deleteExpenseBudget,
+    createExpensePurchase,
+    updateExpensePurchase,
+    deleteExpensePurchase,
   };
 };

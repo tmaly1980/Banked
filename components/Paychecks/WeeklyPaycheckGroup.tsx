@@ -74,7 +74,7 @@ export default function WeeklyPaycheckGroup({
             >
               <View style={styles.paycheckRow}>
                 <Text style={styles.paycheckDate}>
-                  {format(new Date(paycheck.date), 'MMM d')}
+                  {paycheck.date ? format(new Date(paycheck.date), 'MMM d') : 'No date'}
                 </Text>
                 <Text style={styles.paycheckName} numberOfLines={1}>
                   {paycheck.name || 'Paycheck'}

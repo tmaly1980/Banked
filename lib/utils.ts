@@ -1,5 +1,5 @@
 import { startOfWeek, endOfWeek, addWeeks, format, isSameWeek, parseISO } from 'date-fns';
-import { WeeklyGroup } from '../types';
+import { WeeklyGroup, ExpenseBudgetGroup, ExpenseBudget, ExpenseType, ExpenseBudgetWithType, WeeklyGigGroup, GigWithPaychecks } from '../types';
 import { BillModel } from '@/models/BillModel';
 
 export const getWeekRange = (date: Date) => ({
@@ -30,6 +30,78 @@ export const getNext6Weeks = (): WeeklyGroup[] => {
 
 export const formatWeekLabel = (startDate: Date, endDate: Date): string => {
   return `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d')}`;
+};
+
+export const groupExpensesByWeek = (
+  expenseBudgets: ExpenseBudget[],
+  expenseTypes: ExpenseType[]
+): ExpenseBudgetGroup[] => {
+  const groups: ExpenseBudgetGroup[] = [];
+  const today = new Date();
+
+  // Get next 6 weeks starting from today (Sunday-Saturday)
+  for (let i = 0; i < 6; i++) {
+    const weekStart = addWeeks(startOfWeek(today, { weekStartsOn: 0 }), i);
+    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
+    const weekKey = format(weekStart, 'yyyy-MM-dd');
+
+    // Get expense budgets for this week with their type names
+    const weekExpensesList = expenseBudgets
+      .filter(exp => exp.start_date === weekKey)
+      .map(exp => {
+        const expenseType = expenseTypes.find(t => t.id === exp.expense_type_id);
+        return {
+          ...exp,
+          expense_type_name: expenseType?.name || 'Unknown',
+        } as ExpenseBudgetWithType;
+      });
+
+    const totalSpent = weekExpensesList.reduce((sum, exp) => sum + exp.spent_amount, 0);
+    const totalAllocated = weekExpensesList.reduce((sum, exp) => sum + exp.allocated_amount, 0);
+
+    groups.push({
+      startDate: weekStart,
+      endDate: weekEnd,
+      expenses: weekExpensesList,
+      totalSpent,
+      totalAllocated,
+    });
+  }
+
+  return groups;
+};
+
+export const groupGigsByWeek = (gigs: GigWithPaychecks[]): WeeklyGigGroup[] => {
+  const groups: WeeklyGigGroup[] = [];
+  const today = new Date();
+
+  // Get next 6 weeks starting from today (Sunday-Saturday)
+  for (let i = 0; i < 6; i++) {
+    const weekStart = addWeeks(startOfWeek(today, { weekStartsOn: 0 }), i);
+    const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
+
+    // Find gigs that overlap with this week
+    const weekGigs = gigs.filter(gig => {
+      const gigStart = parseISO(gig.start_date);
+      const gigEnd = parseISO(gig.end_date);
+      
+      // Check if gig date range overlaps with week range
+      return gigStart <= weekEnd && gigEnd >= weekStart;
+    });
+
+    const totalAmount = weekGigs.reduce((sum, gig) => sum + gig.total_amount, 0);
+    const totalHours = weekGigs.reduce((sum, gig) => sum + (gig.total_hours || 0), 0);
+
+    groups.push({
+      startDate: weekStart,
+      endDate: weekEnd,
+      gigs: weekGigs,
+      totalAmount,
+      totalHours,
+    });
+  }
+
+  return groups;
 };
 
 export const getBillDueDate = (bill: BillModel, startingDate?: Date): Date | null => {

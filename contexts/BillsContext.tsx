@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { BillPayment, Paycheck, ExpenseType, WeeklyExpense } from '@/types';
+import { BillPayment, Paycheck, ExpenseType, ExpenseBudget, GigWithPaychecks, Gig, ExpensePurchase } from '@/types';
 import { BillModel, Bill } from '@/models/BillModel';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
@@ -7,13 +7,16 @@ import { useBillOperations } from '@/hooks/useBillOperations';
 import { usePaymentOperations } from '@/hooks/usePaymentOperations';
 import { usePaycheckOperations } from '@/hooks/usePaycheckOperations';
 import { useExpenseOperations } from '@/hooks/useExpenseOperations';
+import { useGigOperations } from '@/hooks/useGigOperations';
 import { useRealtimeSubscriptions } from '@/hooks/useRealtimeSubscriptions';
 
 interface BillsContextType {
   bills: BillModel[];
   paychecks: Paycheck[];
   expenseTypes: ExpenseType[];
-  weeklyExpenses: WeeklyExpense[];
+  expenseBudgets: ExpenseBudget[];
+  expensePurchases: ExpensePurchase[];
+  gigs: GigWithPaychecks[];
   loading: boolean;
   error: string | null;
   loadBills: () => Promise<void>;
@@ -30,9 +33,22 @@ interface BillsContextType {
   deleteBillPayment: (paymentId: string) => Promise<{ error: Error | null }>;
   markPaymentAsPaid: (paymentId: string) => Promise<{ error: Error | null }>;
   loadExpenseTypes: () => Promise<void>;
-  loadWeeklyExpenses: () => Promise<void>;
+  loadExpenseBudgets: () => Promise<void>;
+  loadExpensePurchases: () => Promise<void>;
   createOrUpdateExpenseType: (name: string, defaultAmount?: number) => Promise<{ data: ExpenseType | null; error: Error | null }>;
-  saveWeeklyExpenses: (weekStartDate: string, expenses: Array<{ expense_type_id: string | null; expense_type_name: string; amount: number }>) => Promise<void>;
+  saveExpenseBudgets: (startDate: string, expenses: Array<{ expense_type_id: string | null; expense_type_name: string; allocated_amount: number; spent_amount?: number }>) => Promise<void>;
+  createExpenseBudget: (data: { expense_type_name: string; start_date: string; end_date?: string; allocated_amount: number; spent_amount?: number }) => Promise<{ data: ExpenseBudget | null; error: Error | null }>;
+  updateExpenseBudget: (id: string, updates: { allocated_amount?: number; spent_amount?: number; end_date?: string }) => Promise<{ error: Error | null }>;
+  deleteExpenseBudget: (id: string) => Promise<{ error: Error | null }>;
+  createExpensePurchase: (data: { expense_type_id: string; amount: number; date: string; notes?: string }) => Promise<{ data: ExpensePurchase | null; error: Error | null }>;
+  updateExpensePurchase: (id: string, updates: { amount?: number; date?: string; notes?: string }) => Promise<{ error: Error | null }>;
+  deleteExpensePurchase: (id: string) => Promise<{ error: Error | null }>;
+  loadGigs: () => Promise<void>;
+  createGig: (gig: Omit<Gig, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<{ data: Gig | null; error: Error | null }>;
+  updateGig: (id: string, updates: Partial<Gig>) => Promise<{ error: Error | null }>;
+  deleteGig: (id: string) => Promise<{ error: Error | null }>;
+  linkPaycheckToGig: (gigId: string, paycheckId: string) => Promise<{ error: Error | null }>;
+  unlinkPaycheckFromGig: (gigId: string, paycheckId: string) => Promise<{ error: Error | null }>;
   refreshData: () => Promise<void>;
 }
 
@@ -43,7 +59,9 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
   const [bills, setBills] = useState<BillModel[]>([]);
   const [paychecks, setPaychecks] = useState<Paycheck[]>([]);
   const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
-  const [weeklyExpenses, setWeeklyExpenses] = useState<WeeklyExpense[]>([]);
+  const [expenseBudgets, setExpenseBudgets] = useState<ExpenseBudget[]>([]);
+  const [expensePurchases, setExpensePurchases] = useState<ExpensePurchase[]>([]);
+  const [gigs, setGigs] = useState<GigWithPaychecks[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -125,54 +143,121 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const loadExpenseTypes = useCallback(async () => {
-    if (!user) {
-      setExpenseTypes([]);
-      return;
-    }
-
     try {
       const { data, error } = await supabase
         .from('expense_types')
         .select('*')
-        .eq('user_id', user.id)
-        .order('name', { ascending: true });
+        .order('order', { ascending: true });
 
       if (error) throw error;
       setExpenseTypes(data || []);
     } catch (err) {
       console.error('[BillsContext] Error loading expense types:', err);
     }
-  }, [user]);
+  }, []);
 
-  const loadWeeklyExpenses = useCallback(async () => {
+  const loadExpenseBudgets = useCallback(async () => {
     if (!user) {
-      setWeeklyExpenses([]);
+      setExpenseBudgets([]);
       return;
     }
 
     try {
       const { data, error } = await supabase
-        .from('weekly_expenses')
+        .from('expense_budgets')
         .select('*')
         .eq('user_id', user.id)
-        .order('week_start_date', { ascending: false });
+        .order('start_date', { ascending: false });
 
       if (error) throw error;
-      setWeeklyExpenses(data || []);
+      setExpenseBudgets(data || []);
     } catch (err) {
-      console.error('[BillsContext] Error loading weekly expenses:', err);
+      console.error('[BillsContext] Error loading expense budgets:', err);
+    }
+  }, [user]);
+
+  const loadExpensePurchases = useCallback(async () => {
+    if (!user) {
+      setExpensePurchases([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('expense_purchases')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+      setExpensePurchases(data || []);
+    } catch (err) {
+      console.error('[BillsContext] Error loading expense purchases:', err);
+    }
+  }, [user]);
+
+  const loadGigs = useCallback(async () => {
+    if (!user) {
+      setGigs([]);
+      return;
+    }
+
+    try {
+      // Load gigs
+      const { data: gigsData, error: gigsError } = await supabase
+        .from('gigs')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('start_date', { ascending: false });
+
+      if (gigsError) throw gigsError;
+
+      // Load gig-paycheck relationships
+      const { data: gigPaychecksData, error: gpError } = await supabase
+        .from('gig_paychecks')
+        .select('*');
+
+      if (gpError) throw gpError;
+
+      // Load paychecks
+      const { data: paychecksData, error: paychecksError } = await supabase
+        .from('paychecks')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (paychecksError) throw paychecksError;
+
+      // Combine data
+      const gigsWithPaychecks: GigWithPaychecks[] = (gigsData || []).map(gig => {
+        const linkedPaycheckIds = (gigPaychecksData || [])
+          .filter(gp => gp.gig_id === gig.id)
+          .map(gp => gp.paycheck_id);
+        
+        const linkedPaychecks = (paychecksData || [])
+          .filter(pc => linkedPaycheckIds.includes(pc.id));
+
+        return {
+          ...gig,
+          paychecks: linkedPaychecks,
+        };
+      });
+
+      setGigs(gigsWithPaychecks);
+    } catch (err) {
+      console.error('[BillsContext] Error loading gigs:', err);
     }
   }, [user]);
 
   const refreshData = useCallback(async () => {
-    await Promise.all([loadBills(), loadPaychecks(), loadExpenseTypes(), loadWeeklyExpenses()]);
-  }, [loadBills, loadPaychecks, loadExpenseTypes, loadWeeklyExpenses]);
+    await Promise.all([loadBills(), loadPaychecks(), loadExpenseTypes(), loadExpenseBudgets(), loadExpensePurchases(), loadGigs()]);
+  }, [loadBills, loadPaychecks, loadExpenseTypes, loadExpenseBudgets, loadExpensePurchases, loadGigs]);
 
   // Use custom hooks for operations
   const billOps = useBillOperations(user?.id, loadBills);
   const paymentOps = usePaymentOperations(user?.id, loadBills);
   const paycheckOps = usePaycheckOperations(user?.id, loadPaychecks);
-  const expenseOps = useExpenseOperations(user?.id, loadExpenseTypes, loadWeeklyExpenses);
+  const expenseOps = useExpenseOperations(user?.id, loadExpenseTypes, loadExpenseBudgets, loadExpensePurchases);
+  const gigOps = useGigOperations(user?.id, loadGigs);
   
   // Setup realtime subscriptions
   useRealtimeSubscriptions(user?.id, loadBills);
@@ -181,7 +266,9 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     bills,
     paychecks,
     expenseTypes,
-    weeklyExpenses,
+    expenseBudgets,
+    expensePurchases,
+    gigs,
     loading,
     error,
     loadBills,
@@ -190,8 +277,11 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     ...paycheckOps,
     ...paymentOps,
     ...expenseOps,
+    ...gigOps,
     loadExpenseTypes,
-    loadWeeklyExpenses,
+    loadExpenseBudgets,
+    loadExpensePurchases,
+    loadGigs,
     refreshData,
   };
 

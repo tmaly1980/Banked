@@ -57,7 +57,7 @@ export default function PaycheckDetailsModal({
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>Date</Text>
                 <Text style={styles.infoValue}>
-                  {format(new Date(paycheck.date), 'MMM d, yyyy')}
+                  {paycheck.date ? format(new Date(paycheck.date), 'MMM d, yyyy') : 'No date'}
                 </Text>
               </View>
               

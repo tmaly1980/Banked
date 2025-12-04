@@ -35,7 +35,7 @@ export default function PaycheckFormModal({
   const { createPaycheck, updatePaycheck, deletePaycheck } = useBills();
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -49,7 +49,7 @@ export default function PaycheckFormModal({
   const resetForm = () => {
     setName('');
     setAmount('');
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate('');
     setNotes('');
   };
 
@@ -62,11 +62,6 @@ export default function PaycheckFormModal({
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
       showError('Please enter a valid amount');
-      return false;
-    }
-
-    if (!date) {
-      showError('Please enter a date');
       return false;
     }
 
@@ -83,7 +78,7 @@ export default function PaycheckFormModal({
       const paycheckData = {
         name: name.trim() || undefined,
         amount: amountNum,
-        date: dateToTimestamp(date),
+        date: date ? dateToTimestamp(date) : null,
         notes: notes.trim() || undefined,
       };
 
@@ -158,7 +153,7 @@ export default function PaycheckFormModal({
     if (visible && editingPaycheck) {
       setName(editingPaycheck.name || '');
       setAmount(editingPaycheck.amount.toString());
-      setDate(timestampToDate(editingPaycheck.date));
+      setDate(editingPaycheck.date ? timestampToDate(editingPaycheck.date) : '');
       setNotes(editingPaycheck.notes || '');
     } else if (visible && !editingPaycheck) {
       resetForm();

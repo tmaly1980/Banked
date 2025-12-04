@@ -22,7 +22,7 @@ import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
 import { format } from 'date-fns';
 
 export default function HomeScreen() {
-  const { bills, paychecks, expenseTypes, weeklyExpenses, loading, refreshData, deleteBill, deletePaycheck, saveWeeklyExpenses } = useBills();
+  const { bills, paychecks, expenseTypes, expenseBudgets, loading, refreshData, deleteBill, deletePaycheck, saveExpenseBudgets } = useBills();
   const [weeklyGroups, setWeeklyGroups] = useState<WeeklyGroup[]>([]);
   const [deferredBills, setDeferredBills] = useState<BillModel[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -63,14 +63,15 @@ export default function HomeScreen() {
       
       // Get paychecks for this week
       const weekPaychecks = paychecks.filter(paycheck => {
+        if (!paycheck.date) return false;
         const paycheckDate = new Date(paycheck.date);
         return paycheckDate >= group.startDate && paycheckDate <= group.endDate;
       });
       
       const weekPaycheckTotal = weekPaychecks.reduce((sum, pc) => sum + pc.amount, 0);
       
-      // Get weekly expenses for this week
-      const weekExpenses = weeklyExpenses.filter(exp => exp.week_start_date === weekStartDate);
+      // Get expense budgets for this week
+      const weekExpenses = expenseBudgets.filter(exp => exp.start_date === weekStartDate);
       const weekExpensesTotal = weekExpenses.reduce((sum, exp) => sum + exp.amount, 0);
       
       // Add carryover from previous week
@@ -84,7 +85,7 @@ export default function HomeScreen() {
     });
 
     setWeeklyGroups(groups);
-  }, [bills, paychecks, weeklyExpenses]);
+  }, [bills, paychecks, expenseBudgets]);
 
   const handleAddBill = () => {
     setEditingBill(null);
@@ -126,6 +127,7 @@ export default function HomeScreen() {
   const handlePaycheckTotalPress = (group: WeeklyGroup) => {
     // Filter paychecks for this week
     const weekPaychecks = paychecks.filter(paycheck => {
+      if (!paycheck.date) return false;
       const paycheckDate = new Date(paycheck.date);
       return paycheckDate >= group.startDate && paycheckDate <= group.endDate;
     });
@@ -182,13 +184,13 @@ export default function HomeScreen() {
     );
   };
 
-  const handleSaveWeeklyExpenses = async (
+  const handleSaveExpenseBudgets = async (
     expenses: Array<{ expense_type_id: string | null; expense_type_name: string; amount: number }>
   ) => {
     if (!selectedWeekForExpenses) return;
 
     const weekStartDate = format(selectedWeekForExpenses.startDate, 'yyyy-MM-dd');
-    await saveWeeklyExpenses(weekStartDate, expenses);
+    await saveExpenseBudgets(weekStartDate, expenses);
     await refreshData();
   };
 
@@ -286,12 +288,12 @@ export default function HomeScreen() {
         existingExpenseTypes={expenseTypes}
         existingWeeklyExpenses={
           selectedWeekForExpenses
-            ? weeklyExpenses.filter(exp => 
-                exp.week_start_date === format(selectedWeekForExpenses.startDate, 'yyyy-MM-dd')
+            ? expenseBudgets.filter(exp => 
+                exp.start_date === format(selectedWeekForExpenses.startDate, 'yyyy-MM-dd')
               )
             : []
         }
-        onSaveExpenses={handleSaveWeeklyExpenses}
+        onSaveExpenses={handleSaveExpenseBudgets}
         onViewPaycheck={handleViewPaycheck}
         onEditPaycheck={handleEditPaycheck}
         onDeletePaycheck={handleDeletePaycheck}
