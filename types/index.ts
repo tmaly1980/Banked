@@ -61,12 +61,23 @@ export interface ExpenseBudgetWithType extends ExpenseBudget {
   expense_type_name: string;
 }
 
+export interface ChecklistItem {
+  id: string;
+  name: string;
+  checked: boolean;
+  price?: number;
+}
+
 export interface ExpensePurchase {
   id: string;
   user_id: string;
   expense_type_id: string;
-  amount: number;
-  date: string;
+  title?: string;
+  estimated_amount?: number;
+  purchase_amount?: number;
+  purchase_date?: string;
+  checklist: ChecklistItem[];
+  photos: string[];
   notes?: string;
   created_at: string;
 }
@@ -106,6 +117,7 @@ export interface Gig {
   end_date: string;
   total_hours?: number;
   total_amount: number;
+  checklist: ChecklistItem[];
   created_at: string;
   updated_at: string;
 }

@@ -15,6 +15,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useBills } from '@/contexts/BillsContext';
 import SelectPicker from '@/components/SelectPicker';
+import AddPurchaseModal from '@/components/modals/AddPurchaseModal';
+import ViewPurchaseModal from '@/components/modals/ViewPurchaseModal';
 import { ExpenseType, ExpenseBudget, ExpensePurchase } from '@/types';
 import { format } from 'date-fns';
 import { InlineAlert } from '@/components/InlineAlert';
@@ -43,6 +45,9 @@ export default function ExpensesScreen() {
   
   const { alert, showError, showSuccess, hideAlert } = useInlineAlert();
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
+  const [addPurchaseModalVisible, setAddPurchaseModalVisible] = useState(false);
+  const [viewPurchaseModalVisible, setViewPurchaseModalVisible] = useState(false);
+  const [selectedPurchase, setSelectedPurchase] = useState<ExpensePurchase | null>(null);
   const [purchaseModalVisible, setPurchaseModalVisible] = useState(false);
   const [purchaseListVisible, setPurchaseListVisible] = useState(false);
   const [selectedExpenseType, setSelectedExpenseType] = useState<ExpenseType | null>(null);
@@ -67,16 +72,18 @@ export default function ExpensesScreen() {
       const typePurchases = expensePurchases.filter(p => p.expense_type_id === typeId);
       const typeBudget = expenseBudgets.find(b => b.expense_type_id === typeId);
       
-      const totalPurchases = typePurchases.reduce((sum, p) => sum + p.amount, 0);
+      const totalPurchases = typePurchases.reduce((sum, p) => sum + (p.purchase_amount || 0), 0);
       const budget = typeBudget?.amount || 0;
 
       rows.push({
         type,
         totalPurchases,
         budget,
-        purchases: typePurchases.sort((a, b) => 
-          new Date(b.date).getTime() - new Date(a.date).getTime()
-        ),
+        purchases: typePurchases.sort((a, b) => {
+          const dateA = a.purchase_date ? new Date(a.purchase_date).getTime() : new Date(a.created_at).getTime();
+          const dateB = b.purchase_date ? new Date(b.purchase_date).getTime() : new Date(b.created_at).getTime();
+          return dateB - dateA;
+        }),
       });
     });
 
@@ -88,7 +95,38 @@ export default function ExpensesScreen() {
   };
 
   const handleAddPurchase = () => {
-    setPurchaseModalVisible(true);
+    setAddPurchaseModalVisible(true);
+  };
+
+  const handlePurchaseAdded = async (data: { title: string; expense_type_id: string; notes?: string }) => {
+    try {
+      const { data: purchase, error } = await createExpensePurchase(data);
+      if (error) throw error;
+      
+      setAddPurchaseModalVisible(false);
+      showSuccess('Purchase added successfully');
+      
+      // Open view purchase modal with the new purchase
+      if (purchase) {
+        setSelectedPurchase(purchase);
+        setViewPurchaseModalVisible(true);
+      }
+      
+      await refreshData();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to add purchase');
+    }
+  };
+
+  const handleUpdatePurchase = async (id: string, updates: Partial<ExpensePurchase>) => {
+    try {
+      const { error } = await updateExpensePurchase(id, updates);
+      if (error) throw error;
+      
+      await refreshData();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to update purchase');
+    }
   };
 
   const handleRowPress = (row: ExpenseRow) => {
@@ -194,6 +232,27 @@ export default function ExpensesScreen() {
             showError(error instanceof Error ? error.message : 'Failed to save budget');
           }
         }}
+      />
+
+      {/* Add Purchase Modal */}
+      <AddPurchaseModal
+        visible={addPurchaseModalVisible}
+        onClose={() => setAddPurchaseModalVisible(false)}
+        expenseTypes={expenseTypes}
+        onSuccess={handlePurchaseAdded}
+      />
+
+      {/* View Purchase Modal */}
+      <ViewPurchaseModal
+        visible={viewPurchaseModalVisible}
+        onClose={() => {
+          setViewPurchaseModalVisible(false);
+          setSelectedPurchase(null);
+        }}
+        purchase={selectedPurchase}
+        expenseType={selectedPurchase ? expenseTypes.find(t => t.id === selectedPurchase.expense_type_id) || null : null}
+        budget={selectedPurchase ? expenseBudgets.find(b => b.expense_type_id === selectedPurchase.expense_type_id) || null : null}
+        onUpdate={handleUpdatePurchase}
       />
 
       {/* Purchase Modal */}

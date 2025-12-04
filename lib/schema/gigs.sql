@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS gigs (
   end_date DATE,
   total_hours NUMERIC,
   total_amount NUMERIC NOT NULL,
+  checklist JSONB DEFAULT '[]'::JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -57,5 +58,6 @@ CREATE POLICY "Users can delete their own gig paychecks"
 CREATE INDEX idx_gigs_user_id ON gigs(user_id);
 CREATE INDEX idx_gigs_start_date ON gigs(start_date);
 CREATE INDEX idx_gigs_end_date ON gigs(end_date);
+CREATE INDEX idx_gigs_checklist ON gigs USING GIN(checklist);
 CREATE INDEX idx_gig_paychecks_gig_id ON gig_paychecks(gig_id);
 CREATE INDEX idx_gig_paychecks_paycheck_id ON gig_paychecks(paycheck_id);

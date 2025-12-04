@@ -72,28 +72,35 @@ export class BillModel {
     return this.due_day !== undefined && this.due_day !== null;
   }
 
-  // Get the next due date for this bill
-  get nextDueDate(): Date | null {
+  // Get the next due date for this bill (from a reference date)
+  // For week-based views, use getBillDueDate() from utils instead
+  getNextDueDate(fromDate: Date = new Date()): Date | null {
     if (this.due_date) {
       // One-time bill
       return new Date(this.due_date);
     } else if (this.due_day) {
-      // Recurring bill - calculate next occurrence
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = today.getMonth();
+      // Recurring bill - calculate next occurrence from reference date
+      const refDate = new Date(fromDate);
+      refDate.setHours(0, 0, 0, 0);
+      const year = refDate.getFullYear();
+      const month = refDate.getMonth();
       
       // Try current month first
       let dueDate = new Date(year, month, this.due_day);
       
-      // If the due date has passed, use next month
-      if (dueDate < today) {
+      // If the due date has passed the reference date, use next month
+      if (dueDate < refDate) {
         dueDate = new Date(year, month + 1, this.due_day);
       }
       
       return dueDate;
     }
     return null;
+  }
+
+  // Getter for backward compatibility - uses today as reference
+  get nextDueDate(): Date | null {
+    return this.getNextDueDate();
   }
 
   // Get the next date (scheduled payment date or due date)

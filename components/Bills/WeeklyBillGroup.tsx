@@ -74,22 +74,31 @@ export default function WeeklyBillGroup({
     if (group.bills.length === 0) return null;
 
     // Find the last bill due date in this week
+    // Always use getBillDueDate with the week's startDate for context
     const billDates = group.bills
-      .map(bill => bill.next_date || getBillDueDate(bill, group.startDate))
+      .map(bill => getBillDueDate(bill, group.startDate))
       .filter(date => date !== null) as Date[];
     
     if (billDates.length === 0) return null;
 
     const lastBillDate = new Date(Math.max(...billDates.map(d => d.getTime())));
+    lastBillDate.setHours(0, 0, 0, 0);
     
-    // Calculate from today or start of week (whichever is later)
+    // Calculate from today to last bill date
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const weekStart = new Date(group.startDate);
-    weekStart.setHours(0, 0, 0, 0);
     
-    const startDate = today > weekStart ? today : weekStart;
-    const daysToGo = Math.ceil((lastBillDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const daysToGo = Math.ceil((lastBillDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Debug logging
+    console.log('=== Days To Go Calculation ===');
+    console.log('Week:', formatWeekLabel(group.startDate, group.endDate));
+    console.log('Today:', today.toISOString());
+    console.log('Last Bill Date:', lastBillDate.toISOString());
+    console.log('Bill Dates:', billDates.map(d => d.toISOString()));
+    console.log('Bills:', group.bills.map(b => ({ name: b.name, due_day: b.due_day, due_date: b.due_date })));
+    console.log('Days To Go:', daysToGo);
+    console.log('=============================');
     
     return daysToGo;
   };
@@ -149,8 +158,8 @@ export default function WeeklyBillGroup({
         {group.bills.length > 0 ? (
           <View style={styles.billsList}>
           {group.bills.map((bill) => {
-            // Use next_date which considers deferred payments, fallback to getBillDueDate for recurring bills in this week
-            const displayDate = bill.next_date || getBillDueDate(bill, group.startDate);
+            // Always use getBillDueDate with week start date for proper context
+            const displayDate = getBillDueDate(bill, group.startDate);
             const priorityColor = getPriorityColor(bill.priority);
             const priorityIcon = getPriorityIcon(bill.priority);
             return (

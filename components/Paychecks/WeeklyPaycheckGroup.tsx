@@ -57,7 +57,9 @@ export default function WeeklyPaycheckGroup({
 
         {/* Paychecks List */}
         <View style={styles.paychecksList}>
-          {paychecks.map((paycheck) => (
+          {paychecks
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+            .map((paycheck) => (
             <TouchableOpacity
               key={paycheck.id}
               style={styles.paycheckItem}

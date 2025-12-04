@@ -147,8 +147,8 @@ export const useExpenseOperations = (
 
   const createExpensePurchase = useCallback(async (data: {
     expense_type_id: string;
-    amount: number;
-    date: string;
+    title?: string;
+    estimated_amount?: number;
     notes?: string;
   }) => {
     if (!userId) return { data: null, error: new Error('User not authenticated') };
@@ -159,9 +159,11 @@ export const useExpenseOperations = (
         .insert({
           user_id: userId,
           expense_type_id: data.expense_type_id,
-          amount: data.amount,
-          date: data.date,
+          title: data.title,
+          estimated_amount: data.estimated_amount,
           notes: data.notes,
+          checklist: [],
+          photos: [],
         })
         .select()
         .single();
@@ -177,8 +179,12 @@ export const useExpenseOperations = (
   const updateExpensePurchase = useCallback(async (
     id: string,
     updates: {
-      amount?: number;
-      date?: string;
+      title?: string;
+      estimated_amount?: number;
+      purchase_amount?: number;
+      purchase_date?: string;
+      checklist?: any[];
+      photos?: string[];
       notes?: string;
     }
   ) => {

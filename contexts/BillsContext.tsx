@@ -72,7 +72,6 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      setLoading(true);
       setError(null);
 
       // Fetch bills
@@ -110,8 +109,6 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load bills');
       console.error('Error loading bills:', err);
-    } finally {
-      setLoading(false);
     }
   }, [user]);
 
@@ -122,7 +119,6 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      setLoading(true);
       setError(null);
 
       const { data, error: paychecksError } = await supabase
@@ -137,8 +133,6 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load paychecks');
       console.error('Error loading paychecks:', err);
-    } finally {
-      setLoading(false);
     }
   }, [user]);
 
@@ -249,7 +243,12 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
   }, [user]);
 
   const refreshData = useCallback(async () => {
-    await Promise.all([loadBills(), loadPaychecks(), loadExpenseTypes(), loadExpenseBudgets(), loadExpensePurchases(), loadGigs()]);
+    try {
+      setLoading(true);
+      await Promise.all([loadBills(), loadPaychecks(), loadExpenseTypes(), loadExpenseBudgets(), loadExpensePurchases(), loadGigs()]);
+    } finally {
+      setLoading(false);
+    }
   }, [loadBills, loadPaychecks, loadExpenseTypes, loadExpenseBudgets, loadExpensePurchases, loadGigs]);
 
   // Use custom hooks for operations

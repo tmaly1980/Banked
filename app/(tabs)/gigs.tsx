@@ -15,14 +15,16 @@ import { format, parseISO } from 'date-fns';
 import { groupGigsByWeek, formatWeekLabel } from '@/lib/utils';
 import GigFormModal from '@/components/modals/GigFormModal';
 import LinkPaychecksModal from '@/components/modals/LinkPaychecksModal';
+import ViewGigModal from '@/components/modals/ViewGigModal';
 
 export default function GigsScreen() {
-  const { gigs, paychecks, loading, refreshData, deleteGig } = useBills();
+  const { gigs, paychecks, loading, refreshData, deleteGig, updateGig } = useBills();
   const [gigFormVisible, setGigFormVisible] = useState(false);
   const [linkPaychecksVisible, setLinkPaychecksVisible] = useState(false);
+  const [viewGigVisible, setViewGigVisible] = useState(false);
   const [editingGig, setEditingGig] = useState<GigWithPaychecks | null>(null);
   const [selectedGig, setSelectedGig] = useState<GigWithPaychecks | null>(null);
-  const [expandedGigs, setExpandedGigs] = useState<Set<string>>(new Set());
+  const [viewingGig, setViewingGig] = useState<GigWithPaychecks | null>(null);
 
   useEffect(() => {
     refreshData();
@@ -68,14 +70,18 @@ export default function GigsScreen() {
     setLinkPaychecksVisible(true);
   };
 
-  const toggleGigDetails = (gigId: string) => {
-    const newExpanded = new Set(expandedGigs);
-    if (newExpanded.has(gigId)) {
-      newExpanded.delete(gigId);
-    } else {
-      newExpanded.add(gigId);
+  const handleViewGig = (gig: GigWithPaychecks) => {
+    setViewingGig(gig);
+    setViewGigVisible(true);
+  };
+
+  const handleUpdateGig = async (updates: Partial<GigWithPaychecks>) => {
+    if (!viewingGig) return;
+
+    const { error } = await updateGig(viewingGig.id, updates);
+    if (error) {
+      Alert.alert('Error', error.message);
     }
-    setExpandedGigs(newExpanded);
   };
 
   const formatAmount = (amount: number) => {
@@ -141,100 +147,37 @@ export default function GigsScreen() {
                 <Text style={styles.emptyWeekText}>No gigs this week</Text>
               </View>
             ) : (
-              group.gigs.map(gig => {
-                const isExpanded = expandedGigs.has(gig.id);
-                return (
-                  <View key={gig.id} style={styles.gigCard}>
-                    <TouchableOpacity
-                      onPress={() => toggleGigDetails(gig.id)}
-                      style={styles.gigHeader}
-                    >
-                      <View style={styles.gigMainInfo}>
-                        <Text style={styles.gigName}>{gig.name}</Text>
-                        <Text style={styles.gigDateRange}>
-                          {formatDateRange(gig.start_date, gig.end_date)}
+              group.gigs.map(gig => (
+                <TouchableOpacity
+                  key={gig.id}
+                  style={styles.gigCard}
+                  onPress={() => handleViewGig(gig)}
+                >
+                  <View style={styles.gigHeader}>
+                    <View style={styles.gigMainInfo}>
+                      <Text style={styles.gigName}>{gig.name}</Text>
+                      <Text style={styles.gigDateRange}>
+                        {formatDateRange(gig.start_date, gig.end_date)}
+                      </Text>
+                    </View>
+                    <View style={styles.gigAmountInfo}>
+                      <Text style={styles.gigAmount}>
+                        {formatAmount(gig.total_amount)}
+                      </Text>
+                      {gig.total_hours && (
+                        <Text style={styles.gigHours}>
+                          {formatHours(gig.total_hours)}
                         </Text>
-                      </View>
-                      <View style={styles.gigAmountInfo}>
-                        <Text style={styles.gigAmount}>
-                          {formatAmount(gig.total_amount)}
-                        </Text>
-                        {gig.total_hours && (
-                          <Text style={styles.gigHours}>
-                            {formatHours(gig.total_hours)}
-                          </Text>
-                        )}
-                      </View>
-                      <Ionicons
-                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                        size={24}
-                        color="#7f8c8d"
-                      />
-                    </TouchableOpacity>
-
-                    {isExpanded && (
-                      <View style={styles.gigDetails}>
-                        {gig.description && (
-                          <View style={styles.detailSection}>
-                            <Text style={styles.detailLabel}>Description:</Text>
-                            <Text style={styles.detailText}>{gig.description}</Text>
-                          </View>
-                        )}
-
-                        {/* Linked Paychecks */}
-                        <View style={styles.detailSection}>
-                          <Text style={styles.detailLabel}>
-                            Linked Paychecks ({gig.paychecks.length}):
-                          </Text>
-                          {gig.paychecks.length === 0 ? (
-                            <Text style={styles.noPaychecksText}>
-                              No paychecks linked
-                            </Text>
-                          ) : (
-                            gig.paychecks.map(pc => (
-                              <View key={pc.id} style={styles.paycheckItem}>
-                                <Text style={styles.paycheckDate}>
-                                  {pc.date ? format(parseISO(pc.date), 'MMM d, yyyy') : 'No date'}
-                                </Text>
-                                <Text style={styles.paycheckAmount}>
-                                  {formatAmount(pc.amount)}
-                                </Text>
-                              </View>
-                            ))
-                          )}
-                        </View>
-
-                        {/* Action Buttons */}
-                        <View style={styles.actionButtons}>
-                          <TouchableOpacity
-                            onPress={() => handleLinkPaychecks(gig)}
-                            style={styles.linkButton}
-                          >
-                            <Ionicons name="link" size={20} color="#3498db" />
-                            <Text style={styles.linkButtonText}>
-                              Link Paychecks
-                            </Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            onPress={() => handleEditGig(gig)}
-                            style={styles.editButton}
-                          >
-                            <Ionicons name="pencil" size={20} color="#f39c12" />
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            onPress={() => handleDeleteGig(gig)}
-                            style={styles.deleteButton}
-                          >
-                            <Ionicons name="trash" size={20} color="#e74c3c" />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    )}
+                      )}
+                    </View>
+                    <Ionicons
+                      name="chevron-forward"
+                      size={24}
+                      color="#7f8c8d"
+                    />
                   </View>
-                );
-              })
+                </TouchableOpacity>
+              ))
             )}
           </View>
         ))}
@@ -258,6 +201,16 @@ export default function GigsScreen() {
           setLinkPaychecksVisible(false);
           setSelectedGig(null);
         }}
+      />
+
+      <ViewGigModal
+        visible={viewGigVisible}
+        gig={viewingGig}
+        onClose={() => {
+          setViewGigVisible(false);
+          setViewingGig(null);
+        }}
+        onUpdate={handleUpdateGig}
       />
     </View>
   );
@@ -334,7 +287,7 @@ const styles = StyleSheet.create({
   gigHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 16,
     gap: 12,
   },
   gigMainInfo: {
@@ -362,78 +315,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7f8c8d',
     marginTop: 2,
-  },
-  gigDetails: {
-    padding: 12,
-    paddingTop: 0,
-    backgroundColor: '#f8f9fa',
-  },
-  detailSection: {
-    marginBottom: 12,
-  },
-  detailLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#7f8c8d',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#2c3e50',
-    lineHeight: 20,
-  },
-  noPaychecksText: {
-    fontSize: 14,
-    color: '#95a5a6',
-    fontStyle: 'italic',
-  },
-  paycheckItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: 'white',
-    borderRadius: 6,
-    marginBottom: 6,
-  },
-  paycheckDate: {
-    fontSize: 14,
-    color: '#2c3e50',
-  },
-  paycheckAmount: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#27ae60',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
-  linkButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    padding: 10,
-    backgroundColor: '#e3f2fd',
-    borderRadius: 6,
-  },
-  linkButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#3498db',
-  },
-  editButton: {
-    padding: 10,
-    backgroundColor: '#fff3e0',
-    borderRadius: 6,
-  },
-  deleteButton: {
-    padding: 10,
-    backgroundColor: '#ffebee',
-    borderRadius: 6,
   },
 });
