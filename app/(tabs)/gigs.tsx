@@ -220,6 +220,12 @@ export default function GigsScreen() {
           setViewingGig(null);
         }}
         onUpdate={handleUpdateGig}
+        onEdit={() => {
+          if (viewingGig) {
+            setViewGigVisible(false);
+            handleEditGig(viewingGig);
+          }
+        }}
       />
     </View>
   );

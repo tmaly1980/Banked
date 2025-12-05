@@ -287,6 +287,13 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
   // Setup realtime subscriptions
   useRealtimeSubscriptions(user?.id, loadBills);
 
+  // Initial data load when user becomes available
+  useEffect(() => {
+    if (user) {
+      refreshData();
+    }
+  }, [user, refreshData]);
+
   // Cleanup: Reset loading state on unmount or hot reload
   useEffect(() => {
     return () => {

@@ -101,7 +101,7 @@ export default function HomeScreen() {
         const purchaseDate = new Date(purchase.purchase_date);
         return purchaseDate >= group.startDate && purchaseDate <= group.endDate;
       });
-      const weekPurchasesTotal = weekPurchases.reduce((sum, p) => sum + (p.purchase_amount || 0), 0);
+      const weekPurchasesTotal = weekPurchases.reduce((sum, p) => sum + (p.purchase_amount || p.estimated_amount || 0), 0);
       
       // Use the greater of budgeted or actual expenses
       const weekExpenseDeduction = Math.max(weekExpensesTotal, weekPurchasesTotal);

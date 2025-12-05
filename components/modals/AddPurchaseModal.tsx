@@ -20,7 +20,7 @@ interface AddPurchaseModalProps {
   visible: boolean;
   onClose: () => void;
   expenseTypes: ExpenseType[];
-  onSuccess: (data: { description?: string; expense_type_id: string; amount: number; purchase_date: string }) => void;
+  onSuccess: (data: { description?: string; expense_type_id: string; amount?: number; purchase_date?: string }) => void;
 }
 
 export default function AddPurchaseModal({
@@ -93,6 +93,27 @@ export default function AddPurchaseModal({
     console.log('[AddPurchaseModal] === handleSave END ===');
   };
 
+  const handleDateChange = (value: string) => {
+    setPurchaseDate(value);
+    
+    // Auto-generate description if date is valid and description is empty
+    if (value && !description && selectedTypeId) {
+      const selectedType = expenseTypes.find(t => t.id === selectedTypeId);
+      if (selectedType) {
+        try {
+          const date = new Date(value);
+          if (!isNaN(date.getTime())) {
+            const formattedDate = format(date, 'MM/dd');
+            const autoDescription = `${selectedType.name} ${formattedDate}`;
+            setDescription(autoDescription);
+          }
+        } catch (e) {
+          // Invalid date, ignore
+        }
+      }
+    }
+  };
+
   const isValid = !!selectedTypeId;
 
   const pickerItems = expenseTypes.map(type => ({
@@ -129,23 +150,12 @@ export default function AddPurchaseModal({
             />
           </View>
 
-          <View style={globalStyles.inputGroup}>
-            <Text style={globalStyles.label}>Description (optional)</Text>
-            <TextInput
-              style={globalStyles.input}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="e.g. Weekly Groceries"
-              placeholderTextColor="#999"
-            />
-          </View>
-
           <View style={styles.rowContainer}>
             <View style={styles.rowItemLeft}>
               <DateInput
                 label="Date (optional)"
                 value={purchaseDate}
-                onChangeDate={setPurchaseDate}
+                onChangeDate={handleDateChange}
               />
             </View>
             <View style={styles.rowItemRight}>
@@ -157,8 +167,29 @@ export default function AddPurchaseModal({
                 placeholder="$0.00"
                 placeholderTextColor="#999"
                 keyboardType="decimal-pad"
+              />
+            </View>
+          </View>
+
+          <View style={globalStyles.inputGroup}>
+            <Text style={globalStyles.label}>Description (optional)</Text>
+            <View style={styles.descriptionInputContainer}>
+              <TextInput
+                style={globalStyles.input}
+                value={description}
+                onChangeText={setDescription}
+                placeholder="e.g. Weekly Groceries"
+                placeholderTextColor="#999"
                 autoFocus
               />
+              {description.length > 0 && (
+                <TouchableOpacity
+                  style={styles.clearButton}
+                  onPress={() => setDescription('')}
+                >
+                  <Text style={styles.clearButtonText}>✕</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </ScrollView>
@@ -174,9 +205,25 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   rowItemLeft: {
-    flex: 2,
+    flex: 3,
   },
   rowItemRight: {
-    flex: 1,
+    flex: 2,
+  },
+  descriptionInputContainer: {
+    position: 'relative',
+  },
+  clearButton: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearButtonText: {
+    fontSize: 18,
+    color: '#999',
   },
 });

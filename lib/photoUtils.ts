@@ -2,10 +2,13 @@ import { supabase } from '@/lib/supabase';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 
-export interface PhotoUploadResult {
+export interface FileUploadResult {
   url: string;
   error: Error | null;
 }
+
+// Backwards compatibility alias
+export type PhotoUploadResult = FileUploadResult;
 
 /**
  * Request camera roll permissions
@@ -68,33 +71,61 @@ export async function takePhoto(): Promise<ImagePicker.ImagePickerAsset | null> 
   return result.assets[0];
 }
 
+export async function uriToFile(uri: string): Promise<Uint8Array> {
+    try {
+      // Use fetch to read the file as ArrayBuffer
+      const response = await fetch(uri);
+      const arrayBuffer = await response.arrayBuffer();
+      return new Uint8Array(arrayBuffer);
+    } catch (error) {
+      console.error('[FileUploadService] Error converting URI to file:', error);
+      throw error;
+    }
+  }
+
 /**
- * Upload a photo to Supabase storage
+ * Generic file upload function to Supabase storage
+ * Centralized function for all file uploads using modern FileSystem API
+ * @param uri - File URI to upload
+ * @param bucket - Supabase storage bucket name
+ * @param filePath - Path within the bucket (e.g., 'userId/purchaseId/filename.ext')
+ * @param contentType - Optional MIME type, will be inferred from extension if not provided
  */
-export async function uploadPurchasePhoto(
+export async function uploadFile(
   uri: string,
-  userId: string,
-  purchaseId: string
-): Promise<PhotoUploadResult> {
+  bucket: string,
+  filePath: string,
+  contentType?: string
+): Promise<FileUploadResult> {
   try {
-    // Read file as base64
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+    // Convert URI to Uint8Array using fetch
+    const fileData = await uriToFile(uri);
 
-    // Get file extension
-    const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-    const fileName = `${userId}/${purchaseId}/${Date.now()}.${ext}`;
+    // Verify file has content
+    if (!fileData || fileData.length === 0) {
+      throw new Error('File is empty or could not be read');
+    }
 
-    // Convert base64 to blob for upload
-    const contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-    const blob = base64ToBlob(base64, contentType);
+    // Infer content type from file extension if not provided
+    let mimeType = contentType;
+    if (!mimeType) {
+      const ext = uri.split('.').pop()?.toLowerCase() || '';
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) {
+        mimeType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+      } else if (['pdf'].includes(ext)) {
+        mimeType = 'application/pdf';
+      } else if (['mp4', 'mov'].includes(ext)) {
+        mimeType = `video/${ext}`;
+      } else {
+        mimeType = 'application/octet-stream';
+      }
+    }
 
     // Upload to Supabase storage
     const { data, error } = await supabase.storage
-      .from('purchase-photos')
-      .upload(fileName, blob, {
-        contentType,
+      .from(bucket)
+      .upload(filePath, fileData, {
+        contentType: mimeType,
         upsert: false,
       });
 
@@ -104,7 +135,7 @@ export async function uploadPurchasePhoto(
 
     // Get public URL
     const { data: urlData } = supabase.storage
-      .from('purchase-photos')
+      .from(bucket)
       .getPublicUrl(data.path);
 
     return { url: urlData.publicUrl, error: null };
@@ -114,20 +145,36 @@ export async function uploadPurchasePhoto(
 }
 
 /**
- * Delete a photo from Supabase storage
+ * Upload a photo to Supabase storage (wrapper for uploadFile)
+ * @deprecated Use uploadFile for more flexibility
  */
-export async function deletePurchasePhoto(photoUrl: string): Promise<{ error: Error | null }> {
+export async function uploadPurchasePhoto(
+  uri: string,
+  userId: string,
+  purchaseId: string
+): Promise<PhotoUploadResult> {
+  const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+  const fileName = `${userId}/${purchaseId}/${Date.now()}.${ext}`;
+  return uploadFile(uri, 'purchase-photos', fileName);
+}
+
+/**
+ * Generic file deletion from Supabase storage
+ * @param fileUrl - Full URL of the file to delete
+ * @param bucket - Supabase storage bucket name
+ */
+export async function deleteFile(fileUrl: string, bucket: string): Promise<{ error: Error | null }> {
   try {
     // Extract file path from URL
-    const urlParts = photoUrl.split('/purchase-photos/');
+    const urlParts = fileUrl.split(`/${bucket}/`);
     if (urlParts.length < 2) {
-      throw new Error('Invalid photo URL');
+      throw new Error(`Invalid file URL for bucket: ${bucket}`);
     }
 
     const filePath = urlParts[1];
 
     const { error } = await supabase.storage
-      .from('purchase-photos')
+      .from(bucket)
       .remove([filePath]);
 
     if (error) {
@@ -141,23 +188,9 @@ export async function deletePurchasePhoto(photoUrl: string): Promise<{ error: Er
 }
 
 /**
- * Convert base64 string to Blob
+ * Delete a photo from Supabase storage (wrapper for deleteFile)
+ * @deprecated Use deleteFile for more flexibility
  */
-function base64ToBlob(base64: string, contentType: string): Blob {
-  const byteCharacters = atob(base64);
-  const byteArrays = [];
-
-  for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-    const slice = byteCharacters.slice(offset, offset + 512);
-    const byteNumbers = new Array(slice.length);
-    
-    for (let i = 0; i < slice.length; i++) {
-      byteNumbers[i] = slice.charCodeAt(i);
-    }
-    
-    const byteArray = new Uint8Array(byteNumbers);
-    byteArrays.push(byteArray);
-  }
-
-  return new Blob(byteArrays, { type: contentType });
+export async function deletePurchasePhoto(photoUrl: string): Promise<{ error: Error | null }> {
+  return deleteFile(photoUrl, 'purchase-photos');
 }

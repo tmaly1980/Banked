@@ -16,6 +16,7 @@ interface DateInputProps {
   value: string;
   onChangeDate: (date: string) => void;
   placeholder?: string;
+  required?: boolean;
 }
 
 export default function DateInput({
@@ -23,6 +24,7 @@ export default function DateInput({
   value,
   onChangeDate,
   placeholder = 'MM/DD/YYYY',
+  required = false,
 }: DateInputProps) {
   const [showCalendar, setShowCalendar] = useState(false);
   const [displayValue, setDisplayValue] = useState('');
@@ -106,7 +108,7 @@ export default function DateInput({
             keyboardType="number-pad"
             maxLength={10}
           />
-          {displayValue && (
+          {displayValue && !required && (
             <TouchableOpacity
               style={styles.clearButton}
               onPress={handleClear}

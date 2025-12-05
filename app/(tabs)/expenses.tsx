@@ -111,7 +111,7 @@ export default function ExpensesScreen() {
           return dateA - dateB;
         });
 
-      const total = typePurchases.reduce((sum, p) => sum + (p.purchase_amount || 0), 0);
+      const total = typePurchases.reduce((sum, p) => sum + (p.purchase_amount || p.estimated_amount || 0), 0);
 
       groups.push({ type, purchases: typePurchases, total });
     });
@@ -197,6 +197,11 @@ export default function ExpensesScreen() {
       
       setAddPurchaseModalVisible(false);
       showSuccess('Purchase added successfully');
+      
+      // If purchase has no date, switch to upcoming tab
+      if (!data.purchase_date) {
+        setActiveTab('upcoming');
+      }
       
       await refreshData();
     } catch (error) {
@@ -311,27 +316,25 @@ export default function ExpensesScreen() {
         }
       />
 
-      {/* Tab Selector - only show if there are upcoming purchases */}
-      {upcomingPurchases.length > 0 && (
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'weekly' && styles.activeTab]}
-            onPress={() => setActiveTab('weekly')}
-          >
-            <Text style={[styles.tabText, activeTab === 'weekly' && styles.activeTabText]}>
-              Weekly
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]}
-            onPress={() => setActiveTab('upcoming')}
-          >
-            <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>
-              Upcoming
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Tab Selector */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'weekly' && styles.activeTab]}
+          onPress={() => setActiveTab('weekly')}
+        >
+          <Text style={[styles.tabText, activeTab === 'weekly' && styles.activeTabText]}>
+            Weekly
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]}
+          onPress={() => setActiveTab('upcoming')}
+        >
+          <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>
+            Upcoming
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Week Selector (only for Weekly tab) */}
       {activeTab === 'weekly' && (
@@ -421,7 +424,7 @@ export default function ExpensesScreen() {
                           </Text>
                         </View>
                         <Text style={styles.purchaseAmount}>
-                          {formatAmount(purchase.purchase_amount || 0)}
+                          {formatAmount(purchase.purchase_amount || purchase.estimated_amount || 0)}
                         </Text>
                       </TouchableOpacity>
                     </Swipeable>

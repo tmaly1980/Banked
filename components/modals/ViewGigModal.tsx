@@ -19,6 +19,7 @@ interface ViewGigModalProps {
   onClose: () => void;
   gig: GigWithPaychecks | null;
   onUpdate: (updates: Partial<GigWithPaychecks>) => Promise<void>;
+  onEdit?: () => void;
 }
 
 export default function ViewGigModal({
@@ -26,6 +27,7 @@ export default function ViewGigModal({
   onClose,
   gig,
   onUpdate,
+  onEdit,
 }: ViewGigModalProps) {
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [isAddingItem, setIsAddingItem] = useState(false);
@@ -133,7 +135,12 @@ export default function ViewGigModal({
             <Text style={styles.title} numberOfLines={1}>
               {gig.name}
             </Text>
-            <View style={{ width: 60 }} />
+            {onEdit && (
+              <TouchableOpacity onPress={onEdit}>
+                <Text style={styles.editButton}>Edit</Text>
+              </TouchableOpacity>
+            )}
+            {!onEdit && <View style={{ width: 60 }} />}
           </View>
 
           <ScrollView style={styles.content}>
@@ -308,6 +315,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e1e8ed',
   },
   closeButton: {
+    fontSize: 17,
+    color: '#007AFF',
+  },
+  editButton: {
     fontSize: 17,
     color: '#007AFF',
   },

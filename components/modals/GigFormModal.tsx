@@ -206,57 +206,62 @@ export default function GigFormModal({ visible, gig, onClose }: GigFormModalProp
               />
             </View>
 
-            {/* Start Date */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Start Date *</Text>
-              <DateInput
-                label=""
-                value={startDate}
-                onChangeDate={handleStartDateChange}
-                placeholder="Select start date"
-              />
+            {/* Start Date and End Date Row */}
+            <View style={styles.rowContainer}>
+              <View style={styles.halfWidth}>
+                <Text style={styles.label}>Start Date *</Text>
+                <DateInput
+                  label=""
+                  value={startDate}
+                  onChangeDate={handleStartDateChange}
+                  placeholder="Start date"
+                  required={true}
+                />
+              </View>
+              <View style={styles.halfWidth}>
+                <Text style={styles.label}>End Date *</Text>
+                <DateInput
+                  label=""
+                  value={endDate}
+                  onChangeDate={setEndDate}
+                  placeholder="End date"
+                  required={true}
+                />
+                {startDate && !gig && (
+                  <Text style={styles.helperText}>
+                    Defaults to end of week
+                  </Text>
+                )}
+              </View>
             </View>
 
-            {/* End Date */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>End Date *</Text>
-              <DateInput
-                label=""
-                value={endDate}
-                onChangeDate={setEndDate}
-                placeholder="Select end date"
-              />
-              {startDate && !gig && (
-                <Text style={styles.helperText}>
-                  Defaults to end of week
-                </Text>
-              )}
-            </View>
-
-            {/* Total Hours */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Total Hours</Text>
-              <TextInput
-                style={styles.input}
-                value={totalHours}
-                onChangeText={setTotalHours}
-                placeholder="e.g., 40"
-                placeholderTextColor="#95a5a6"
-                keyboardType="decimal-pad"
-              />
-            </View>
-
-            {/* Total Amount */}
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Total Amount *</Text>
-              <TextInput
-                style={styles.input}
-                value={totalAmount}
-                onChangeText={setTotalAmount}
-                placeholder="e.g., 1500.00"
-                placeholderTextColor="#95a5a6"
-                keyboardType="decimal-pad"
-              />
+            {/* Total Hours and Total Amount Row */}
+            <View style={styles.rowContainer}>
+              <View style={styles.halfWidth}>
+                <Text style={styles.label}>Total Hours</Text>
+                <TextInput
+                  style={styles.input}
+                  value={totalHours}
+                  onChangeText={setTotalHours}
+                  placeholder="e.g., 40"
+                  placeholderTextColor="#95a5a6"
+                  keyboardType="decimal-pad"
+                />
+              </View>
+              <View style={styles.halfWidth}>
+                <Text style={styles.label}>Total Amount *</Text>
+                <View style={styles.amountInputWrapper}>
+                  <Text style={styles.dollarSign}>$</Text>
+                  <TextInput
+                    style={styles.amountInput}
+                    value={totalAmount}
+                    onChangeText={setTotalAmount}
+                    placeholder="0.00"
+                    placeholderTextColor="#95a5a6"
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              </View>
             </View>
           </ScrollView>
 
@@ -320,6 +325,14 @@ const styles = StyleSheet.create({
   inputGroup: {
     marginBottom: 16,
   },
+  rowContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  halfWidth: {
+    flex: 1,
+  },
   label: {
     fontSize: 14,
     fontWeight: '600',
@@ -338,6 +351,26 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  amountInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#dfe6e9',
+    borderRadius: 8,
+    backgroundColor: 'white',
+  },
+  dollarSign: {
+    fontSize: 16,
+    color: '#2c3e50',
+    paddingLeft: 12,
+    fontWeight: '500',
+  },
+  amountInput: {
+    flex: 1,
+    padding: 12,
+    fontSize: 16,
+    color: '#2c3e50',
   },
   helperText: {
     fontSize: 12,
