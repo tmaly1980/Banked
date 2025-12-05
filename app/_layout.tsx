@@ -4,6 +4,7 @@ import { Slot, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { BillsProvider } from '@/contexts/BillsContext';
+import { PaychecksProvider } from '@/contexts/PaychecksContext';
 import { ToastProvider } from '@/components/CustomToast';
 
 function RootLayoutNav() {
@@ -37,9 +38,11 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
         <BillsProvider>
-          <ToastProvider>
-            <RootLayoutNav />
-          </ToastProvider>
+          <PaychecksProvider>
+            <ToastProvider>
+              <RootLayoutNav />
+            </ToastProvider>
+          </PaychecksProvider>
         </BillsProvider>
       </AuthProvider>
     </GestureHandlerRootView>

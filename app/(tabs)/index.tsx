@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
   Text,
 } from 'react-native';
 import { useBills } from '@/contexts/BillsContext';
+import { useRecurringPaychecks } from '@/hooks/useRecurringPaychecks';
 import TabScreenHeader from '@/components/TabScreenHeader';
 import { groupBillsByWeek } from '@/lib/utils';
 import { WeeklyGroup, Paycheck, WeeklyPaycheckGroup } from '@/types';
@@ -21,10 +22,12 @@ import PaycheckDetailsModal from '@/components/modals/PaycheckDetailsModal';
 import { globalStyles } from '@/lib/globalStyles';
 import WeeklyBillGroup from '@/components/Bills/WeeklyBillGroup';
 import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
-import { format } from 'date-fns';
+import { format, addWeeks, subWeeks } from 'date-fns';
+import { generateRecurringPaycheckInstances, formatDateForDB } from '@/utils/paycheckHelpers';
 
 export default function HomeScreen() {
   const { bills, paychecks, expenseTypes, expenseBudgets, expensePurchases, loading, refreshData, deleteBill, deletePaycheck, saveExpenseBudgets } = useBills();
+  const { recurringPaychecks, loadRecurringPaychecks } = useRecurringPaychecks();
   const [weeklyGroups, setWeeklyGroups] = useState<WeeklyGroup[]>([]);
   const [deferredBills, setDeferredBills] = useState<BillModel[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -40,8 +43,55 @@ export default function HomeScreen() {
   const [selectedWeekForExpenses, setSelectedWeekForExpenses] = useState<WeeklyGroup | null>(null);
 
   useEffect(() => {
-    refreshData();
+    const init = async () => {
+      await refreshData();
+      await loadRecurringPaychecks();
+    };
+    init();
   }, []);
+
+  // Generate all paycheck instances (actual + recurring) for the 6-week range
+  const allPaycheckInstances = useMemo(() => {
+    const now = new Date();
+    const rangeStart = subWeeks(now, 3);
+    const rangeEnd = addWeeks(now, 3);
+
+    console.log('[HomeScreen] Generating paycheck instances for range:', {
+      rangeStart: formatDateForDB(rangeStart),
+      rangeEnd: formatDateForDB(rangeEnd),
+    });
+
+    // Start with actual paychecks
+    const instances = [...paychecks];
+
+    // Generate instances from recurring paychecks
+    recurringPaychecks.forEach(recurring => {
+      const dates = generateRecurringPaycheckInstances(recurring, rangeStart, rangeEnd);
+
+      dates.forEach(date => {
+        const dateStr = formatDateForDB(date);
+        
+        // Check if there's already an actual paycheck for this date and recurring_paycheck_id
+        const hasActual = paychecks.some(
+          p => p.date === dateStr && p.recurring_paycheck_id === recurring.id
+        );
+
+        // Only add generated instance if no actual paycheck exists
+        if (!hasActual) {
+          instances.push({
+            id: `generated-${recurring.id}-${dateStr}`,
+            user_id: recurring.user_id,
+            amount: recurring.amount,
+            date: dateStr,
+            recurring_paycheck_id: recurring.id,
+            created_at: new Date().toISOString(),
+          });
+        }
+      });
+    });
+
+    return instances;
+  }, [paychecks, recurringPaychecks]);
 
   useEffect(() => {
     // Separate deferred and regular bills
@@ -63,8 +113,8 @@ export default function HomeScreen() {
     groups.forEach(group => {
       const weekStartDate = format(group.startDate, 'yyyy-MM-dd');
       
-      // Get paychecks for this week
-      const weekPaychecks = paychecks.filter(paycheck => {
+      // Get paychecks for this week (use generated instances)
+      const weekPaychecks = allPaycheckInstances.filter(paycheck => {
         if (!paycheck.date) return false;
         const paycheckDate = new Date(paycheck.date);
         return paycheckDate >= group.startDate && paycheckDate <= group.endDate;
@@ -114,7 +164,7 @@ export default function HomeScreen() {
     });
 
     setWeeklyGroups(groups);
-  }, [bills, paychecks, expenseBudgets, expensePurchases]);
+  }, [bills, allPaycheckInstances, expenseBudgets, expensePurchases]);
 
   const handleAddBill = () => {
     setEditingBill(null);

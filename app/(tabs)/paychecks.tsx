@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,47 +9,129 @@ import {
   Alert,
 } from 'react-native';
 import { useBills } from '@/contexts/BillsContext';
+import { useRecurringPaychecks } from '@/hooks/useRecurringPaychecks';
 import TabScreenHeader from '@/components/TabScreenHeader';
 import { Paycheck, WeeklyPaycheckGroup } from '@/types';
 import { formatAmount } from '@/lib/utils';
 import PaycheckFormModal from '@/components/modals/PaycheckFormModal';
 import PaycheckDetailsModal from '@/components/modals/PaycheckDetailsModal';
 import WeeklyPaycheckGroupComponent from '@/components/Paychecks/WeeklyPaycheckGroup';
-import { format, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
+import { format, startOfWeek, endOfWeek, isWithinInterval, addWeeks, subWeeks } from 'date-fns';
 import { globalStyles } from '@/lib/globalStyles';
+import { generateRecurringPaycheckInstances, formatDateForDB } from '@/utils/paycheckHelpers';
+
+// Extended Paycheck type for generated instances
+export interface PaycheckInstance extends Omit<Paycheck, 'id' | 'created_at'> {
+  id: string;
+  isGenerated?: boolean;
+  recurring_paycheck_id?: string;
+  created_at: string;
+}
 
 export default function PaychecksScreen() {
   const { paychecks, loading, refreshData, deletePaycheck } = useBills();
+  const { recurringPaychecks, loadRecurringPaychecks } = useRecurringPaychecks();
   const [weeklyGroups, setWeeklyGroups] = useState<WeeklyPaycheckGroup[]>([]);
-  const [unknownPaychecks, setUnknownPaychecks] = useState<Paycheck[]>([]);
+  const [unknownPaychecks, setUnknownPaychecks] = useState<PaycheckInstance[]>([]);
   const [unknownTotal, setUnknownTotal] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
   const [editingPaycheck, setEditingPaycheck] = useState<Paycheck | null>(null);
+  const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
   const [selectedPaycheck, setSelectedPaycheck] = useState<Paycheck | null>(null);
 
   useEffect(() => {
-    refreshData();
+    const init = async () => {
+      await refreshData();
+      await loadRecurringPaychecks();
+    };
+    init();
   }, []);
+
+  // Generate paycheck instances from recurring paychecks within 6-week range
+  const allPaycheckInstances = useMemo(() => {
+    const now = new Date();
+    const rangeStart = now; // Start from today
+    const rangeEnd = addWeeks(now, 6);   // 6 weeks forward
+
+    console.log('[PaychecksScreen] Generating instances for range:', {
+      rangeStart: formatDateForDB(rangeStart),
+      rangeEnd: formatDateForDB(rangeEnd),
+      paychecksCount: paychecks.length,
+      recurringCount: recurringPaychecks.length,
+    });
+
+    // Start with actual paychecks
+    const instances: PaycheckInstance[] = paychecks.map(p => ({
+      ...p,
+      isGenerated: false,
+    }));
+
+    console.log('[PaychecksScreen] Starting with', instances.length, 'actual paychecks');
+
+    // Generate instances from recurring paychecks
+    recurringPaychecks.forEach(recurring => {
+      console.log('[PaychecksScreen] Processing recurring paycheck:', {
+        id: recurring.id,
+        amount: recurring.amount,
+        recurrence_unit: recurring.recurrence_unit,
+        interval: recurring.interval,
+        start_date: recurring.start_date,
+        end_date: recurring.end_date,
+      });
+
+      const dates = generateRecurringPaycheckInstances(recurring, rangeStart, rangeEnd);
+      
+      console.log('[PaychecksScreen] Generated', dates.length, 'dates for recurring paycheck:', recurring.id);
+
+      dates.forEach(date => {
+        const dateStr = formatDateForDB(date);
+        
+        // Check if there's already an actual paycheck for this date and recurring_paycheck_id
+        const hasActual = paychecks.some(
+          p => p.date === dateStr && p.recurring_paycheck_id === recurring.id
+        );
+
+        // Only add generated instance if no actual paycheck exists
+        if (!hasActual) {
+          instances.push({
+            id: `generated-${recurring.id}-${dateStr}`,
+            user_id: recurring.user_id,
+            amount: recurring.amount,
+            date: dateStr,
+            recurring_paycheck_id: recurring.id,
+            isGenerated: true,
+            created_at: new Date().toISOString(),
+          });
+          console.log('[PaychecksScreen] Added generated instance for', dateStr);
+        } else {
+          console.log('[PaychecksScreen] Skipping duplicate for', dateStr);
+        }
+      });
+    });
+
+    console.log('[PaychecksScreen] Total instances after generation:', instances.length);
+    return instances;
+  }, [paychecks, recurringPaychecks]);
 
   useEffect(() => {
     // Group paychecks by week
-    const { groups, unknown, unknownTotal } = groupPaychecksByWeek(paychecks);
+    const { groups, unknown, unknownTotal } = groupPaychecksByWeek(allPaycheckInstances);
     setWeeklyGroups(groups);
     setUnknownPaychecks(unknown);
     setUnknownTotal(unknownTotal);
-  }, [paychecks]);
+  }, [allPaycheckInstances]);
 
-  const groupPaychecksByWeek = (paychecks: Paycheck[]): { 
+  const groupPaychecksByWeek = (paychecks: PaycheckInstance[]): { 
     groups: WeeklyPaycheckGroup[]; 
-    unknown: Paycheck[];
+    unknown: PaycheckInstance[];
     unknownTotal: number;
   } => {
     if (paychecks.length === 0) return { groups: [], unknown: [], unknownTotal: 0 };
 
     // Create a map of weeks
     const weeksMap = new Map<string, WeeklyPaycheckGroup>();
-    const unknownPaychecks: Paycheck[] = [];
+    const unknownPaychecks: PaycheckInstance[] = [];
     let unknownTotal = 0;
 
     paychecks.forEach((paycheck) => {
@@ -101,17 +183,62 @@ export default function PaychecksScreen() {
 
   const handleAddPaycheck = () => {
     setEditingPaycheck(null);
+    setEditingRecurringId(null);
     setModalVisible(true);
   };
 
-  const handleViewPaycheck = (paycheck: Paycheck) => {
-    setEditingPaycheck(paycheck);
-    setModalVisible(true);
+  const handlePaycheckSuccess = async () => {
+    console.log('🔄 Refreshing all paycheck data...');
+    await refreshData();
+    await loadRecurringPaychecks();
   };
 
-  const handleEditPaycheck = (paycheck: Paycheck) => {
-    setEditingPaycheck(paycheck);
-    setModalVisible(true);
+  const handleViewPaycheck = async (paycheck: Paycheck) => {
+    // If it's a generated instance, we need to allow editing it (which creates an actual paycheck)
+    if ((paycheck as PaycheckInstance).isGenerated) {
+      await handleEditPaycheck(paycheck);
+    } else {
+      setEditingPaycheck(paycheck);
+      setEditingRecurringId(null);
+      setModalVisible(true);
+    }
+  };
+
+  const handleEditPaycheck = async (paycheck: Paycheck) => {
+    const instance = paycheck as PaycheckInstance;
+    
+    // If this is a generated instance, edit the recurring paycheck instead
+    if (instance.isGenerated && instance.recurring_paycheck_id) {
+      console.log('📝 Editing recurring paycheck:', instance.recurring_paycheck_id);
+      console.log('📝 Current recurring paychecks:', recurringPaychecks.map(rp => rp.id));
+      
+      // Ensure recurring paychecks are loaded
+      if (recurringPaychecks.length === 0) {
+        console.log('📝 Loading recurring paychecks...');
+        await loadRecurringPaychecks();
+      }
+      
+      // Reload to ensure we have fresh data
+      const { data } = await loadRecurringPaychecks();
+      console.log('📝 Loaded recurring paychecks:', data?.length, data?.map(rp => rp.id));
+      
+      const recurring = data?.find(rp => rp.id === instance.recurring_paycheck_id);
+      console.log('📝 Found recurring paycheck:', recurring);
+      
+      if (!recurring) {
+        Alert.alert('Error', 'Could not find recurring paycheck to edit');
+        return;
+      }
+      
+      setEditingRecurringId(instance.recurring_paycheck_id);
+      setEditingPaycheck(null);
+      setModalVisible(true);
+    } else {
+      // Regular one-time paycheck
+      setEditingPaycheck(paycheck);
+      setEditingRecurringId(null);
+      setModalVisible(true);
+    }
   };
 
   const handleDeletePaycheck = async (paycheck: Paycheck) => {
@@ -219,8 +346,9 @@ export default function PaychecksScreen() {
       <PaycheckFormModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onSuccess={refreshData}
+        onSuccess={handlePaycheckSuccess}
         editingPaycheck={editingPaycheck}
+        editingRecurringId={editingRecurringId}
       />
 
       {/* Paycheck Details Modal */}

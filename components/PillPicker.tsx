@@ -1,29 +1,49 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 
-interface PillPickerProps<T extends string> {
-  options: readonly T[];
+interface PillOption<T = string> {
+  label: string;
   value: T;
-  onChange: (value: T) => void;
-  labels?: Record<T, string>;
 }
 
-export default function PillPicker<T extends string>({
+interface PillPickerProps<T = string> {
+  options: PillOption<T>[] | readonly T[];
+  selectedValue?: T;
+  value?: T;
+  onSelect?: (value: T) => void;
+  onChange?: (value: T) => void;
+}
+
+export default function PillPicker<T = string>({
   options,
+  selectedValue,
   value,
+  onSelect,
   onChange,
-  labels,
 }: PillPickerProps<T>) {
+  const currentValue = selectedValue ?? value;
+  const handleChange = onSelect ?? onChange;
+
+  if (!handleChange) {
+    console.error('[PillPicker] Either onSelect or onChange must be provided');
+    return null;
+  }
+
+  // Check if options are objects with label/value or simple values
+  const isObjectOptions = options.length > 0 && typeof options[0] === 'object' && 'label' in options[0];
+
   return (
     <View style={styles.container}>
       {options.map((option, index) => {
-        const isSelected = option === value;
+        const optionValue = isObjectOptions ? (option as PillOption<T>).value : (option as T);
+        const optionLabel = isObjectOptions ? (option as PillOption<T>).label : String(option);
+        const isSelected = optionValue === currentValue;
         const isFirst = index === 0;
         const isLast = index === options.length - 1;
         
         return (
           <TouchableOpacity
-            key={option}
+            key={String(optionValue)}
             style={[
               styles.pill,
               isSelected && styles.pillSelected,
@@ -31,11 +51,11 @@ export default function PillPicker<T extends string>({
               isLast && styles.pillLast,
               !isFirst && !isLast && styles.pillMiddle,
             ]}
-            onPress={() => onChange(option)}
+            onPress={() => handleChange(optionValue)}
             activeOpacity={0.7}
           >
             <Text style={[styles.pillText, isSelected && styles.pillTextSelected]}>
-              {labels?.[option] || option}
+              {optionLabel}
             </Text>
           </TouchableOpacity>
         );

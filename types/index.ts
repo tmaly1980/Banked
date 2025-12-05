@@ -37,7 +37,27 @@ export interface Paycheck {
   amount: number;
   date: string | null;
   notes?: string;
+  recurring_paycheck_id?: string;
   created_at: string;
+}
+
+export type DayOfWeek = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday';
+export type RecurrenceUnit = 'week' | 'month';
+
+export interface RecurringPaycheck {
+  id: string;
+  user_id: string;
+  amount: number;
+  start_date: string;
+  end_date?: string;
+  recurrence_unit: RecurrenceUnit;
+  interval: number;
+  day_of_week?: DayOfWeek;
+  day_of_month?: number;
+  last_day_of_month: boolean;
+  last_business_day_of_month: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ExpenseType {
