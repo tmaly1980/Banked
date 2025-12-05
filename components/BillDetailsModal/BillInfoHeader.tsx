@@ -14,7 +14,7 @@ interface BillInfoHeaderProps {
 export default function BillInfoHeader({ bill, lastPayment }: BillInfoHeaderProps) {
   const dueDate = bill.next_date;
   const lastPaymentDate = lastPayment ? lastPayment.payment_date : null;
-  const daysLateBadge = lastPayment ? getDaysLateBadge(lastPayment) : null;
+  const daysLateBadge = lastPayment ? getDaysLateBadge(lastPayment, bill.due_day) : null;
 
   return (
     <View style={styles.section}>

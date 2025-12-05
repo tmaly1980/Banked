@@ -12,7 +12,7 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
   const [payments, setPayments] = useState<BillPayment[]>([]);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(localDate(new Date()));
-  const [appliedDate, setAppliedDate] = useState(localDate(new Date()));
+  const [appliedDate, setAppliedDate] = useState('');
   const [scheduledPaymentId, setScheduledPaymentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -53,10 +53,8 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
     } else {
       setScheduledPaymentId(null);
       setPaymentAmount(bill.amount.toString());
-      const dueDate = bill.next_date;
-      const defaultDate = dueDate ? localDate(dueDate) : localDate(new Date());
       setPaymentDate(localDate(new Date()));
-      setAppliedDate(defaultDate);
+      setAppliedDate('');
     }
   };
 
@@ -74,21 +72,24 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
       return;
     }
 
-    if (!appliedDate) {
-      toast.show({ type: 'error', text1: 'Please enter an applied date' });
-      return;
-    }
-
     setLoading(true);
     try {
+      // Determine if payment should be marked as paid
+      // If payment date is today or in the past, mark as paid
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const paymentDateObj = new Date(paymentDate);
+      paymentDateObj.setHours(0, 0, 0, 0);
+      const isPaid = paymentDateObj <= today;
+
       if (scheduledPaymentId) {
         // Update existing scheduled payment
         const { error } = await updateBillPayment(
           scheduledPaymentId,
           amount,
           dateToTimestamp(paymentDate),
-          dateToTimestamp(appliedDate),
-          false
+          appliedDate ? dateToTimestamp(appliedDate) : undefined,
+          isPaid
         );
         if (error) throw error;
         toast.show({ type: 'success', text1: 'Payment updated successfully' });
@@ -98,8 +99,8 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
           bill.id,
           amount,
           dateToTimestamp(paymentDate),
-          dateToTimestamp(appliedDate),
-          false
+          appliedDate ? dateToTimestamp(appliedDate) : undefined,
+          isPaid
         );
         if (error) throw error;
         toast.show({ type: 'success', text1: 'Payment saved successfully' });

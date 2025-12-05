@@ -72,9 +72,25 @@ export default function HomeScreen() {
       
       const weekPaycheckTotal = weekPaychecks.reduce((sum, pc) => sum + pc.amount, 0);
       
-      // Get expense budgets for this week
-      const weekExpenses = expenseBudgets.filter(exp => exp.start_date === weekStartDate);
-      const weekExpensesTotal = weekExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+      // Get active expense budgets for this week
+      const weekExpensesTotal = expenseTypes.reduce((sum, type) => {
+        // Find budgets for this expense type that are active for this week
+        const activeBudgets = expenseBudgets
+          .filter(b => {
+            if (b.expense_type_id !== type.id) return false;
+            
+            // Check if budget is active for this week
+            const effectiveFrom = new Date(b.effective_from);
+            const effectiveTo = b.effective_to ? new Date(b.effective_to) : null;
+            
+            return effectiveFrom <= group.startDate && (!effectiveTo || effectiveTo >= group.endDate);
+          })
+          .sort((a, b) => new Date(b.effective_from).getTime() - new Date(a.effective_from).getTime());
+        
+        // Use most recent active budget
+        const activeBudget = activeBudgets[0];
+        return sum + (activeBudget?.amount || 0);
+      }, 0);
       
       // Get actual expense purchases for this week
       const weekPurchases = expensePurchases.filter(purchase => {
@@ -204,12 +220,14 @@ export default function HomeScreen() {
 
     const weekStartDate = format(selectedWeekForExpenses.startDate, 'yyyy-MM-dd');
     // Map to the correct format expected by saveExpenseBudgets
-    const formattedExpenses = expenses.map(exp => ({
-      expense_type_id: exp.expense_type_id,
-      expense_type_name: exp.expense_type_name,
-      allocated_amount: exp.amount,
-      spent_amount: 0,
-    }));
+    const formattedExpenses = expenses
+      .filter((exp): exp is { expense_type_id: string; expense_type_name: string; amount: number } => 
+        exp.expense_type_id !== null
+      )
+      .map(exp => ({
+        expense_type_id: exp.expense_type_id,
+        amount: exp.amount,
+      }));
     await saveExpenseBudgets(weekStartDate, formattedExpenses);
     await refreshData();
   };
@@ -309,9 +327,27 @@ export default function HomeScreen() {
         existingExpenseTypes={expenseTypes}
         existingWeeklyExpenses={
           selectedWeekForExpenses
-            ? expenseBudgets.filter(exp => 
-                exp.start_date === format(selectedWeekForExpenses.startDate, 'yyyy-MM-dd')
-              )
+            ? expenseTypes.map(type => {
+                // Find active budget for this type in the selected week
+                const activeBudgets = expenseBudgets
+                  .filter(b => {
+                    if (b.expense_type_id !== type.id) return false;
+                    
+                    const effectiveFrom = new Date(b.effective_from);
+                    const effectiveTo = b.effective_to ? new Date(b.effective_to) : null;
+                    
+                    return effectiveFrom <= selectedWeekForExpenses.startDate && 
+                           (!effectiveTo || effectiveTo >= selectedWeekForExpenses.endDate);
+                  })
+                  .sort((a, b) => new Date(b.effective_from).getTime() - new Date(a.effective_from).getTime());
+                
+                const activeBudget = activeBudgets[0];
+                
+                return {
+                  expense_type_id: type.id,
+                  amount: activeBudget?.amount || 0,
+                };
+              }).filter(exp => exp.amount > 0)
             : []
         }
         onSaveExpenses={handleSaveExpenseBudgets}

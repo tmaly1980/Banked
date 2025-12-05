@@ -21,6 +21,7 @@ import TabScreenHeader from '@/components/TabScreenHeader';
 import SelectPicker from '@/components/SelectPicker';
 import AddPurchaseModal from '@/components/modals/AddPurchaseModal';
 import ViewPurchaseModal from '@/components/modals/ViewPurchaseModal';
+import EditExpenseBudgetModal from '@/components/modals/EditExpenseBudgetModal';
 import { ExpenseType, ExpenseBudget, ExpensePurchase } from '@/types';
 import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, isThisWeek, isSameDay } from 'date-fns';
 import { InlineAlert } from '@/components/InlineAlert';
@@ -56,6 +57,8 @@ export default function ExpensesScreen() {
   const [addPurchaseModalVisible, setAddPurchaseModalVisible] = useState(false);
   const [viewPurchaseModalVisible, setViewPurchaseModalVisible] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<ExpensePurchase | null>(null);
+  const [editBudgetModalVisible, setEditBudgetModalVisible] = useState(false);
+  const [selectedExpenseType, setSelectedExpenseType] = useState<ExpenseType | null>(null);
 
   useEffect(() => {
     refreshData();
@@ -63,6 +66,23 @@ export default function ExpensesScreen() {
 
   const weekStart = startOfWeek(selectedWeek, { weekStartsOn: 0 });
   const weekEnd = endOfWeek(selectedWeek, { weekStartsOn: 0 });
+
+  const getActiveBudget = (expenseTypeId: string): ExpenseBudget | null => {
+    // Find budgets for this expense type that are active for the selected week
+    const activeBudgets = expenseBudgets
+      .filter(b => {
+        if (b.expense_type_id !== expenseTypeId) return false;
+        
+        // Check if budget is active for the selected week
+        const effectiveFrom = new Date(b.effective_from);
+        const effectiveTo = b.effective_to ? new Date(b.effective_to) : null;
+        
+        return effectiveFrom <= weekStart && (!effectiveTo || effectiveTo >= weekEnd);
+      })
+      .sort((a, b) => new Date(b.effective_from).getTime() - new Date(a.effective_from).getTime());
+    
+    return activeBudgets[0] || null;
+  };
 
   // Group purchases by expense type for the selected week
   const weeklyPurchases = useMemo(() => {
@@ -128,15 +148,14 @@ export default function ExpensesScreen() {
   // Calculate totals for footer
   const { totalPurchases, totalBudget } = useMemo(() => {
     if (activeTab === 'weekly') {
-      const weekStartDate = format(weekStart, 'yyyy-MM-dd');
-      
       // Total purchases for the week
       const purchases = weeklyPurchases.reduce((sum, group) => sum + group.total, 0);
       
-      // Total budget for the week
-      const budgets = expenseBudgets
-        .filter(b => b.start_date === weekStartDate)
-        .reduce((sum, b) => sum + b.amount, 0);
+      // Total budget for the week - sum all active budgets
+      const budgets = expenseTypes.reduce((sum, type) => {
+        const activeBudget = getActiveBudget(type.id);
+        return sum + (activeBudget?.amount || 0);
+      }, 0);
       
       return { totalPurchases: purchases, totalBudget: budgets };
     } else {
@@ -146,7 +165,7 @@ export default function ExpensesScreen() {
       // No budget for upcoming (undated) purchases
       return { totalPurchases: purchases, totalBudget: 0 };
     }
-  }, [activeTab, weeklyPurchases, upcomingPurchases, expenseBudgets, weekStart]);
+  }, [activeTab, weeklyPurchases, upcomingPurchases, expenseBudgets, weekStart, expenseTypes]);
 
   const handlePreviousWeek = () => {
     setSelectedWeek(subWeeks(selectedWeek, 1));
@@ -217,6 +236,44 @@ export default function ExpensesScreen() {
       await refreshData();
     } catch (error) {
       showError(error instanceof Error ? error.message : 'Failed to delete purchase');
+    }
+  };
+
+  const handleExpenseTypePress = (type: ExpenseType) => {
+    setSelectedExpenseType(type);
+    setEditBudgetModalVisible(true);
+  };
+
+  const handleSaveBudget = async (data: {
+    expense_type_id: string;
+    effective_from: string;
+    effective_to?: string;
+    start_mmdd?: string;
+    end_mmdd?: string;
+    frequency: 'once' | 'weekly' | 'monthly' | 'yearly';
+    amount: number;
+    notes?: string;
+  }) => {
+    try {
+      const existingBudget = selectedExpenseType ? getActiveBudget(selectedExpenseType.id) : null;
+      
+      // If budget exists and dates haven't changed, update it
+      // Otherwise create a new budget record
+      if (existingBudget && 
+          existingBudget.effective_from === data.effective_from &&
+          existingBudget.effective_to === data.effective_to) {
+        const { error } = await updateExpenseBudget(existingBudget.id, data);
+        if (error) throw error;
+        showSuccess('Budget updated');
+      } else {
+        const { error } = await createExpenseBudget(data);
+        if (error) throw error;
+        showSuccess('Budget created');
+      }
+      
+      await refreshData();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to save budget');
     }
   };
 
@@ -325,13 +382,24 @@ export default function ExpensesScreen() {
               </Text>
             </View>
           ) : (
-            weeklyPurchases.map((group) => (
-              <View key={group.type.id} style={styles.categoryGroup}>
-                <View style={styles.categoryHeader}>
-                  <Text style={styles.categoryName}>{group.type.name}</Text>
-                  <Text style={styles.categoryTotal}>{formatAmount(group.total)}</Text>
-                </View>
-                <View style={styles.categoryCard}>
+            weeklyPurchases.map((group) => {
+              const activeBudget = getActiveBudget(group.type.id);
+              const budgetAmount = activeBudget?.amount || 0;
+              const isOverBudget = budgetAmount > 0 && group.total > budgetAmount;
+
+              return (
+                <View key={group.type.id} style={styles.categoryGroup}>
+                  <TouchableOpacity 
+                    style={styles.categoryHeader}
+                    onPress={() => handleExpenseTypePress(group.type)}
+                  >
+                    <Text style={styles.categoryName}>{group.type.name}</Text>
+                    <Text style={[styles.categoryTotal, isOverBudget && styles.overBudget]}>
+                      {formatAmount(group.total)}
+                      {budgetAmount > 0 && ` / ${formatAmount(budgetAmount)}`}
+                    </Text>
+                  </TouchableOpacity>
+                  <View style={styles.categoryCard}>
                   {group.purchases.map((purchase, index) => (
                     <Swipeable
                       key={purchase.id}
@@ -360,7 +428,8 @@ export default function ExpensesScreen() {
                   ))}
                 </View>
               </View>
-            ))
+              );
+            })
           )
         ) : (
           // Upcoming View
@@ -375,10 +444,13 @@ export default function ExpensesScreen() {
           ) : (
             upcomingPurchases.map((group) => (
               <View key={group.type.id} style={styles.categoryGroup}>
-                <View style={styles.categoryHeader}>
+                <TouchableOpacity 
+                  style={styles.categoryHeader}
+                  onPress={() => handleExpenseTypePress(group.type)}
+                >
                   <Text style={styles.categoryName}>{group.type.name}</Text>
                   <Text style={styles.categoryTotal}>{formatAmount(group.total)}</Text>
-                </View>
+                </TouchableOpacity>
                 <View style={styles.categoryCard}>
                   {group.purchases.map((purchase, index) => (
                     <Swipeable
@@ -441,6 +513,18 @@ export default function ExpensesScreen() {
         budget={selectedPurchase ? expenseBudgets.find(b => b.expense_type_id === selectedPurchase.expense_type_id) || null : null}
         onUpdate={handleUpdatePurchase}
         onDelete={handleDeletePurchase}
+      />
+
+      {/* Edit Budget Modal */}
+      <EditExpenseBudgetModal
+        visible={editBudgetModalVisible}
+        onClose={() => {
+          setEditBudgetModalVisible(false);
+          setSelectedExpenseType(null);
+        }}
+        expenseType={selectedExpenseType}
+        existingBudget={selectedExpenseType ? getActiveBudget(selectedExpenseType.id) : null}
+        onSave={handleSaveBudget}
       />
       </View>
     </GestureHandlerRootView>
@@ -555,6 +639,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#27ae60',
+  },
+  overBudget: {
+    color: '#e74c3c',
   },
   categoryCard: {
     backgroundColor: '#fff',

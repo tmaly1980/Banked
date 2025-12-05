@@ -9,7 +9,19 @@ export const usePaymentOperations = (userId: string | undefined, loadBills: () =
     appliedDate?: string,
     isPaid: boolean = false
   ) => {
-    if (!userId) return { data: null, error: new Error('User not authenticated') };
+    console.log('[addBillPayment] Starting payment creation:', {
+      billId,
+      amount,
+      paymentDate,
+      appliedDate,
+      isPaid,
+      userId,
+    });
+
+    if (!userId) {
+      console.error('[addBillPayment] User not authenticated');
+      return { data: null, error: new Error('User not authenticated') };
+    }
 
     try {
       const { data, error } = await supabase
@@ -25,13 +37,19 @@ export const usePaymentOperations = (userId: string | undefined, loadBills: () =
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[addBillPayment] Supabase error:', error);
+        throw error;
+      }
+
+      console.log('[addBillPayment] Payment created successfully:', data);
 
       // Refresh bills to update payment totals
       await loadBills();
 
       return { data, error: null };
     } catch (err) {
+      console.error('[addBillPayment] Exception caught:', err);
       return { data: null, error: err as Error };
     }
   }, [userId, loadBills]);
@@ -43,7 +61,19 @@ export const usePaymentOperations = (userId: string | undefined, loadBills: () =
     appliedDate?: string,
     isPaid?: boolean
   ) => {
-    if (!userId) return { data: null, error: new Error('User not authenticated') };
+    console.log('[updateBillPayment] Starting payment update:', {
+      paymentId,
+      amount,
+      paymentDate,
+      appliedDate,
+      isPaid,
+      userId,
+    });
+
+    if (!userId) {
+      console.error('[updateBillPayment] User not authenticated');
+      return { data: null, error: new Error('User not authenticated') };
+    }
 
     try {
       const updateData: any = {
@@ -61,19 +91,33 @@ export const usePaymentOperations = (userId: string | undefined, loadBills: () =
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[updateBillPayment] Supabase error:', error);
+        throw error;
+      }
+
+      console.log('[updateBillPayment] Payment updated successfully:', data);
 
       // Refresh bills to update payment totals
       await loadBills();
 
       return { data, error: null };
     } catch (err) {
+      console.error('[updateBillPayment] Exception caught:', err);
       return { data: null, error: err as Error };
     }
   }, [userId, loadBills]);
 
   const deleteBillPayment = useCallback(async (paymentId: string) => {
-    if (!userId) return { error: new Error('User not authenticated') };
+    console.log('[deleteBillPayment] Starting payment deletion:', {
+      paymentId,
+      userId,
+    });
+
+    if (!userId) {
+      console.error('[deleteBillPayment] User not authenticated');
+      return { error: new Error('User not authenticated') };
+    }
 
     try {
       const { error } = await supabase
@@ -82,17 +126,31 @@ export const usePaymentOperations = (userId: string | undefined, loadBills: () =
         .eq('id', paymentId)
         .eq('user_id', userId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[deleteBillPayment] Supabase error:', error);
+        throw error;
+      }
+
+      console.log('[deleteBillPayment] Payment deleted successfully');
 
       await loadBills();
       return { error: null };
     } catch (err) {
+      console.error('[deleteBillPayment] Exception caught:', err);
       return { error: err as Error };
     }
   }, [userId, loadBills]);
 
   const markPaymentAsPaid = useCallback(async (paymentId: string) => {
-    if (!userId) return { error: new Error('User not authenticated') };
+    console.log('[markPaymentAsPaid] Marking payment as paid:', {
+      paymentId,
+      userId,
+    });
+
+    if (!userId) {
+      console.error('[markPaymentAsPaid] User not authenticated');
+      return { error: new Error('User not authenticated') };
+    }
 
     try {
       const { error } = await supabase
@@ -101,11 +159,17 @@ export const usePaymentOperations = (userId: string | undefined, loadBills: () =
         .eq('id', paymentId)
         .eq('user_id', userId);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[markPaymentAsPaid] Supabase error:', error);
+        throw error;
+      }
+
+      console.log('[markPaymentAsPaid] Payment marked as paid successfully');
 
       await loadBills();
       return { error: null };
     } catch (err) {
+      console.error('[markPaymentAsPaid] Exception caught:', err);
       return { error: err as Error };
     }
   }, [userId, loadBills]);

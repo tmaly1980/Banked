@@ -107,7 +107,6 @@ export interface ExpenseBudgetGroup {
   startDate: Date;
   endDate: Date;
   expenses: ExpenseBudgetWithType[];
-  totalSpent: number;
   totalAllocated: number;
 }
 

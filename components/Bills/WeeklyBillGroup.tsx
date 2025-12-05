@@ -50,9 +50,9 @@ export default function WeeklyBillGroup({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high': return Colors.danger;
-      case 'medium': return Colors.warning;
-      case 'low': return Colors.text;
+      case 'high': return '#e74c3c'; // red
+      case 'medium': return '#e67e22'; // orange
+      case 'low': return '#f39c12'; // yellow
       default: return Colors.secondary;
     }
   };
@@ -126,6 +126,16 @@ export default function WeeklyBillGroup({
             const today = startOfDay(new Date());
             const daysUntilDue = displayDate ? differenceInDays(startOfDay(displayDate), today) : null;
             
+            // Determine if paid: check for payment within this week's date range
+            const isPaid = bill.payments.some(payment => {
+              if (!payment.payment_date) return false;
+              const paymentDate = new Date(payment.payment_date);
+              return paymentDate >= group.startDate && paymentDate <= group.endDate;
+            });
+            
+            const isOverdue = !isPaid && daysUntilDue !== null && daysUntilDue < 0;
+            const isDueToday = !isPaid && daysUntilDue === 0;
+            
             return (
               <TouchableOpacity
                 key={bill.id}
@@ -142,9 +152,23 @@ export default function WeeklyBillGroup({
                 )}
               >
                 <View style={styles.billRow}>
-                  {daysUntilDue !== null && (
-                    <View style={[styles.daysBadge, daysUntilDue === 0 && styles.daysBadgeToday]}>
-                      <Text style={[styles.daysBadgeText, daysUntilDue === 0 && styles.daysBadgeTextToday]}>
+                  {isPaid ? (
+                    <MaterialCommunityIcons 
+                      name="check-circle" 
+                      size={20} 
+                      color="#27ae60" 
+                      style={styles.statusIcon}
+                    />
+                  ) : isDueToday || isOverdue ? (
+                    <MaterialCommunityIcons 
+                      name="alert-circle-outline" 
+                      size={20} 
+                      color="#e67e22" 
+                      style={styles.statusIcon}
+                    />
+                  ) : daysUntilDue !== null && daysUntilDue > 0 && (
+                    <View style={styles.daysBadge}>
+                      <Text style={styles.daysBadgeText}>
                         {daysUntilDue}d
                       </Text>
                     </View>
@@ -155,16 +179,16 @@ export default function WeeklyBillGroup({
                     color={priorityColor} 
                     style={styles.priorityIcon}
                   />
-                  <Text style={[styles.billDate, { color: priorityColor }]}>
+                  <Text style={styles.billDate}>
                     {displayDate ? format(displayDate, 'MMM d') : 'No date'}
                   </Text>
-                  <Text style={[styles.billName, { color: priorityColor }]} numberOfLines={1}>
+                  <Text style={styles.billName} numberOfLines={1}>
                     {bill.name}
                   </Text>
                   {bill.loss_risk_flag && (
                     <Text style={styles.urgentIcon}>⚠️</Text>
                   )}
-                  <Text style={[styles.billAmount, { color: priorityColor }]}>
+                  <Text style={styles.billAmount}>
                     {formatAmount(bill.amount)}
                   </Text>
                 </View>
@@ -208,16 +232,14 @@ const styles = StyleSheet.create({
     minWidth: 28,
     alignItems: 'center',
   },
-  daysBadgeToday: {
-    backgroundColor: '#3498db',
-  },
   daysBadgeText: {
     fontSize: 11,
     fontWeight: '600',
     color: '#7f8c8d',
   },
-  daysBadgeTextToday: {
-    color: '#fff',
+  statusIcon: {
+    width: 28,
+    marginRight: -8,
   },
   priorityIcon: {
     width: 16,
@@ -226,11 +248,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     width: 50,
+    color: '#2c3e50',
   },
   billName: {
     fontSize: 14,
     fontWeight: '500',
     flex: 1,
+    color: '#2c3e50',
   },
   urgentIcon: {
     fontSize: 14,
@@ -239,6 +263,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 'auto',
+    color: '#2c3e50',
   },
   emptyState: {
     paddingVertical: 16,

@@ -32,11 +32,11 @@ export function dateToTimestamp(dateString: string): string {
   const timezone = getDeviceTimezone();
   // Set time to noon to avoid day boundary issues
   const result = moment.tz(dateString + ' 12:00:00', 'YYYY-MM-DD HH:mm:ss', timezone).toISOString();
-  console.log('[dateToTimestamp]', {
-    input: dateString,
-    timezone,
-    output: result,
-  });
+  // console.log('[dateToTimestamp]', {
+  //   input: dateString,
+  //   timezone,
+  //   output: result,
+  // });
   return result;
 }
 

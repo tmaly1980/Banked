@@ -36,22 +36,20 @@ export default function PaymentForm({
         {scheduledPaymentId ? 'Edit/Make Payment' : 'Make/Schedule Payment'}
       </Text>
 
-      <View style={styles.inputRow}>
-        <View style={styles.inputGroup}>
-          <DateInput
-            label="Payment Date"
-            value={paymentDate}
-            onChangeDate={onPaymentDateChange}
-          />
-        </View>
+      <View style={styles.inputGroup}>
+        <DateInput
+          label="Payment Date"
+          value={paymentDate}
+          onChangeDate={onPaymentDateChange}
+        />
+      </View>
 
-        <View style={styles.inputGroup}>
-          <DateInput
-            label="Applied Date"
-            value={appliedDate}
-            onChangeDate={onAppliedDateChange}
-          />
-        </View>
+      <View style={styles.inputGroup}>
+        <DateInput
+          label="Applied Date (Optional)"
+          value={appliedDate}
+          onChangeDate={onAppliedDateChange}
+        />
       </View>
 
       <View style={styles.inputGroup}>

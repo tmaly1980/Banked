@@ -75,9 +75,13 @@ export const useExpenseOperations = (
 
   const createExpenseBudget = useCallback(async (data: {
     expense_type_id: string;
-    start_date: string;
-    end_date?: string;
+    effective_from: string;
+    effective_to?: string;
+    start_mmdd?: string;
+    end_mmdd?: string;
+    frequency: 'once' | 'weekly' | 'monthly' | 'yearly';
     amount: number;
+    notes?: string;
   }) => {
     if (!userId) return { data: null, error: new Error('User not authenticated') };
 
@@ -88,9 +92,13 @@ export const useExpenseOperations = (
         .insert({
           user_id: userId,
           expense_type_id: data.expense_type_id,
-          start_date: data.start_date,
-          end_date: data.end_date,
+          effective_from: data.effective_from,
+          effective_to: data.effective_to,
+          start_mmdd: data.start_mmdd,
+          end_mmdd: data.end_mmdd,
+          frequency: data.frequency,
           amount: data.amount,
+          notes: data.notes,
         })
         .select()
         .single();
@@ -106,8 +114,13 @@ export const useExpenseOperations = (
   const updateExpenseBudget = useCallback(async (
     id: string,
     updates: {
+      effective_from?: string;
+      effective_to?: string;
+      start_mmdd?: string;
+      end_mmdd?: string;
+      frequency?: 'once' | 'weekly' | 'monthly' | 'yearly';
       amount?: number;
-      end_date?: string;
+      notes?: string;
     }
   ) => {
     if (!userId) return { error: new Error('User not authenticated') };
@@ -151,27 +164,44 @@ export const useExpenseOperations = (
     amount?: number;
     purchase_date?: string;
   }) => {
-    if (!userId) return { data: null, error: new Error('User not authenticated') };
+    console.log('[createExpensePurchase] Starting with data:', JSON.stringify(data, null, 2));
+    console.log('[createExpensePurchase] userId:', userId);
+
+    if (!userId) {
+      console.error('[createExpensePurchase] User not authenticated');
+      return { data: null, error: new Error('User not authenticated') };
+    }
 
     try {
+      const insertData = {
+        user_id: userId,
+        expense_type_id: data.expense_type_id,
+        description: data.description,
+        purchase_amount: data.amount,
+        purchase_date: data.purchase_date,
+        checklist: [],
+        photos: [],
+      };
+      
+      console.log('[createExpensePurchase] Inserting into database:', JSON.stringify(insertData, null, 2));
+      
       const { data: purchase, error } = await supabase
         .from('expense_purchases')
-        .insert({
-          user_id: userId,
-          expense_type_id: data.expense_type_id,
-          description: data.description,
-          purchase_amount: data.amount,
-          purchase_date: data.purchase_date,
-          checklist: [],
-          photos: [],
-        })
+        .insert(insertData)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[createExpensePurchase] Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('[createExpensePurchase] Purchase created successfully:', purchase);
       await loadExpensePurchases();
+      console.log('[createExpensePurchase] Purchases reloaded');
       return { data: purchase, error: null };
     } catch (err) {
+      console.error('[createExpensePurchase] Exception caught:', err);
       return { data: null, error: err as Error };
     }
   }, [userId, loadExpensePurchases]);

@@ -73,7 +73,7 @@ export default function PaycheckWeekModal({
         id: type.id,
         expenseTypeId: type.id,
         expenseTypeName: type.name,
-        amount: existingExpense ? existingExpense.allocated_amount.toString() : '',
+        amount: existingExpense ? existingExpense.amount.toString() : '',
         isNewType: false,
       };
     });

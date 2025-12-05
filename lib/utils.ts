@@ -51,25 +51,38 @@ export const groupExpensesByWeek = (
     const weekEnd = endOfWeek(weekStart, { weekStartsOn: 0 });
     const weekKey = format(weekStart, 'yyyy-MM-dd');
 
-    // Get expense budgets for this week with their type names
-    const weekExpensesList = expenseBudgets
-      .filter(exp => exp.start_date === weekKey)
-      .map(exp => {
-        const expenseType = expenseTypes.find(t => t.id === exp.expense_type_id);
+    // Get active expense budgets for this week with their type names
+    const weekExpensesList = expenseTypes
+      .map(type => {
+        // Find active budgets for this type in this week
+        const activeBudgets = expenseBudgets
+          .filter(b => {
+            if (b.expense_type_id !== type.id) return false;
+            
+            const effectiveFrom = new Date(b.effective_from);
+            const effectiveTo = b.effective_to ? new Date(b.effective_to) : null;
+            
+            return effectiveFrom <= weekStart && (!effectiveTo || effectiveTo >= weekEnd);
+          })
+          .sort((a, b) => new Date(b.effective_from).getTime() - new Date(a.effective_from).getTime());
+        
+        const activeBudget = activeBudgets[0];
+        
+        if (!activeBudget) return null;
+        
         return {
-          ...exp,
-          expense_type_name: expenseType?.name || 'Unknown',
+          ...activeBudget,
+          expense_type_name: type.name,
         } as ExpenseBudgetWithType;
-      });
+      })
+      .filter((exp): exp is ExpenseBudgetWithType => exp !== null);
 
-    const totalSpent = weekExpensesList.reduce((sum, exp) => sum + exp.spent_amount, 0);
-    const totalAllocated = weekExpensesList.reduce((sum, exp) => sum + exp.allocated_amount, 0);
+    const totalAllocated = weekExpensesList.reduce((sum, exp) => sum + exp.amount, 0);
 
     groups.push({
       startDate: weekStart,
       endDate: weekEnd,
       expenses: weekExpensesList,
-      totalSpent,
       totalAllocated,
     });
   }

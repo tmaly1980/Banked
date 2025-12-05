@@ -62,7 +62,7 @@ export default function WeeklyExpensesModal({
         id: type.id,
         expenseTypeId: type.id,
         expenseTypeName: type.name,
-        amount: existingExpense ? existingExpense.allocated_amount.toString() : '',
+        amount: existingExpense ? existingExpense.amount.toString() : '',
         isNewType: false,
       };
     });
@@ -281,12 +281,6 @@ const styles = StyleSheet.create({
   rowNumberText: {
     color: 'white',
     fontSize: 14,
-  },
-  expenseRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 12,
   },
   nameInput: {
     flex: 1,

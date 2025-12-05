@@ -1,4 +1,4 @@
-import { differenceInDays } from 'date-fns';
+import { differenceInDays, differenceInMonths, startOfDay } from 'date-fns';
 import { BillPayment } from '@/types';
 
 export interface DaysLateBadge {
@@ -6,12 +6,59 @@ export interface DaysLateBadge {
   color: string;
 }
 
-export const getDaysLateBadge = (payment: BillPayment): DaysLateBadge | null => {
+/**
+ * Calculate this month's due date based on the bill's due day
+ * @param dueDay - The day of the month the bill is due (1-31)
+ * @returns Date object for this month's due date
+ */
+export const getThisMonthDueDate = (dueDay: number): Date => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  
+  // Create date for this month's due day
+  const dueDate = new Date(year, month, dueDay);
+  dueDate.setHours(0, 0, 0, 0);
+  
+  return dueDate;
+};
+
+/**
+ * Calculate the number of complete months since the last payment
+ * @param lastPaymentDate - The date of the last payment (string or Date)
+ * @returns Number of complete months since last payment
+ */
+export const getMonthsSinceLastPayment = (lastPaymentDate: string | Date): number => {
+  const today = startOfDay(new Date());
+  const paymentDate = startOfDay(new Date(lastPaymentDate));
+  
+  return differenceInMonths(today, paymentDate);
+};
+
+export const getDaysLateBadge = (payment: BillPayment, dueDay?: number): DaysLateBadge | null => {
   const appliedDateStr = payment.applied_date || payment.payment_date;
   const appliedDateObj = new Date(appliedDateStr);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   appliedDateObj.setHours(0, 0, 0, 0);
+  
+  const monthsSinceLastPayment = getMonthsSinceLastPayment(appliedDateStr);
+  
+  // Determine if we should show the late badge
+  let showBadge = false;
+  
+  if (monthsSinceLastPayment > 1) {
+    // More than 1 month since last payment
+    showBadge = true;
+  } else if (dueDay) {
+    // Check if this month's due date has passed
+    const thisMonthDueDate = getThisMonthDueDate(dueDay);
+    if (thisMonthDueDate < today) {
+      showBadge = true;
+    }
+  }
+  
+  if (!showBadge) return null;
   
   const daysLate = differenceInDays(today, appliedDateObj);
   

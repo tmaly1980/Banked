@@ -32,43 +32,47 @@ export default function AddPurchaseModal({
   const [description, setDescription] = useState('');
   const [selectedTypeId, setSelectedTypeId] = useState<string>('');
   const [amount, setAmount] = useState('');
-  const [purchaseDate, setPurchaseDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [purchaseDate, setPurchaseDate] = useState('');
 
   useEffect(() => {
     if (visible) {
+      console.log('[AddPurchaseModal] Modal opened - resetting form');
       setDescription('');
       setSelectedTypeId('');
       setAmount('');
-      setPurchaseDate(format(new Date(), 'yyyy-MM-dd'));
+      setPurchaseDate('');
     }
   }, [visible]);
 
   const handleClose = () => {
+    console.log('[AddPurchaseModal] Closing modal - resetting form');
     setDescription('');
     setSelectedTypeId('');
     setAmount('');
-    setPurchaseDate(format(new Date(), 'yyyy-MM-dd'));
+    setPurchaseDate('');
     onClose();
   };
 
   const handleSave = () => {
-    console.log('=== AddPurchaseModal handleSave ===');
-    console.log('selectedTypeId:', selectedTypeId);
-    console.log('amount:', amount);
-    console.log('purchaseDate:', purchaseDate);
-    console.log('description:', description);
+    console.log('[AddPurchaseModal] === handleSave START ===');
+    console.log('[AddPurchaseModal] Form values:', {
+      selectedTypeId,
+      amount,
+      purchaseDate,
+      description,
+    });
     
-    const parsedAmount = parseFloat(amount);
-    console.log('parsedAmount:', parsedAmount);
-    console.log('isNaN(parsedAmount):', isNaN(parsedAmount));
-    console.log('parsedAmount <= 0:', parsedAmount <= 0);
+    // Only require expense type - amount, date, and description are optional
+    if (!selectedTypeId) {
+      console.log('[AddPurchaseModal] Validation failed - No expense type selected');
+      return;
+    }
+
+    const parsedAmount = amount ? parseFloat(amount) : undefined;
+    console.log('[AddPurchaseModal] Parsed amount:', parsedAmount);
     
-    if (!selectedTypeId || !amount || isNaN(parsedAmount) || parsedAmount <= 0) {
-      console.log('Validation failed - returning early');
-      if (!selectedTypeId) console.log('  - No expense type selected');
-      if (!amount) console.log('  - No amount entered');
-      if (isNaN(parsedAmount)) console.log('  - Amount is not a number');
-      if (parsedAmount <= 0) console.log('  - Amount is <= 0');
+    if (amount && (isNaN(parsedAmount!) || parsedAmount! <= 0)) {
+      console.log('[AddPurchaseModal] Validation failed - Invalid amount');
       return;
     }
 
@@ -76,15 +80,20 @@ export default function AddPurchaseModal({
       description: description.trim() || undefined,
       expense_type_id: selectedTypeId,
       amount: parsedAmount,
-      purchase_date: purchaseDate,
+      purchase_date: purchaseDate || undefined,
     };
     
-    console.log('Calling onSuccess with data:', data);
-    onSuccess(data);
-    console.log('onSuccess called successfully');
+    console.log('[AddPurchaseModal] Calling onSuccess with data:', JSON.stringify(data, null, 2));
+    try {
+      onSuccess(data);
+      console.log('[AddPurchaseModal] onSuccess called successfully');
+    } catch (error) {
+      console.error('[AddPurchaseModal] Error calling onSuccess:', error);
+    }
+    console.log('[AddPurchaseModal] === handleSave END ===');
   };
 
-  const isValid = selectedTypeId && amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0;
+  const isValid = !!selectedTypeId;
 
   const pickerItems = expenseTypes.map(type => ({
     label: type.name,
@@ -134,13 +143,13 @@ export default function AddPurchaseModal({
           <View style={styles.rowContainer}>
             <View style={styles.rowItemLeft}>
               <DateInput
-                label="Date"
+                label="Date (optional)"
                 value={purchaseDate}
                 onChangeDate={setPurchaseDate}
               />
             </View>
             <View style={styles.rowItemRight}>
-              <Text style={globalStyles.label}>Amount</Text>
+              <Text style={globalStyles.label}>Amount (optional)</Text>
               <TextInput
                 style={globalStyles.input}
                 value={amount}

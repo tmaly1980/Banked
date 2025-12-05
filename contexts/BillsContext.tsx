@@ -36,9 +36,26 @@ interface BillsContextType {
   loadExpenseBudgets: () => Promise<void>;
   loadExpensePurchases: () => Promise<void>;
   createOrUpdateExpenseType: (name: string, defaultAmount?: number) => Promise<{ data: ExpenseType | null; error: Error | null }>;
-  saveExpenseBudgets: (startDate: string, expenses: Array<{ expense_type_id: string | null; expense_type_name: string; allocated_amount: number; spent_amount?: number }>) => Promise<void>;
-  createExpenseBudget: (data: { expense_type_name: string; start_date: string; end_date?: string; allocated_amount: number; spent_amount?: number }) => Promise<{ data: ExpenseBudget | null; error: Error | null }>;
-  updateExpenseBudget: (id: string, updates: { allocated_amount?: number; spent_amount?: number; end_date?: string }) => Promise<{ error: Error | null }>;
+  saveExpenseBudgets: (startDate: string, expenses: Array<{ expense_type_id: string; amount: number }>) => Promise<void>;
+  createExpenseBudget: (data: { 
+    expense_type_id: string; 
+    effective_from: string; 
+    effective_to?: string; 
+    start_mmdd?: string; 
+    end_mmdd?: string; 
+    frequency: 'once' | 'weekly' | 'monthly' | 'yearly'; 
+    amount: number; 
+    notes?: string 
+  }) => Promise<{ data: ExpenseBudget | null; error: Error | null }>;
+  updateExpenseBudget: (id: string, updates: { 
+    effective_from?: string; 
+    effective_to?: string; 
+    start_mmdd?: string; 
+    end_mmdd?: string; 
+    frequency?: 'once' | 'weekly' | 'monthly' | 'yearly'; 
+    amount?: number; 
+    notes?: string 
+  }) => Promise<{ error: Error | null }>;
   deleteExpenseBudget: (id: string) => Promise<{ error: Error | null }>;
   createExpensePurchase: (data: { expense_type_id: string; description?: string; amount?: number; purchase_date?: string }) => Promise<{ data: ExpensePurchase | null; error: Error | null }>;
   updateExpensePurchase: (id: string, updates: { description?: string; estimated_amount?: number; purchase_amount?: number; purchase_date?: string; checklist?: any[]; photos?: string[] }) => Promise<{ error: Error | null }>;
@@ -161,7 +178,7 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
         .from('expense_budgets')
         .select('*')
         .eq('user_id', user.id)
-        .order('start_date', { ascending: false });
+        .order('effective_from', { ascending: false });
 
       if (error) throw error;
       setExpenseBudgets(data || []);
