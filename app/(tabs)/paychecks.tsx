@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useBills } from '@/contexts/BillsContext';
 import { useRecurringPaychecks } from '@/hooks/useRecurringPaychecks';
+import { usePaycheckInstances, PaycheckInstance } from '@/contexts/PaychecksContext';
 import TabScreenHeader from '@/components/TabScreenHeader';
 import { Paycheck, WeeklyPaycheckGroup } from '@/types';
 import { formatAmount } from '@/lib/utils';
@@ -20,17 +21,10 @@ import { format, startOfWeek, endOfWeek, isWithinInterval, addWeeks, subWeeks } 
 import { globalStyles } from '@/lib/globalStyles';
 import { generateRecurringPaycheckInstances, formatDateForDB } from '@/utils/paycheckHelpers';
 
-// Extended Paycheck type for generated instances
-export interface PaycheckInstance extends Omit<Paycheck, 'id' | 'created_at'> {
-  id: string;
-  isGenerated?: boolean;
-  recurring_paycheck_id?: string;
-  created_at: string;
-}
-
 export default function PaychecksScreen() {
-  const { paychecks, loading, refreshData, deletePaycheck } = useBills();
+  const { deletePaycheck } = useBills();
   const { recurringPaychecks, loadRecurringPaychecks } = useRecurringPaychecks();
+  const { allPaycheckInstances, loading, refreshPaychecks } = usePaycheckInstances();
   const [weeklyGroups, setWeeklyGroups] = useState<WeeklyPaycheckGroup[]>([]);
   const [unknownPaychecks, setUnknownPaychecks] = useState<PaycheckInstance[]>([]);
   const [unknownTotal, setUnknownTotal] = useState(0);
@@ -39,80 +33,6 @@ export default function PaychecksScreen() {
   const [editingPaycheck, setEditingPaycheck] = useState<Paycheck | null>(null);
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
   const [selectedPaycheck, setSelectedPaycheck] = useState<Paycheck | null>(null);
-
-  useEffect(() => {
-    const init = async () => {
-      await refreshData();
-      await loadRecurringPaychecks();
-    };
-    init();
-  }, []);
-
-  // Generate paycheck instances from recurring paychecks within 6-week range
-  const allPaycheckInstances = useMemo(() => {
-    const now = new Date();
-    const rangeStart = now; // Start from today
-    const rangeEnd = addWeeks(now, 6);   // 6 weeks forward
-
-    console.log('[PaychecksScreen] Generating instances for range:', {
-      rangeStart: formatDateForDB(rangeStart),
-      rangeEnd: formatDateForDB(rangeEnd),
-      paychecksCount: paychecks.length,
-      recurringCount: recurringPaychecks.length,
-    });
-
-    // Start with actual paychecks
-    const instances: PaycheckInstance[] = paychecks.map(p => ({
-      ...p,
-      isGenerated: false,
-    }));
-
-    console.log('[PaychecksScreen] Starting with', instances.length, 'actual paychecks');
-
-    // Generate instances from recurring paychecks
-    recurringPaychecks.forEach(recurring => {
-      console.log('[PaychecksScreen] Processing recurring paycheck:', {
-        id: recurring.id,
-        amount: recurring.amount,
-        recurrence_unit: recurring.recurrence_unit,
-        interval: recurring.interval,
-        start_date: recurring.start_date,
-        end_date: recurring.end_date,
-      });
-
-      const dates = generateRecurringPaycheckInstances(recurring, rangeStart, rangeEnd);
-      
-      console.log('[PaychecksScreen] Generated', dates.length, 'dates for recurring paycheck:', recurring.id);
-
-      dates.forEach(date => {
-        const dateStr = formatDateForDB(date);
-        
-        // Check if there's already an actual paycheck for this date and recurring_paycheck_id
-        const hasActual = paychecks.some(
-          p => p.date === dateStr && p.recurring_paycheck_id === recurring.id
-        );
-
-        // Only add generated instance if no actual paycheck exists
-        if (!hasActual) {
-          instances.push({
-            id: `generated-${recurring.id}-${dateStr}`,
-            user_id: recurring.user_id,
-            amount: recurring.amount,
-            date: dateStr,
-            recurring_paycheck_id: recurring.id,
-            isGenerated: true,
-            created_at: new Date().toISOString(),
-          });
-          console.log('[PaychecksScreen] Added generated instance for', dateStr);
-        } else {
-          console.log('[PaychecksScreen] Skipping duplicate for', dateStr);
-        }
-      });
-    });
-
-    console.log('[PaychecksScreen] Total instances after generation:', instances.length);
-    return instances;
-  }, [paychecks, recurringPaychecks]);
 
   useEffect(() => {
     // Group paychecks by week
@@ -189,8 +109,7 @@ export default function PaychecksScreen() {
 
   const handlePaycheckSuccess = async () => {
     console.log('🔄 Refreshing all paycheck data...');
-    await refreshData();
-    await loadRecurringPaychecks();
+    await refreshPaychecks();
   };
 
   const handleViewPaycheck = async (paycheck: Paycheck) => {
@@ -282,7 +201,7 @@ export default function PaychecksScreen() {
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refreshData} />
+          <RefreshControl refreshing={loading} onRefresh={refreshPaychecks} />
         }
       >
         {weeklyGroups.length > 0 || unknownPaychecks.length > 0 ? (

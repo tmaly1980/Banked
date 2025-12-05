@@ -69,7 +69,7 @@ export function PaychecksProvider({ children }: { children: ReactNode }) {
           name: `Recurring: $${recurring.amount}`,
           amount: recurring.amount,
           date: dateStr,
-          notes: null,
+          notes: undefined,
           created_at: new Date().toISOString(),
           recurring_paycheck_id: recurring.id,
           isGenerated: true,
