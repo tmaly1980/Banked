@@ -62,13 +62,12 @@ CREATE TABLE IF NOT EXISTS expense_purchases (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users NOT NULL,
   expense_type_id UUID REFERENCES expense_types ON DELETE CASCADE NOT NULL,
-  title TEXT,
+  description TEXT,
   estimated_amount NUMERIC,
   purchase_amount NUMERIC,
   purchase_date TIMESTAMP WITH TIME ZONE,
   checklist JSONB DEFAULT '[]'::jsonb,
   photos TEXT[] DEFAULT ARRAY[]::TEXT[],
-  notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -99,7 +98,7 @@ CREATE INDEX idx_expense_budgets_expense_type_id ON expense_budgets(expense_type
 CREATE INDEX idx_expense_purchases_user_id ON expense_purchases(user_id);
 CREATE INDEX idx_expense_purchases_purchase_date ON expense_purchases(purchase_date);
 CREATE INDEX idx_expense_purchases_expense_type_id ON expense_purchases(expense_type_id);
-CREATE INDEX idx_expense_purchases_title ON expense_purchases(title);
+CREATE INDEX idx_expense_purchases_description ON expense_purchases(description);
 
 -- Create index for expense_types order
 CREATE INDEX idx_expense_types_order ON expense_types("order");

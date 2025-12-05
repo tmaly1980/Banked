@@ -147,9 +147,9 @@ export const useExpenseOperations = (
 
   const createExpensePurchase = useCallback(async (data: {
     expense_type_id: string;
-    title?: string;
-    estimated_amount?: number;
-    notes?: string;
+    description?: string;
+    amount?: number;
+    purchase_date?: string;
   }) => {
     if (!userId) return { data: null, error: new Error('User not authenticated') };
 
@@ -159,9 +159,9 @@ export const useExpenseOperations = (
         .insert({
           user_id: userId,
           expense_type_id: data.expense_type_id,
-          title: data.title,
-          estimated_amount: data.estimated_amount,
-          notes: data.notes,
+          description: data.description,
+          purchase_amount: data.amount,
+          purchase_date: data.purchase_date,
           checklist: [],
           photos: [],
         })
@@ -179,13 +179,12 @@ export const useExpenseOperations = (
   const updateExpensePurchase = useCallback(async (
     id: string,
     updates: {
-      title?: string;
+      description?: string;
       estimated_amount?: number;
       purchase_amount?: number;
       purchase_date?: string;
       checklist?: any[];
       photos?: string[];
-      notes?: string;
     }
   ) => {
     if (!userId) return { error: new Error('User not authenticated') };

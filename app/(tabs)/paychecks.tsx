@@ -16,6 +16,7 @@ import PaycheckFormModal from '@/components/modals/PaycheckFormModal';
 import PaycheckDetailsModal from '@/components/modals/PaycheckDetailsModal';
 import WeeklyPaycheckGroupComponent from '@/components/Paychecks/WeeklyPaycheckGroup';
 import { format, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
+import { globalStyles } from '@/lib/globalStyles';
 
 export default function PaychecksScreen() {
   const { paychecks, loading, refreshData, deletePaycheck } = useBills();
@@ -234,19 +235,14 @@ export default function PaychecksScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#ecf0f1',
+    ...globalStyles.screenContainer,
   },
   addButton: {
+    ...globalStyles.addButton,
     backgroundColor: '#27ae60',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
   },
   addButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 12,
+    ...globalStyles.addButtonText,
   },
   content: {
     flex: 1,

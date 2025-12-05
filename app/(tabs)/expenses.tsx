@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import { InlineAlert } from '@/components/InlineAlert';
 import { useInlineAlert } from '@/hooks/useInlineAlert';
 import { formatAmount } from '@/lib/utils';
+import { globalStyles } from '@/lib/globalStyles';
 
 interface ExpenseRow {
   type: ExpenseType;
@@ -100,22 +101,19 @@ export default function ExpensesScreen() {
     setAddPurchaseModalVisible(true);
   };
 
-  const handlePurchaseAdded = async (data: { title: string; expense_type_id: string; notes?: string }) => {
+  const handlePurchaseAdded = async (data: { description?: string; expense_type_id: string; amount: number; purchase_date: string }) => {
     try {
+      console.log('handlePurchaseAdded called with:', data);
       const { data: purchase, error } = await createExpensePurchase(data);
+      console.log('createExpensePurchase result - purchase:', purchase, 'error:', error);
       if (error) throw error;
       
       setAddPurchaseModalVisible(false);
       showSuccess('Purchase added successfully');
       
-      // Open view purchase modal with the new purchase
-      if (purchase) {
-        setSelectedPurchase(purchase);
-        setViewPurchaseModalVisible(true);
-      }
-      
       await refreshData();
     } catch (error) {
+      console.error('handlePurchaseAdded error:', error);
       showError(error instanceof Error ? error.message : 'Failed to add purchase');
     }
   };
@@ -142,12 +140,6 @@ export default function ExpensesScreen() {
         title="Expenses"
         rightContent={
           <View style={styles.headerButtons}>
-            <TouchableOpacity
-              style={[styles.headerButton, { backgroundColor: '#3498db' }]}
-              onPress={handleAddBudget}
-            >
-              <Text style={styles.headerButtonText}>Budget</Text>
-            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.headerButton, { backgroundColor: '#27ae60' }]}
               onPress={handleAddPurchase}
@@ -283,7 +275,11 @@ export default function ExpensesScreen() {
         expenseType={selectedExpenseType}
         purchases={selectedExpenseType ? 
           expensePurchases.filter(p => p.expense_type_id === selectedExpenseType.id)
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .sort((a, b) => {
+              const dateA = a.purchase_date ? new Date(a.purchase_date).getTime() : new Date(a.created_at).getTime();
+              const dateB = b.purchase_date ? new Date(b.purchase_date).getTime() : new Date(b.created_at).getTime();
+              return dateB - dateA;
+            })
           : []
         }
         onDelete={async (id) => {
@@ -352,8 +348,6 @@ function BudgetModal({ visible, onClose, expenseTypes, expenseBudgets, onSuccess
     value: type.id,
   }));
 
-  console.log('[PickerItems]: ', pickerItems);
-
   const handleClose = () => {
     setSelectedTypeId(null);
     setAmount('');
@@ -364,20 +358,20 @@ function BudgetModal({ visible, onClose, expenseTypes, expenseBudgets, onSuccess
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
+        style={globalStyles.modalContainer}
       >
-        <View style={styles.header}>
+        <View style={globalStyles.modalHeader}>
           <TouchableOpacity onPress={handleClose}>
-            <Text style={styles.cancelButton}>Cancel</Text>
+            <Text style={globalStyles.cancelButton}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Set Budget</Text>
+          <Text style={globalStyles.modalTitle}>Set Budget</Text>
           <TouchableOpacity onPress={handleSave} disabled={!selectedTypeId || !amount}>
-            <Text style={[styles.saveButton, (!selectedTypeId || !amount) && styles.disabledButton]}>Save</Text>
+            <Text style={[globalStyles.saveButton, (!selectedTypeId || !amount) && globalStyles.disabledButton]}>Save</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
-          <View style={styles.inputGroup}>
+        <ScrollView style={globalStyles.form} keyboardShouldPersistTaps="handled">
+          <View style={globalStyles.inputGroup}>
             <SelectPicker
               label="Expense Type"
               value={selectedTypeId || ''}
@@ -387,10 +381,10 @@ function BudgetModal({ visible, onClose, expenseTypes, expenseBudgets, onSuccess
             />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Budget Amount</Text>
+          <View style={globalStyles.inputGroup}>
+            <Text style={globalStyles.label}>Budget Amount</Text>
             <TextInput
-              style={styles.input}
+              style={globalStyles.input}
               value={amount}
               onChangeText={setAmount}
               placeholder="0.00"
@@ -558,17 +552,21 @@ function PurchaseListModal({ visible, onClose, expenseType, purchases, onDelete 
               purchases.map((purchase) => (
                 <View key={purchase.id} style={styles.purchaseItem}>
                   <View style={styles.purchaseItemLeft}>
-                    <Text style={styles.purchaseDate}>
-                      {formatDate(purchase.date)}
+                    <Text style={styles.purchaseTitle}>
+                      {purchase.description || expenseType?.name || 'Purchase'}
                     </Text>
-                    {purchase.notes && (
-                      <Text style={styles.purchaseNotes}>{purchase.notes}</Text>
+                    {purchase.purchase_date && (
+                      <Text style={styles.purchaseDate}>
+                        {formatDate(purchase.purchase_date)}
+                      </Text>
                     )}
                   </View>
                   <View style={styles.purchaseItemRight}>
-                    <Text style={styles.purchaseAmount}>
-                      {formatAmount(purchase.amount)}
-                    </Text>
+                    {purchase.purchase_amount && (
+                      <Text style={styles.purchaseAmount}>
+                        {formatAmount(purchase.purchase_amount)}
+                      </Text>
+                    )}
                     <TouchableOpacity
                       onPress={() => onDelete(purchase.id)}
                       style={styles.deleteButton}
@@ -818,10 +816,15 @@ const styles = StyleSheet.create({
   purchaseItemLeft: {
     flex: 1,
   },
-  purchaseDate: {
-    fontSize: 14,
+  purchaseTitle: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#2c3e50',
+    marginBottom: 2,
+  },
+  purchaseDate: {
+    fontSize: 13,
+    color: '#7f8c8d',
     marginBottom: 4,
   },
   purchaseNotes: {

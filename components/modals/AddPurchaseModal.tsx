@@ -11,14 +11,16 @@ import {
   ScrollView,
 } from 'react-native';
 import SelectPicker from '@/components/SelectPicker';
+import DateInput from '@/components/DateInput';
 import { ExpenseType } from '@/types';
 import { format } from 'date-fns';
+import { globalStyles } from '@/lib/globalStyles';
 
 interface AddPurchaseModalProps {
   visible: boolean;
   onClose: () => void;
   expenseTypes: ExpenseType[];
-  onSuccess: (data: { title: string; expense_type_id: string; amount: number; purchase_date: string; notes?: string }) => void;
+  onSuccess: (data: { description?: string; expense_type_id: string; amount: number; purchase_date: string }) => void;
 }
 
 export default function AddPurchaseModal({
@@ -27,45 +29,62 @@ export default function AddPurchaseModal({
   expenseTypes,
   onSuccess,
 }: AddPurchaseModalProps) {
-  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [selectedTypeId, setSelectedTypeId] = useState<string>('');
   const [amount, setAmount] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [notes, setNotes] = useState('');
 
   useEffect(() => {
     if (visible) {
-      setTitle('');
+      setDescription('');
       setSelectedTypeId('');
       setAmount('');
       setPurchaseDate(format(new Date(), 'yyyy-MM-dd'));
-      setNotes('');
     }
   }, [visible]);
 
   const handleClose = () => {
-    setTitle('');
+    setDescription('');
     setSelectedTypeId('');
     setAmount('');
     setPurchaseDate(format(new Date(), 'yyyy-MM-dd'));
-    setNotes('');
     onClose();
   };
 
   const handleSave = () => {
+    console.log('=== AddPurchaseModal handleSave ===');
+    console.log('selectedTypeId:', selectedTypeId);
+    console.log('amount:', amount);
+    console.log('purchaseDate:', purchaseDate);
+    console.log('description:', description);
+    
     const parsedAmount = parseFloat(amount);
-    if (!title.trim() || !selectedTypeId || !amount || isNaN(parsedAmount) || parsedAmount <= 0) return;
+    console.log('parsedAmount:', parsedAmount);
+    console.log('isNaN(parsedAmount):', isNaN(parsedAmount));
+    console.log('parsedAmount <= 0:', parsedAmount <= 0);
+    
+    if (!selectedTypeId || !amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      console.log('Validation failed - returning early');
+      if (!selectedTypeId) console.log('  - No expense type selected');
+      if (!amount) console.log('  - No amount entered');
+      if (isNaN(parsedAmount)) console.log('  - Amount is not a number');
+      if (parsedAmount <= 0) console.log('  - Amount is <= 0');
+      return;
+    }
 
-    onSuccess({
-      title: title.trim(),
+    const data = {
+      description: description.trim() || undefined,
       expense_type_id: selectedTypeId,
       amount: parsedAmount,
       purchase_date: purchaseDate,
-      notes: notes.trim() || undefined,
-    });
+    };
+    
+    console.log('Calling onSuccess with data:', data);
+    onSuccess(data);
+    console.log('onSuccess called successfully');
   };
 
-  const isValid = title.trim() && selectedTypeId && amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0;
+  const isValid = selectedTypeId && amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0;
 
   const pickerItems = expenseTypes.map(type => ({
     label: type.name,
@@ -76,34 +95,22 @@ export default function AddPurchaseModal({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
+        style={globalStyles.modalContainer}
       >
-        <View style={styles.header}>
+        <View style={globalStyles.modalHeader}>
           <TouchableOpacity onPress={handleClose}>
-            <Text style={styles.cancelButton}>Cancel</Text>
+            <Text style={globalStyles.cancelButton}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Add Purchase</Text>
-          <TouchableOpacity onPress={handleSave} disabled={!title.trim() || !selectedTypeId}>
-            <Text style={[styles.saveButton, (!title.trim() || !selectedTypeId) && styles.disabledButton]}>
+          <Text style={globalStyles.modalTitle}>Add Purchase</Text>
+          <TouchableOpacity onPress={handleSave} disabled={!isValid}>
+            <Text style={[globalStyles.saveButton, !isValid && globalStyles.disabledButton]}>
               Save
             </Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Title</Text>
-            <TextInput
-              style={styles.input}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="e.g. Weekly Groceries"
-              placeholderTextColor="#999"
-              autoFocus
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
+        <ScrollView style={globalStyles.form} keyboardShouldPersistTaps="handled">
+          <View style={globalStyles.inputGroup}>
             <SelectPicker
               label="Expense Type"
               value={selectedTypeId}
@@ -113,18 +120,37 @@ export default function AddPurchaseModal({
             />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Notes (optional)</Text>
+          <View style={globalStyles.inputGroup}>
+            <Text style={globalStyles.label}>Description (optional)</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Add any additional details..."
-              multiline
-              numberOfLines={3}
+              style={globalStyles.input}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="e.g. Weekly Groceries"
               placeholderTextColor="#999"
-              textAlignVertical="top"
             />
+          </View>
+
+          <View style={styles.rowContainer}>
+            <View style={styles.rowItemLeft}>
+              <DateInput
+                label="Date"
+                value={purchaseDate}
+                onChangeDate={setPurchaseDate}
+              />
+            </View>
+            <View style={styles.rowItemRight}>
+              <Text style={globalStyles.label}>Amount</Text>
+              <TextInput
+                style={globalStyles.input}
+                value={amount}
+                onChangeText={setAmount}
+                placeholder="$0.00"
+                placeholderTextColor="#999"
+                keyboardType="decimal-pad"
+                autoFocus
+              />
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -133,69 +159,15 @@ export default function AddPurchaseModal({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  header: {
+  rowContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e1e8ed',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    color: '#007AFF',
-    fontSize: 16,
-  },
-  saveButton: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  form: {
-    flex: 1,
-    padding: 20,
-  },
-  inputGroup: {
+    gap: 12,
     marginBottom: 20,
   },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-    color: '#333',
+  rowItemLeft: {
+    flex: 2,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  infoBox: {
-    backgroundColor: '#e3f2fd',
-    padding: 16,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#1976d2',
-    lineHeight: 20,
+  rowItemRight: {
+    flex: 1,
   },
 });

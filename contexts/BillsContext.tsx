@@ -181,7 +181,7 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
         .from('expense_purchases')
         .select('*')
         .eq('user_id', user.id)
-        .order('date', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setExpensePurchases(data || []);

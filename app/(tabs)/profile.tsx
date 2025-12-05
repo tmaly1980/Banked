@@ -8,6 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import TabScreenHeader from '@/components/TabScreenHeader';
 import packageJson from '@/package.json';
 
 export default function ProfileScreen() {
@@ -38,10 +39,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
-      </View>
+      <TabScreenHeader title="Profile" />
 
       <ScrollView style={styles.content}>
         {/* Profile Info */}

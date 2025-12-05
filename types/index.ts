@@ -72,13 +72,12 @@ export interface ExpensePurchase {
   id: string;
   user_id: string;
   expense_type_id: string;
-  title?: string;
+  description?: string;
   estimated_amount?: number;
   purchase_amount?: number;
   purchase_date?: string;
   checklist: ChecklistItem[];
   photos: string[];
-  notes?: string;
   created_at: string;
 }
 

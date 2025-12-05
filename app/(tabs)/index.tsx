@@ -18,6 +18,7 @@ import BillDetailsModal from '@/components/modals/BillDetailsModal';
 import PaycheckWeekModal from '@/components/modals/PaycheckWeekModal';
 import PaycheckFormModal from '@/components/modals/PaycheckFormModal';
 import PaycheckDetailsModal from '@/components/modals/PaycheckDetailsModal';
+import { globalStyles } from '@/lib/globalStyles';
 import WeeklyBillGroup from '@/components/Bills/WeeklyBillGroup';
 import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
 import { format } from 'date-fns';
@@ -331,22 +332,17 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#ecf0f1',
+    ...globalStyles.screenContainer,
   },
   addButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+    ...globalStyles.addButton,
+    backgroundColor: '#e74c3c',
   },
   addButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 12,
+    ...globalStyles.addButtonText,
   },
   content: {
-    flex: 1,
-    padding: 16,
+    ...globalStyles.content,
   },
   contentContainer: {
     paddingBottom: 80,

@@ -19,6 +19,7 @@ import { BillModel } from '@/models/BillModel';
 import DateInput from '@/components/DateInput';
 import DayOfMonthInput from '@/components/DayOfMonthInput';
 import { dateToTimestamp, timestampToDate } from '@/lib/dateUtils';
+import { globalStyles } from '@/lib/globalStyles';
 
 interface BillFormModalProps {
   visible: boolean;
@@ -151,23 +152,23 @@ export default function BillFormModal({
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
+        style={globalStyles.modalContainer}
       >
-        <View style={styles.header}>
+        <View style={globalStyles.modalHeader}>
           <TouchableOpacity onPress={handleClose}>
-            <Text style={styles.cancelButton}>Cancel</Text>
+            <Text style={globalStyles.cancelButton}>Cancel</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>
+          <Text style={globalStyles.modalTitle}>
             {editingBill ? 'Edit' : 'Add'} Bill
           </Text>
           <TouchableOpacity onPress={handleSubmit} disabled={loading}>
-            <Text style={[styles.saveButton, loading && styles.disabledButton]}>
+            <Text style={[globalStyles.saveButton, loading && globalStyles.disabledButton]}>
               {loading ? 'Saving...' : 'Save'}
             </Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.form}>
+        <ScrollView style={globalStyles.form}>
           <InlineAlert
             type={alert.type}
             message={alert.message}
@@ -175,20 +176,20 @@ export default function BillFormModal({
             onDismiss={hideAlert}
           />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Bill Name</Text>
+          <View style={globalStyles.inputGroup}>
+            <Text style={globalStyles.label}>Bill Name</Text>
             <TextInput
-              style={styles.input}
+              style={globalStyles.input}
               value={name}
               onChangeText={setName}
               placeholder="Electric Bill, Rent, etc."
             />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Amount</Text>
+          <View style={globalStyles.inputGroup}>
+            <Text style={globalStyles.label}>Amount</Text>
             <TextInput
-              style={styles.input}
+              style={globalStyles.input}
               value={amount}
               onChangeText={setAmount}
               placeholder="0.00"
@@ -197,7 +198,7 @@ export default function BillFormModal({
           </View>
 
           <View style={styles.switchGroup}>
-            <Text style={styles.label}>Recurring Monthly</Text>
+            <Text style={globalStyles.label}>Recurring Monthly</Text>
             <Switch value={isRecurring} onValueChange={setIsRecurring} />
           </View>
 
@@ -215,8 +216,8 @@ export default function BillFormModal({
             />
           )}
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Priority</Text>
+          <View style={globalStyles.inputGroup}>
+            <Text style={globalStyles.label}>Priority</Text>
             <View style={styles.chipContainer}>
               <Chip
                 mode={priority === 'low' ? 'flat' : 'outlined'}
@@ -249,19 +250,19 @@ export default function BillFormModal({
           </View>
 
           <View style={styles.switchGroup}>
-            <Text style={styles.label}>Loss Risk</Text>
+            <Text style={globalStyles.label}>Loss Risk</Text>
             <Switch value={lossRiskFlag} onValueChange={setLossRiskFlag} />
           </View>
 
           <View style={styles.switchGroup}>
-            <Text style={styles.label}>Deferred</Text>
+            <Text style={globalStyles.label}>Deferred</Text>
             <Switch value={deferredFlag} onValueChange={setDeferredFlag} />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Notes</Text>
+          <View style={globalStyles.inputGroup}>
+            <Text style={globalStyles.label}>Notes</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[globalStyles.input, globalStyles.textArea]}
               value={notes}
               onChangeText={setNotes}
               placeholder="Add any notes or reminders..."
@@ -277,61 +278,11 @@ export default function BillFormModal({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e1e8ed',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    color: '#007AFF',
-    fontSize: 16,
-  },
-  saveButton: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  form: {
-    flex: 1,
-    padding: 20,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
   switchGroup: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-    color: '#333',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
   },
   chipContainer: {
     flexDirection: 'row',

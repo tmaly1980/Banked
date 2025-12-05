@@ -271,7 +271,7 @@ export default function ViewPurchaseModal({
               <Text style={styles.closeButton}>Close</Text>
             </TouchableOpacity>
             <Text style={styles.title} numberOfLines={1}>
-              {purchase.title || 'Purchase'}
+              {purchase.description || expenseType?.name || 'Purchase'}
             </Text>
             <View style={{ width: 60 }} />
           </View>
@@ -283,14 +283,7 @@ export default function ViewPurchaseModal({
             <Text style={styles.sectionValue}>{expenseType.name}</Text>
           </View>
 
-          {purchase.notes && (
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Notes</Text>
-              <Text style={styles.sectionValue}>{purchase.notes}</Text>
-            </View>
-          )}
-
-          {/* Photos */}
+          {/* Photo Section */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Photos</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoCarousel}>
