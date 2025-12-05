@@ -9,7 +9,9 @@ import {
   Alert,
 } from 'react-native';
 import { useBills } from '@/contexts/BillsContext';
+import TabScreenHeader from '@/components/TabScreenHeader';
 import { Paycheck, WeeklyPaycheckGroup } from '@/types';
+import { formatAmount } from '@/lib/utils';
 import PaycheckFormModal from '@/components/modals/PaycheckFormModal';
 import PaycheckDetailsModal from '@/components/modals/PaycheckDetailsModal';
 import WeeklyPaycheckGroupComponent from '@/components/Paychecks/WeeklyPaycheckGroup';
@@ -135,16 +137,17 @@ export default function PaychecksScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Paychecks</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={handleAddPaycheck}
-        >
-          <Text style={styles.addButtonText}>+ Paycheck</Text>
-        </TouchableOpacity>
-      </View>
+      <TabScreenHeader
+        title="Paychecks"
+        rightContent={
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={handleAddPaycheck}
+          >
+            <Text style={styles.addButtonText}>+ Paycheck</Text>
+          </TouchableOpacity>
+        }
+      />
 
       {/* Main Content */}
       <ScrollView
@@ -160,11 +163,15 @@ export default function PaychecksScreen() {
             {unknownPaychecks.length > 0 && (
               <View style={styles.unknownGroup}>
                 <View style={styles.unknownHeader}>
-                  <Text style={styles.unknownLabel}>Unknown Date</Text>
+                  <Text style={styles.unknownLabel}>Upcoming</Text>
                   <Text style={styles.unknownTotal}>{formatAmount(unknownTotal)}</Text>
                 </View>
                 {unknownPaychecks.map((paycheck) => (
-                  <View key={paycheck.id} style={styles.unknownPaycheckItem}>
+                  <TouchableOpacity
+                    key={paycheck.id}
+                    style={styles.unknownPaycheckItem}
+                    onPress={() => handleEditPaycheck(paycheck)}
+                  >
                     <View style={styles.unknownPaycheckInfo}>
                       <Text style={styles.unknownPaycheckName}>
                         {paycheck.name || 'Paycheck'}
@@ -175,28 +182,10 @@ export default function PaychecksScreen() {
                         </Text>
                       )}
                     </View>
-                    <View style={styles.unknownPaycheckActions}>
-                      <Text style={styles.unknownPaycheckAmount}>
-                        {formatAmount(paycheck.amount)}
-                      </Text>
-                      <View style={styles.unknownActionButtons}>
-                        <TouchableOpacity
-                          onPress={() => handleEditPaycheck(paycheck)}
-                          style={styles.unknownActionButton}
-                        >
-                          <Text style={styles.unknownActionButtonText}>Edit</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => handleDeletePaycheck(paycheck)}
-                          style={[styles.unknownActionButton, styles.deleteButton]}
-                        >
-                          <Text style={[styles.unknownActionButtonText, styles.deleteButtonText]}>
-                            Delete
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
+                    <Text style={styles.unknownPaycheckAmount}>
+                      {formatAmount(paycheck.amount)}
+                    </Text>
+                  </TouchableOpacity>
                 ))}
               </View>
             )}
@@ -246,26 +235,7 @@ export default function PaychecksScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    backgroundColor: 'white',
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    backgroundColor: '#ecf0f1',
   },
   addButton: {
     backgroundColor: '#27ae60',

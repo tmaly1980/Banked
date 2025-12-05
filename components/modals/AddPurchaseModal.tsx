@@ -12,12 +12,13 @@ import {
 } from 'react-native';
 import SelectPicker from '@/components/SelectPicker';
 import { ExpenseType } from '@/types';
+import { format } from 'date-fns';
 
 interface AddPurchaseModalProps {
   visible: boolean;
   onClose: () => void;
   expenseTypes: ExpenseType[];
-  onSuccess: (data: { title: string; expense_type_id: string; notes?: string }) => void;
+  onSuccess: (data: { title: string; expense_type_id: string; amount: number; purchase_date: string; notes?: string }) => void;
 }
 
 export default function AddPurchaseModal({
@@ -28,12 +29,16 @@ export default function AddPurchaseModal({
 }: AddPurchaseModalProps) {
   const [title, setTitle] = useState('');
   const [selectedTypeId, setSelectedTypeId] = useState<string>('');
+  const [amount, setAmount] = useState('');
+  const [purchaseDate, setPurchaseDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
 
   useEffect(() => {
     if (visible) {
       setTitle('');
       setSelectedTypeId('');
+      setAmount('');
+      setPurchaseDate(format(new Date(), 'yyyy-MM-dd'));
       setNotes('');
     }
   }, [visible]);
@@ -41,19 +46,26 @@ export default function AddPurchaseModal({
   const handleClose = () => {
     setTitle('');
     setSelectedTypeId('');
+    setAmount('');
+    setPurchaseDate(format(new Date(), 'yyyy-MM-dd'));
     setNotes('');
     onClose();
   };
 
   const handleSave = () => {
-    if (!title.trim() || !selectedTypeId) return;
+    const parsedAmount = parseFloat(amount);
+    if (!title.trim() || !selectedTypeId || !amount || isNaN(parsedAmount) || parsedAmount <= 0) return;
 
     onSuccess({
       title: title.trim(),
       expense_type_id: selectedTypeId,
+      amount: parsedAmount,
+      purchase_date: purchaseDate,
       notes: notes.trim() || undefined,
     });
   };
+
+  const isValid = title.trim() && selectedTypeId && amount && !isNaN(parseFloat(amount)) && parseFloat(amount) > 0;
 
   const pickerItems = expenseTypes.map(type => ({
     label: type.name,
@@ -113,12 +125,6 @@ export default function AddPurchaseModal({
               placeholderTextColor="#999"
               textAlignVertical="top"
             />
-          </View>
-
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>
-              You'll be able to add a checklist or mark the purchase as complete next.
-            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

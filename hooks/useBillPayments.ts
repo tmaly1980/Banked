@@ -163,7 +163,7 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
     const selectedDate = new Date(dateToTimestamp(paymentDate));
     selectedDate.setHours(0, 0, 0, 0);
     
-    const nextDueDate = bill.nextDueDate;
+    const nextDueDate = bill.getNextDueDate();
     
     // Make Payment (green) - today or in past
     if (selectedDate <= today) {

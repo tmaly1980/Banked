@@ -32,6 +32,12 @@ export const formatWeekLabel = (startDate: Date, endDate: Date): string => {
   return `${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d')}`;
 };
 
+export const formatAmount = (amount: number): string => {
+  const absAmount = Math.abs(amount);
+  const formattedAmount = absAmount.toFixed(0);
+  return amount < 0 ? `-$${formattedAmount}` : `$${formattedAmount}`;
+};
+
 export const groupExpensesByWeek = (
   expenseBudgets: ExpenseBudget[],
   expenseTypes: ExpenseType[]

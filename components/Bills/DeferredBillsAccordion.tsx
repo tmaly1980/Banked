@@ -15,6 +15,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BillModel } from '@/models/BillModel';
 import { format } from 'date-fns';
+import { formatAmount } from '@/lib/utils';
 import { getBillDueDate } from '@/lib/utils';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;

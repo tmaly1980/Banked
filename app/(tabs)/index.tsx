@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   RefreshControl,
   Alert,
+  Text,
 } from 'react-native';
 import { useBills } from '@/contexts/BillsContext';
+import TabScreenHeader from '@/components/TabScreenHeader';
 import { groupBillsByWeek } from '@/lib/utils';
 import { WeeklyGroup, Paycheck, WeeklyPaycheckGroup } from '@/types';
 import { BillModel } from '@/models/BillModel';
@@ -196,16 +197,17 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Banked</Text>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: '#3498db' }]}
-          onPress={handleAddBill}
-        >
-          <Text style={styles.addButtonText}>+ Bill</Text>
-        </TouchableOpacity>
-      </View>
+      <TabScreenHeader
+        title="Bills"
+        rightContent={
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: '#e74c3c' }]}
+            onPress={handleAddBill}
+          >
+            <Text style={styles.addButtonText}>+ Bill</Text>
+          </TouchableOpacity>
+        }
+      />
 
       {/* Main Content */}
       <ScrollView
@@ -330,26 +332,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    backgroundColor: 'white',
-    paddingTop: 50,
-    paddingBottom: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    backgroundColor: '#ecf0f1',
   },
   addButton: {
     paddingHorizontal: 12,

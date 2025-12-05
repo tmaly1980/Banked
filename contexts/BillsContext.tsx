@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { BillPayment, Paycheck, ExpenseType, ExpenseBudget, GigWithPaychecks, Gig, ExpensePurchase } from '@/types';
 import { BillModel, Bill } from '@/models/BillModel';
 import { supabase } from '@/lib/supabase';
@@ -62,7 +62,7 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
   const [expenseBudgets, setExpenseBudgets] = useState<ExpenseBudget[]>([]);
   const [expensePurchases, setExpensePurchases] = useState<ExpensePurchase[]>([]);
   const [gigs, setGigs] = useState<GigWithPaychecks[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadBills = useCallback(async () => {
@@ -245,7 +245,16 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
   const refreshData = useCallback(async () => {
     try {
       setLoading(true);
-      await Promise.all([loadBills(), loadPaychecks(), loadExpenseTypes(), loadExpenseBudgets(), loadExpensePurchases(), loadGigs()]);
+      await Promise.all([
+        loadBills(), 
+        loadPaychecks(), 
+        loadExpenseTypes(), 
+        loadExpenseBudgets(), 
+        loadExpensePurchases(), 
+        loadGigs()
+      ]);
+    } catch (err) {
+      console.error('[BillsContext] Error refreshing data:', err);
     } finally {
       setLoading(false);
     }
@@ -260,6 +269,13 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
   
   // Setup realtime subscriptions
   useRealtimeSubscriptions(user?.id, loadBills);
+
+  // Cleanup: Reset loading state on unmount or hot reload
+  useEffect(() => {
+    return () => {
+      setLoading(false);
+    };
+  }, []);
 
   const value = {
     bills,

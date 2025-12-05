@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBills } from '@/contexts/BillsContext';
+import TabScreenHeader from '@/components/TabScreenHeader';
 import SelectPicker from '@/components/SelectPicker';
 import AddPurchaseModal from '@/components/modals/AddPurchaseModal';
 import ViewPurchaseModal from '@/components/modals/ViewPurchaseModal';
@@ -21,6 +22,7 @@ import { ExpenseType, ExpenseBudget, ExpensePurchase } from '@/types';
 import { format } from 'date-fns';
 import { InlineAlert } from '@/components/InlineAlert';
 import { useInlineAlert } from '@/hooks/useInlineAlert';
+import { formatAmount } from '@/lib/utils';
 
 interface ExpenseRow {
   type: ExpenseType;
@@ -134,30 +136,27 @@ export default function ExpensesScreen() {
     setPurchaseListVisible(true);
   };
 
-  const formatAmount = (amount: number) => {
-    return `$${amount.toFixed(2)}`;
-  };
-
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Expenses</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity
-            style={[styles.headerButton, { backgroundColor: '#3498db' }]}
-            onPress={handleAddBudget}
-          >
-            <Text style={styles.headerButtonText}>Budget</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.headerButton, { backgroundColor: '#27ae60' }]}
-            onPress={handleAddPurchase}
-          >
-            <Text style={styles.headerButtonText}>Purchase</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <TabScreenHeader
+        title="Expenses"
+        rightContent={
+          <View style={styles.headerButtons}>
+            <TouchableOpacity
+              style={[styles.headerButton, { backgroundColor: '#3498db' }]}
+              onPress={handleAddBudget}
+            >
+              <Text style={styles.headerButtonText}>Budget</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.headerButton, { backgroundColor: '#27ae60' }]}
+              onPress={handleAddPurchase}
+            >
+              <Text style={styles.headerButtonText}>Purchase</Text>
+            </TouchableOpacity>
+          </View>
+        }
+      />
 
       <ScrollView
         style={styles.content}
@@ -601,20 +600,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ecf0f1',
   },
-  header: {
-    backgroundColor: '#2c3e50',
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
   headerButtons: {
     flexDirection: 'row',
     gap: 10,
@@ -682,19 +667,7 @@ const styles = StyleSheet.create({
   overBudget: {
     color: '#e74c3c',
   },
-  container: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e1e8ed',
-  },
+
   title: {
     fontSize: 18,
     fontWeight: '600',

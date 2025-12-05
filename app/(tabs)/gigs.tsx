@@ -12,10 +12,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useBills } from '@/contexts/BillsContext';
 import { WeeklyGigGroup, GigWithPaychecks, Paycheck } from '@/types';
 import { format, parseISO } from 'date-fns';
-import { groupGigsByWeek, formatWeekLabel } from '@/lib/utils';
+import { groupGigsByWeek, formatWeekLabel, formatAmount } from '@/lib/utils';
 import GigFormModal from '@/components/modals/GigFormModal';
 import LinkPaychecksModal from '@/components/modals/LinkPaychecksModal';
 import ViewGigModal from '@/components/modals/ViewGigModal';
+import TabScreenHeader from '@/components/TabScreenHeader';
+import WeeklyCard from '@/components/WeeklyCard';
 
 export default function GigsScreen() {
   const { gigs, paychecks, loading, refreshData, deleteGig, updateGig } = useBills();
@@ -75,17 +77,13 @@ export default function GigsScreen() {
     setViewGigVisible(true);
   };
 
-  const handleUpdateGig = async (updates: Partial<GigWithPaychecks>) => {
+  const handleUpdateGig = async (updates: any) => {
     if (!viewingGig) return;
 
     const { error } = await updateGig(viewingGig.id, updates);
     if (error) {
       Alert.alert('Error', error.message);
     }
-  };
-
-  const formatAmount = (amount: number) => {
-    return `$${amount.toFixed(2)}`;
   };
 
   const formatHours = (hours?: number) => {
@@ -109,13 +107,14 @@ export default function GigsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Gigs</Text>
-        <TouchableOpacity onPress={handleAddGig} style={styles.addButton}>
-          <Ionicons name="add-circle" size={32} color="#3498db" />
-        </TouchableOpacity>
-      </View>
+      <TabScreenHeader
+        title="Gigs"
+        rightContent={
+          <TouchableOpacity style={styles.addButton} onPress={handleAddGig}>
+            <Text style={styles.addButtonText}>+ Gig</Text>
+          </TouchableOpacity>
+        }
+      />
 
       {/* Weekly Groups */}
       <ScrollView
@@ -124,63 +123,73 @@ export default function GigsScreen() {
           <RefreshControl refreshing={loading} onRefresh={refreshData} />
         }
       >
-        {weeklyGroups.map((group, index) => (
-          <View key={index} style={styles.weekGroup}>
-            <View style={styles.weekHeader}>
-              <Text style={styles.weekLabel}>
-                {formatWeekLabel(group.startDate, group.endDate)}
-              </Text>
-              <View style={styles.weekTotals}>
-                <Text style={styles.weekTotalAmount}>
-                  {formatAmount(group.totalAmount)}
-                </Text>
-                {group.totalHours > 0 && (
-                  <Text style={styles.weekTotalHours}>
-                    {formatHours(group.totalHours)}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {group.gigs.length === 0 ? (
-              <View style={styles.emptyWeek}>
-                <Text style={styles.emptyWeekText}>No gigs this week</Text>
-              </View>
-            ) : (
-              group.gigs.map(gig => (
-                <TouchableOpacity
-                  key={gig.id}
-                  style={styles.gigCard}
-                  onPress={() => handleViewGig(gig)}
-                >
-                  <View style={styles.gigHeader}>
-                    <View style={styles.gigMainInfo}>
-                      <Text style={styles.gigName}>{gig.name}</Text>
-                      <Text style={styles.gigDateRange}>
-                        {formatDateRange(gig.start_date, gig.end_date)}
-                      </Text>
-                    </View>
-                    <View style={styles.gigAmountInfo}>
-                      <Text style={styles.gigAmount}>
-                        {formatAmount(gig.total_amount)}
-                      </Text>
-                      {gig.total_hours && (
-                        <Text style={styles.gigHours}>
-                          {formatHours(gig.total_hours)}
-                        </Text>
-                      )}
-                    </View>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={24}
-                      color="#7f8c8d"
-                    />
-                  </View>
-                </TouchableOpacity>
-              ))
-            )}
+        {weeklyGroups.filter(group => group.gigs.length > 0).length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="briefcase-outline" size={64} color="#bdc3c7" />
+            <Text style={styles.emptyStateText}>No gigs yet</Text>
+            <Text style={styles.emptyStateSubtext}>
+              Tap the + button to add your first gig
+            </Text>
           </View>
-        ))}
+        ) : (
+          weeklyGroups
+            .filter(group => group.gigs.length > 0)
+            .map((group, index) => {
+          const headerRight = (
+            <View style={styles.weekTotals}>
+              <Text style={styles.weekTotalAmount}>
+                {formatAmount(group.totalAmount)}
+              </Text>
+              {group.totalHours > 0 && (
+                <Text style={styles.weekTotalHours}>
+                  {formatHours(group.totalHours)}
+                </Text>
+              )}
+            </View>
+          );
+
+          return (
+            <WeeklyCard
+              key={index}
+              title={formatWeekLabel(group.startDate, group.endDate)}
+              headerRight={headerRight}
+            >
+              <View style={styles.gigsList}>
+                  {group.gigs.map(gig => (
+                    <TouchableOpacity
+                      key={gig.id}
+                      style={styles.gigItem}
+                      onPress={() => handleViewGig(gig)}
+                    >
+                      <View style={styles.gigRow}>
+                        <View style={styles.gigMainInfo}>
+                          <Text style={styles.gigName}>{gig.name}</Text>
+                          <Text style={styles.gigDateRange}>
+                            {formatDateRange(gig.start_date, gig.end_date)}
+                          </Text>
+                        </View>
+                        <View style={styles.gigAmountInfo}>
+                          <Text style={styles.gigAmount}>
+                            {formatAmount(gig.total_amount)}
+                          </Text>
+                          {gig.total_hours && (
+                            <Text style={styles.gigHours}>
+                              {formatHours(gig.total_hours)}
+                            </Text>
+                          )}
+                        </View>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={20}
+                          color="#7f8c8d"
+                        />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+            </WeeklyCard>
+          );
+        }))}
       </ScrollView>
 
       {/* Modals */}
@@ -219,42 +228,40 @@ export default function GigsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f6fa',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e1e8ed',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    backgroundColor: '#ecf0f1',
   },
   addButton: {
-    padding: 4,
+    backgroundColor: '#27ae60',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  addButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
   },
   scrollView: {
     flex: 1,
+    padding: 16,
   },
-  weekGroup: {
-    marginBottom: 16,
-  },
-  weekHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#34495e',
+    paddingVertical: 100,
   },
-  weekLabel: {
-    fontSize: 16,
+  emptyStateText: {
+    fontSize: 18,
     fontWeight: '600',
-    color: 'white',
+    color: '#7f8c8d',
+    marginTop: 16,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#95a5a6',
+    marginTop: 8,
+    textAlign: 'center',
   },
   weekTotals: {
     flexDirection: 'row',
@@ -264,30 +271,23 @@ const styles = StyleSheet.create({
   weekTotalAmount: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2ecc71',
+    color: '#27ae60',
   },
   weekTotalHours: {
     fontSize: 14,
-    color: '#ecf0f1',
+    color: '#7f8c8d',
   },
-  emptyWeek: {
-    padding: 20,
-    backgroundColor: 'white',
-    alignItems: 'center',
+  gigsList: {
+    paddingHorizontal: 16,
   },
-  emptyWeekText: {
-    color: '#95a5a6',
-    fontStyle: 'italic',
-  },
-  gigCard: {
-    backgroundColor: 'white',
+  gigItem: {
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e1e8ed',
+    borderBottomColor: '#f8f9fa',
   },
-  gigHeader: {
+  gigRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
     gap: 12,
   },
   gigMainInfo: {

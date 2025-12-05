@@ -98,11 +98,6 @@ export class BillModel {
     return null;
   }
 
-  // Getter for backward compatibility - uses today as reference
-  get nextDueDate(): Date | null {
-    return this.getNextDueDate();
-  }
-
   // Get the next date (scheduled payment date or due date)
   get next_date(): Date | null {
     // Check for scheduled payment (payment_date > today)
@@ -120,19 +115,19 @@ export class BillModel {
     }
     
     // Fall back to regular due date
-    return this.nextDueDate;
+    return this.getNextDueDate();
   }
 
   // Check if bill is overdue
   get isOverdue(): boolean {
-    const nextDue = this.nextDueDate;
+    const nextDue = this.getNextDueDate();
     if (!nextDue) return false;
     return nextDue < new Date() && !this.isPaid;
   }
 
   // Get days until due (negative if overdue)
   get daysUntilDue(): number | null {
-    const nextDue = this.nextDueDate;
+    const nextDue = this.getNextDueDate();
     if (!nextDue) return null;
     
     const today = new Date();
