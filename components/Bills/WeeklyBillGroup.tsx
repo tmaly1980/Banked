@@ -10,7 +10,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { WeeklyGroup } from '@/types';
 import { BillModel } from '@/models/BillModel';
 import { formatWeekLabel, getBillDueDate, formatAmount } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, differenceInDays, startOfDay } from 'date-fns';
 import { Colors } from '@/constants/Colors';
 import WeeklyCard from '@/components/WeeklyCard';
 import ProgressBar from '@/components/ProgressBar';
@@ -121,6 +121,11 @@ export default function WeeklyBillGroup({
             const displayDate = getBillDueDate(bill, group.startDate);
             const priorityColor = getPriorityColor(bill.priority);
             const priorityIcon = getPriorityIcon(bill.priority);
+            
+            // Calculate days until due
+            const today = startOfDay(new Date());
+            const daysUntilDue = displayDate ? differenceInDays(startOfDay(displayDate), today) : null;
+            
             return (
               <TouchableOpacity
                 key={bill.id}
@@ -137,6 +142,13 @@ export default function WeeklyBillGroup({
                 )}
               >
                 <View style={styles.billRow}>
+                  {daysUntilDue !== null && (
+                    <View style={[styles.daysBadge, daysUntilDue === 0 && styles.daysBadgeToday]}>
+                      <Text style={[styles.daysBadgeText, daysUntilDue === 0 && styles.daysBadgeTextToday]}>
+                        {daysUntilDue}d
+                      </Text>
+                    </View>
+                  )}
                   <MaterialCommunityIcons 
                     name={priorityIcon} 
                     size={16} 
@@ -187,6 +199,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  daysBadge: {
+    backgroundColor: '#ecf0f1',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    minWidth: 28,
+    alignItems: 'center',
+  },
+  daysBadgeToday: {
+    backgroundColor: '#3498db',
+  },
+  daysBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#7f8c8d',
+  },
+  daysBadgeTextToday: {
+    color: '#fff',
   },
   priorityIcon: {
     width: 16,

@@ -51,9 +51,13 @@ export interface ExpenseBudget {
   id: string;
   user_id: string;
   expense_type_id: string;
-  start_date: string;
-  end_date?: string;
+  effective_from: string;
+  effective_to?: string;
+  start_mmdd?: string;
+  end_mmdd?: string;
+  frequency: 'once' | 'weekly' | 'monthly' | 'yearly';
   amount: number;
+  notes?: string;
   created_at: string;
 }
 

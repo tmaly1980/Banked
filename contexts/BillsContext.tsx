@@ -40,8 +40,8 @@ interface BillsContextType {
   createExpenseBudget: (data: { expense_type_name: string; start_date: string; end_date?: string; allocated_amount: number; spent_amount?: number }) => Promise<{ data: ExpenseBudget | null; error: Error | null }>;
   updateExpenseBudget: (id: string, updates: { allocated_amount?: number; spent_amount?: number; end_date?: string }) => Promise<{ error: Error | null }>;
   deleteExpenseBudget: (id: string) => Promise<{ error: Error | null }>;
-  createExpensePurchase: (data: { expense_type_id: string; amount: number; date: string; notes?: string }) => Promise<{ data: ExpensePurchase | null; error: Error | null }>;
-  updateExpensePurchase: (id: string, updates: { amount?: number; date?: string; notes?: string }) => Promise<{ error: Error | null }>;
+  createExpensePurchase: (data: { expense_type_id: string; description?: string; amount?: number; purchase_date?: string }) => Promise<{ data: ExpensePurchase | null; error: Error | null }>;
+  updateExpensePurchase: (id: string, updates: { description?: string; estimated_amount?: number; purchase_amount?: number; purchase_date?: string; checklist?: any[]; photos?: string[] }) => Promise<{ error: Error | null }>;
   deleteExpensePurchase: (id: string) => Promise<{ error: Error | null }>;
   loadGigs: () => Promise<void>;
   createGig: (gig: Omit<Gig, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<{ data: Gig | null; error: Error | null }>;

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { getBillProgressColor } from '@/lib/colorUtils';
 
 interface ProgressBarProps {
   current: number;
@@ -8,14 +9,6 @@ interface ProgressBarProps {
   onLeftPress?: () => void;
   leftPressable?: boolean;
 }
-
-const getProgressBarColor = (progressPercentage: number) => {
-  if (progressPercentage >= 100) return '#27ae60'; // success
-  if (progressPercentage >= 75) return '#f39c12'; // moderate
-  if (progressPercentage >= 50) return '#3498db'; // info
-  if (progressPercentage >= 25) return '#e67e22'; // warning
-  return '#e74c3c'; // danger
-};
 
 export default function ProgressBar({
   current,
@@ -26,6 +19,8 @@ export default function ProgressBar({
 }: ProgressBarProps) {
   const progressPercentage = total > 0 ? Math.min((current / total) * 100, 100) : 0;
   const remaining = current - total;
+  // current = income, total = bills
+  const barColor = getBillProgressColor(current, total);
 
   return (
     <View style={styles.progressContainer}>
@@ -36,7 +31,7 @@ export default function ProgressBar({
               styles.progressBar,
               {
                 width: `${progressPercentage}%`,
-                backgroundColor: getProgressBarColor(progressPercentage),
+                backgroundColor: barColor,
               },
             ]}
           />

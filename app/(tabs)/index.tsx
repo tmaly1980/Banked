@@ -24,7 +24,7 @@ import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
 import { format } from 'date-fns';
 
 export default function HomeScreen() {
-  const { bills, paychecks, expenseTypes, expenseBudgets, loading, refreshData, deleteBill, deletePaycheck, saveExpenseBudgets } = useBills();
+  const { bills, paychecks, expenseTypes, expenseBudgets, expensePurchases, loading, refreshData, deleteBill, deletePaycheck, saveExpenseBudgets } = useBills();
   const [weeklyGroups, setWeeklyGroups] = useState<WeeklyGroup[]>([]);
   const [deferredBills, setDeferredBills] = useState<BillModel[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -76,10 +76,21 @@ export default function HomeScreen() {
       const weekExpenses = expenseBudgets.filter(exp => exp.start_date === weekStartDate);
       const weekExpensesTotal = weekExpenses.reduce((sum, exp) => sum + exp.amount, 0);
       
+      // Get actual expense purchases for this week
+      const weekPurchases = expensePurchases.filter(purchase => {
+        if (!purchase.purchase_date) return false;
+        const purchaseDate = new Date(purchase.purchase_date);
+        return purchaseDate >= group.startDate && purchaseDate <= group.endDate;
+      });
+      const weekPurchasesTotal = weekPurchases.reduce((sum, p) => sum + (p.purchase_amount || 0), 0);
+      
+      // Use the greater of budgeted or actual expenses
+      const weekExpenseDeduction = Math.max(weekExpensesTotal, weekPurchasesTotal);
+      
       // Add carryover from previous week
       group.carryoverBalance = runningBalance;
       // Total available = paychecks + carryover - expenses
-      group.totalPaychecks = weekPaycheckTotal + runningBalance - weekExpensesTotal;
+      group.totalPaychecks = weekPaycheckTotal + runningBalance - weekExpenseDeduction;
       
       // Calculate new running balance for next week
       const weekRemainder = group.totalPaychecks - group.totalBills;
@@ -87,7 +98,7 @@ export default function HomeScreen() {
     });
 
     setWeeklyGroups(groups);
-  }, [bills, paychecks, expenseBudgets]);
+  }, [bills, paychecks, expenseBudgets, expensePurchases]);
 
   const handleAddBill = () => {
     setEditingBill(null);
@@ -192,7 +203,14 @@ export default function HomeScreen() {
     if (!selectedWeekForExpenses) return;
 
     const weekStartDate = format(selectedWeekForExpenses.startDate, 'yyyy-MM-dd');
-    await saveExpenseBudgets(weekStartDate, expenses);
+    // Map to the correct format expected by saveExpenseBudgets
+    const formattedExpenses = expenses.map(exp => ({
+      expense_type_id: exp.expense_type_id,
+      expense_type_name: exp.expense_type_name,
+      allocated_amount: exp.amount,
+      spent_amount: 0,
+    }));
+    await saveExpenseBudgets(weekStartDate, formattedExpenses);
     await refreshData();
   };
 

@@ -27,6 +27,7 @@ interface ViewPurchaseModalProps {
   expenseType: ExpenseType | null;
   budget: ExpenseBudget | null;
   onUpdate: (id: string, updates: Partial<ExpensePurchase>) => Promise<void>;
+  onDelete?: (id: string) => Promise<void>;
 }
 
 export default function ViewPurchaseModal({
@@ -36,6 +37,7 @@ export default function ViewPurchaseModal({
   expenseType,
   budget,
   onUpdate,
+  onDelete,
 }: ViewPurchaseModalProps) {
   const { user } = useAuth();
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -191,11 +193,11 @@ export default function ViewPurchaseModal({
     try {
       const photoUri = await takePhoto();
       if (photoUri) {
-        const result = await uploadPurchasePhoto(photoUri, user.id, purchase.id);
+        const result = await uploadPurchasePhoto(photoUri.uri, user.id, purchase.id);
         if (result.url) {
           const updatedPhotos = [...photos, result.url];
           setPhotos(updatedPhotos);
-          await onUpdate({ ...purchase, photos: updatedPhotos });
+          await onUpdate(purchase.id, { photos: updatedPhotos });
         } else if (result.error) {
           Alert.alert('Upload Error', result.error.message);
         }
@@ -214,11 +216,11 @@ export default function ViewPurchaseModal({
     try {
       const photoUri = await pickImage();
       if (photoUri) {
-        const result = await uploadPurchasePhoto(photoUri, user.id, purchase.id);
+        const result = await uploadPurchasePhoto(photoUri.uri, user.id, purchase.id);
         if (result.url) {
           const updatedPhotos = [...photos, result.url];
           setPhotos(updatedPhotos);
-          await onUpdate({ ...purchase, photos: updatedPhotos });
+          await onUpdate(purchase.id, { photos: updatedPhotos });
         } else if (result.error) {
           Alert.alert('Upload Error', result.error.message);
         }
@@ -246,10 +248,30 @@ export default function ViewPurchaseModal({
               await deletePurchasePhoto(photoUrl);
               const updatedPhotos = photos.filter((url) => url !== photoUrl);
               setPhotos(updatedPhotos);
-              await onUpdate({ ...purchase, photos: updatedPhotos });
+              await onUpdate(purchase.id, { photos: updatedPhotos });
             } catch (error) {
               Alert.alert('Error', 'Failed to delete photo');
             }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDelete = async () => {
+    if (!purchase || !onDelete) return;
+
+    Alert.alert(
+      'Delete Purchase',
+      'Are you sure you want to delete this purchase?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await onDelete(purchase.id);
+            onClose();
           },
         },
       ]
@@ -271,45 +293,48 @@ export default function ViewPurchaseModal({
               <Text style={styles.closeButton}>Close</Text>
             </TouchableOpacity>
             <Text style={styles.title} numberOfLines={1}>
-              {purchase.description || expenseType?.name || 'Purchase'}
+              {expenseType?.name || 'Purchase'}
             </Text>
             <View style={{ width: 60 }} />
           </View>
 
         <ScrollView style={styles.content}>
-          {/* Purchase Info */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Expense Type</Text>
-            <Text style={styles.sectionValue}>{expenseType.name}</Text>
-          </View>
+          {/* Description */}
+          {purchase.description && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Description</Text>
+              <Text style={styles.sectionValue}>{purchase.description}</Text>
+            </View>
+          )}
 
           {/* Photo Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Photos</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoCarousel}>
-              {photos.map((photoUrl, index) => (
-                <View key={index} style={styles.photoContainer}>
-                  <Image source={{ uri: photoUrl }} style={styles.photo} />
-                  <TouchableOpacity
-                    style={styles.deletePhotoButton}
-                    onPress={() => handleDeletePhoto(photoUrl)}
-                  >
-                    <Ionicons name="close-circle" size={28} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              <TouchableOpacity
-                style={styles.addPhotoButton}
-                onPress={handleAddPhoto}
-                disabled={uploadingPhoto}
-              >
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Photos</Text>
+              <TouchableOpacity onPress={handleAddPhoto} disabled={uploadingPhoto}>
                 {uploadingPhoto ? (
                   <ActivityIndicator color="#007AFF" />
                 ) : (
-                  <Ionicons name="camera" size={32} color="#007AFF" />
+                  <Ionicons name="add-circle" size={28} color="#007AFF" />
                 )}
               </TouchableOpacity>
-            </ScrollView>
+            </View>
+            
+            {photos.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoCarousel}>
+                {photos.map((photoUrl, index) => (
+                  <View key={index} style={styles.photoContainer}>
+                    <Image source={{ uri: photoUrl }} style={styles.photo} />
+                    <TouchableOpacity
+                      style={styles.deletePhotoButton}
+                      onPress={() => handleDeletePhoto(photoUrl)}
+                    >
+                      <Ionicons name="close-circle" size={28} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
           </View>
 
           {/* Checklist Section */}
@@ -472,8 +497,16 @@ export default function ViewPurchaseModal({
 
         {/* Fixed Footer */}
         <View style={styles.footer}>
+          {onDelete && (
+            <TouchableOpacity
+              style={[styles.footerButton, styles.deleteFooterButton]}
+              onPress={handleDelete}
+            >
+              <Ionicons name="trash-outline" size={20} color="#e74c3c" />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
-            style={styles.footerButton}
+            style={[styles.footerButton, styles.primaryFooterButton]}
             onPress={() => setShowPurchaseForm(true)}
           >
             <Text style={styles.footerButtonText}>
@@ -713,12 +746,24 @@ const styles = StyleSheet.create({
     borderTopColor: '#e1e8ed',
     padding: 16,
     backgroundColor: '#fff',
+    flexDirection: 'row',
+    gap: 12,
   },
   footerButton: {
-    backgroundColor: '#007AFF',
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryFooterButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+  },
+  deleteFooterButton: {
+    width: 56,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e74c3c',
   },
   footerButtonText: {
     color: '#fff',

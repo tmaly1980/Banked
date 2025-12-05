@@ -11,25 +11,29 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useBills } from '@/contexts/BillsContext';
 import TabScreenHeader from '@/components/TabScreenHeader';
 import SelectPicker from '@/components/SelectPicker';
 import AddPurchaseModal from '@/components/modals/AddPurchaseModal';
 import ViewPurchaseModal from '@/components/modals/ViewPurchaseModal';
 import { ExpenseType, ExpenseBudget, ExpensePurchase } from '@/types';
-import { format } from 'date-fns';
+import { format, startOfWeek, endOfWeek, addWeeks, subWeeks, isThisWeek, isSameDay } from 'date-fns';
 import { InlineAlert } from '@/components/InlineAlert';
 import { useInlineAlert } from '@/hooks/useInlineAlert';
 import { formatAmount } from '@/lib/utils';
 import { globalStyles } from '@/lib/globalStyles';
 
-interface ExpenseRow {
+type TabType = 'weekly' | 'upcoming';
+
+interface GroupedPurchases {
   type: ExpenseType;
-  totalPurchases: number;
-  budget: number;
   purchases: ExpensePurchase[];
+  total: number;
 }
 
 export default function ExpensesScreen() {
@@ -47,54 +51,113 @@ export default function ExpensesScreen() {
   } = useBills();
   
   const { alert, showError, showSuccess, hideAlert } = useInlineAlert();
-  const [budgetModalVisible, setBudgetModalVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabType>('weekly');
+  const [selectedWeek, setSelectedWeek] = useState(new Date());
   const [addPurchaseModalVisible, setAddPurchaseModalVisible] = useState(false);
   const [viewPurchaseModalVisible, setViewPurchaseModalVisible] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState<ExpensePurchase | null>(null);
-  const [purchaseModalVisible, setPurchaseModalVisible] = useState(false);
-  const [purchaseListVisible, setPurchaseListVisible] = useState(false);
-  const [selectedExpenseType, setSelectedExpenseType] = useState<ExpenseType | null>(null);
 
   useEffect(() => {
     refreshData();
   }, []);
 
-  // Group data by expense type
-  const expenseRows = useMemo(() => {
-    const rows: ExpenseRow[] = [];
+  const weekStart = startOfWeek(selectedWeek, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(selectedWeek, { weekStartsOn: 0 });
+
+  // Group purchases by expense type for the selected week
+  const weeklyPurchases = useMemo(() => {
+    const groups: GroupedPurchases[] = [];
     const typeIds = new Set<string>();
 
-    // Collect all expense types that have budgets or purchases
-    expenseBudgets.forEach(budget => typeIds.add(budget.expense_type_id));
-    expensePurchases.forEach(purchase => typeIds.add(purchase.expense_type_id));
+    // Filter purchases for selected week
+    const purchasesInWeek = expensePurchases.filter(p => {
+      if (!p.purchase_date) return false;
+      const purchaseDate = new Date(p.purchase_date);
+      return purchaseDate >= weekStart && purchaseDate <= weekEnd;
+    });
+
+    // Group by type
+    purchasesInWeek.forEach(p => typeIds.add(p.expense_type_id));
 
     typeIds.forEach(typeId => {
       const type = expenseTypes.find(t => t.id === typeId);
       if (!type) return;
 
-      const typePurchases = expensePurchases.filter(p => p.expense_type_id === typeId);
-      const typeBudget = expenseBudgets.find(b => b.expense_type_id === typeId);
-      
-      const totalPurchases = typePurchases.reduce((sum, p) => sum + (p.purchase_amount || 0), 0);
-      const budget = typeBudget?.amount || 0;
+      const typePurchases = purchasesInWeek
+        .filter(p => p.expense_type_id === typeId)
+        .sort((a, b) => {
+          const dateA = new Date(a.purchase_date!).getTime();
+          const dateB = new Date(b.purchase_date!).getTime();
+          return dateA - dateB;
+        });
 
-      rows.push({
-        type,
-        totalPurchases,
-        budget,
-        purchases: typePurchases.sort((a, b) => {
-          const dateA = a.purchase_date ? new Date(a.purchase_date).getTime() : new Date(a.created_at).getTime();
-          const dateB = b.purchase_date ? new Date(b.purchase_date).getTime() : new Date(b.created_at).getTime();
-          return dateB - dateA;
-        }),
-      });
+      const total = typePurchases.reduce((sum, p) => sum + (p.purchase_amount || 0), 0);
+
+      groups.push({ type, purchases: typePurchases, total });
     });
 
-    return rows.sort((a, b) => a.type.order - b.type.order);
-  }, [expenseBudgets, expensePurchases, expenseTypes]);
+    return groups.sort((a, b) => a.type.order - b.type.order);
+  }, [expensePurchases, expenseTypes, weekStart, weekEnd]);
 
-  const handleAddBudget = () => {
-    setBudgetModalVisible(true);
+  // Group upcoming purchases (no date) by expense type
+  const upcomingPurchases = useMemo(() => {
+    const groups: GroupedPurchases[] = [];
+    const typeIds = new Set<string>();
+
+    // Filter purchases without dates
+    const purchasesWithoutDate = expensePurchases.filter(p => !p.purchase_date);
+
+    purchasesWithoutDate.forEach(p => typeIds.add(p.expense_type_id));
+
+    typeIds.forEach(typeId => {
+      const type = expenseTypes.find(t => t.id === typeId);
+      if (!type) return;
+
+      const typePurchases = purchasesWithoutDate
+        .filter(p => p.expense_type_id === typeId)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      const total = typePurchases.reduce((sum, p) => sum + (p.purchase_amount || p.estimated_amount || 0), 0);
+
+      groups.push({ type, purchases: typePurchases, total });
+    });
+
+    return groups.sort((a, b) => a.type.order - b.type.order);
+  }, [expensePurchases, expenseTypes]);
+
+  // Calculate totals for footer
+  const { totalPurchases, totalBudget } = useMemo(() => {
+    if (activeTab === 'weekly') {
+      const weekStartDate = format(weekStart, 'yyyy-MM-dd');
+      
+      // Total purchases for the week
+      const purchases = weeklyPurchases.reduce((sum, group) => sum + group.total, 0);
+      
+      // Total budget for the week
+      const budgets = expenseBudgets
+        .filter(b => b.start_date === weekStartDate)
+        .reduce((sum, b) => sum + b.amount, 0);
+      
+      return { totalPurchases: purchases, totalBudget: budgets };
+    } else {
+      // Upcoming view
+      const purchases = upcomingPurchases.reduce((sum, group) => sum + group.total, 0);
+      
+      // No budget for upcoming (undated) purchases
+      return { totalPurchases: purchases, totalBudget: 0 };
+    }
+  }, [activeTab, weeklyPurchases, upcomingPurchases, expenseBudgets, weekStart]);
+
+  const handlePreviousWeek = () => {
+    setSelectedWeek(subWeeks(selectedWeek, 1));
+  };
+
+  const handleNextWeek = () => {
+    setSelectedWeek(addWeeks(selectedWeek, 1));
+  };
+
+  const handleThisWeek = () => {
+    setSelectedWeek(new Date());
   };
 
   const handleAddPurchase = () => {
@@ -103,9 +166,14 @@ export default function ExpensesScreen() {
 
   const handlePurchaseAdded = async (data: { description?: string; expense_type_id: string; amount: number; purchase_date: string }) => {
     try {
-      console.log('handlePurchaseAdded called with:', data);
-      const { data: purchase, error } = await createExpensePurchase(data);
-      console.log('createExpensePurchase result - purchase:', purchase, 'error:', error);
+      const purchaseData = {
+        expense_type_id: data.expense_type_id,
+        description: data.description,
+        amount: data.amount,
+        purchase_date: data.purchase_date,
+      };
+      
+      const { data: purchase, error } = await createExpensePurchase(purchaseData);
       if (error) throw error;
       
       setAddPurchaseModalVisible(false);
@@ -113,12 +181,18 @@ export default function ExpensesScreen() {
       
       await refreshData();
     } catch (error) {
-      console.error('handlePurchaseAdded error:', error);
       showError(error instanceof Error ? error.message : 'Failed to add purchase');
     }
   };
 
-  const handleUpdatePurchase = async (id: string, updates: Partial<ExpensePurchase>) => {
+  const handleUpdatePurchase = async (id: string, updates: {
+    description?: string;
+    estimated_amount?: number;
+    purchase_amount?: number;
+    purchase_date?: string;
+    checklist?: any[];
+    photos?: string[];
+  }) => {
     try {
       const { error } = await updateExpensePurchase(id, updates);
       if (error) throw error;
@@ -129,26 +203,102 @@ export default function ExpensesScreen() {
     }
   };
 
-  const handleRowPress = (row: ExpenseRow) => {
-    setSelectedExpenseType(row.type);
-    setPurchaseListVisible(true);
+  const handlePurchasePress = (purchase: ExpensePurchase) => {
+    setSelectedPurchase(purchase);
+    setViewPurchaseModalVisible(true);
+  };
+
+  const handleDeletePurchase = async (id: string) => {
+    try {
+      const { error } = await deleteExpensePurchase(id);
+      if (error) throw error;
+      
+      showSuccess('Purchase deleted');
+      await refreshData();
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Failed to delete purchase');
+    }
+  };
+
+  const renderRightActions = (progress: Animated.AnimatedInterpolation<number>, dragX: Animated.AnimatedInterpolation<number>, purchaseId: string) => {
+    const trans = dragX.interpolate({
+      inputRange: [-100, 0],
+      outputRange: [0, 100],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => handleDeletePurchase(purchaseId)}
+      >
+        <Animated.View style={{ transform: [{ translateX: trans }] }}>
+          <Ionicons name="trash-outline" size={24} color="#fff" />
+        </Animated.View>
+      </TouchableOpacity>
+    );
   };
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={styles.container}>
       <TabScreenHeader
         title="Expenses"
         rightContent={
-          <View style={styles.headerButtons}>
-            <TouchableOpacity
-              style={[styles.headerButton, { backgroundColor: '#27ae60' }]}
-              onPress={handleAddPurchase}
-            >
-              <Text style={styles.headerButtonText}>Purchase</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: '#27ae60' }]}
+            onPress={handleAddPurchase}
+          >
+            <Text style={styles.headerButtonText}>+ Add</Text>
+          </TouchableOpacity>
         }
       />
+
+      {/* Tab Selector - only show if there are upcoming purchases */}
+      {upcomingPurchases.length > 0 && (
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'weekly' && styles.activeTab]}
+            onPress={() => setActiveTab('weekly')}
+          >
+            <Text style={[styles.tabText, activeTab === 'weekly' && styles.activeTabText]}>
+              Weekly
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]}
+            onPress={() => setActiveTab('upcoming')}
+          >
+            <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>
+              Upcoming
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Week Selector (only for Weekly tab) */}
+      {activeTab === 'weekly' && (
+        <View style={styles.weekSelector}>
+          <TouchableOpacity onPress={handlePreviousWeek} style={styles.weekArrow}>
+            <Ionicons name="chevron-back" size={24} color="#2c3e50" />
+          </TouchableOpacity>
+          
+          <View style={styles.weekLabelContainer}>
+            <Text style={styles.weekLabel}>
+              {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d')}
+            </Text>
+            {!isThisWeek(selectedWeek) && (
+              <TouchableOpacity onPress={handleThisWeek} style={styles.todayButton}>
+                <Ionicons name="calendar-outline" size={20} color="#3498db" />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          <TouchableOpacity onPress={handleNextWeek} style={styles.weekArrow}>
+            <Ionicons name="chevron-forward" size={24} color="#2c3e50" />
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView
         style={styles.content}
@@ -164,66 +314,112 @@ export default function ExpensesScreen() {
           onDismiss={hideAlert}
         />
 
-        {expenseRows.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="wallet-outline" size={64} color="#bdc3c7" />
-            <Text style={styles.emptyStateText}>No expenses yet</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Add a budget or purchase to get started
-            </Text>
-          </View>
-        ) : (
-          expenseRows.map((row) => (
-            <TouchableOpacity
-              key={row.type.id}
-              style={styles.expenseRow}
-              onPress={() => handleRowPress(row)}
-            >
-              <View style={styles.expenseRowContent}>
-                <Text style={styles.expenseTypeName}>{row.type.name}</Text>
-                <Text style={[
-                  styles.expenseAmount,
-                  row.totalPurchases > row.budget && styles.overBudget
-                ]}>
-                  {formatAmount(row.totalPurchases)} / {formatAmount(row.budget)}
-                </Text>
+        {activeTab === 'weekly' ? (
+          // Weekly View
+          weeklyPurchases.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="calendar-outline" size={64} color="#bdc3c7" />
+              <Text style={styles.emptyStateText}>No purchases this week</Text>
+              <Text style={styles.emptyStateSubtext}>
+                Add a purchase to track your weekly expenses
+              </Text>
+            </View>
+          ) : (
+            weeklyPurchases.map((group) => (
+              <View key={group.type.id} style={styles.categoryGroup}>
+                <View style={styles.categoryHeader}>
+                  <Text style={styles.categoryName}>{group.type.name}</Text>
+                  <Text style={styles.categoryTotal}>{formatAmount(group.total)}</Text>
+                </View>
+                <View style={styles.categoryCard}>
+                  {group.purchases.map((purchase, index) => (
+                    <Swipeable
+                      key={purchase.id}
+                      renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, purchase.id)}
+                    >
+                      <TouchableOpacity
+                        style={[
+                          styles.purchaseRow,
+                          index < group.purchases.length - 1 && styles.purchaseRowBorder
+                        ]}
+                        onPress={() => handlePurchasePress(purchase)}
+                      >
+                        <View style={styles.purchaseLeft}>
+                          <Text style={styles.purchaseDate}>
+                            {format(new Date(purchase.purchase_date!), 'MMM d')}
+                          </Text>
+                          <Text style={styles.purchaseDescription}>
+                            {purchase.description || group.type.name}
+                          </Text>
+                        </View>
+                        <Text style={styles.purchaseAmount}>
+                          {formatAmount(purchase.purchase_amount || 0)}
+                        </Text>
+                      </TouchableOpacity>
+                    </Swipeable>
+                  ))}
+                </View>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#7f8c8d" />
-            </TouchableOpacity>
-          ))
+            ))
+          )
+        ) : (
+          // Upcoming View
+          upcomingPurchases.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons name="list-outline" size={64} color="#bdc3c7" />
+              <Text style={styles.emptyStateText}>No upcoming purchases</Text>
+              <Text style={styles.emptyStateSubtext}>
+                Add purchases without dates to your wishlist
+              </Text>
+            </View>
+          ) : (
+            upcomingPurchases.map((group) => (
+              <View key={group.type.id} style={styles.categoryGroup}>
+                <View style={styles.categoryHeader}>
+                  <Text style={styles.categoryName}>{group.type.name}</Text>
+                  <Text style={styles.categoryTotal}>{formatAmount(group.total)}</Text>
+                </View>
+                <View style={styles.categoryCard}>
+                  {group.purchases.map((purchase, index) => (
+                    <Swipeable
+                      key={purchase.id}
+                      renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, purchase.id)}
+                    >
+                      <TouchableOpacity
+                        style={[
+                          styles.purchaseRow,
+                          index < group.purchases.length - 1 && styles.purchaseRowBorder
+                        ]}
+                        onPress={() => handlePurchasePress(purchase)}
+                      >
+                        <View style={styles.purchaseLeft}>
+                          <Text style={styles.purchaseDescription}>
+                            {purchase.description || group.type.name}
+                          </Text>
+                        </View>
+                        <Text style={styles.purchaseAmount}>
+                          {formatAmount(purchase.purchase_amount || purchase.estimated_amount || 0)}
+                        </Text>
+                      </TouchableOpacity>
+                    </Swipeable>
+                  ))}
+                </View>
+              </View>
+            ))
+          )
         )}
       </ScrollView>
 
-      {/* Budget Modal */}
-      <BudgetModal
-        visible={budgetModalVisible}
-        onClose={() => setBudgetModalVisible(false)}
-        expenseTypes={expenseTypes}
-        expenseBudgets={expenseBudgets}
-        onSuccess={async (data) => {
-          try {
-            const existingBudget = expenseBudgets.find(
-              b => b.expense_type_id === data.expense_type_id
-            );
-
-            if (existingBudget) {
-              const { error } = await updateExpenseBudget(existingBudget.id, {
-                amount: data.amount,
-              });
-              if (error) throw error;
-            } else {
-              const { error } = await createExpenseBudget(data);
-              if (error) throw error;
-            }
-
-            showSuccess('Budget saved successfully');
-            setBudgetModalVisible(false);
-            await refreshData();
-          } catch (error) {
-            showError(error instanceof Error ? error.message : 'Failed to save budget');
-          }
-        }}
-      />
+      {/* Fixed Footer with Total */}
+      <View style={styles.footer}>
+        <Text style={styles.footerLabel}>Total</Text>
+        <Text style={styles.footerAmount}>
+          {formatAmount(totalPurchases)}
+          {totalBudget > 0 && (
+            <Text style={styles.footerBudget}> / {formatAmount(totalBudget)}</Text>
+          )}
+        </Text>
+      </View>
 
       {/* Add Purchase Modal */}
       <AddPurchaseModal
@@ -244,373 +440,78 @@ export default function ExpensesScreen() {
         expenseType={selectedPurchase ? expenseTypes.find(t => t.id === selectedPurchase.expense_type_id) || null : null}
         budget={selectedPurchase ? expenseBudgets.find(b => b.expense_type_id === selectedPurchase.expense_type_id) || null : null}
         onUpdate={handleUpdatePurchase}
+        onDelete={handleDeletePurchase}
       />
-
-      {/* Purchase Modal */}
-      <PurchaseModal
-        visible={purchaseModalVisible}
-        onClose={() => setPurchaseModalVisible(false)}
-        expenseTypes={expenseTypes}
-        onSuccess={async (data) => {
-          try {
-            const { error } = await createExpensePurchase(data);
-            if (error) throw error;
-            
-            showSuccess('Purchase added successfully');
-            setPurchaseModalVisible(false);
-            await refreshData();
-          } catch (error) {
-            showError(error instanceof Error ? error.message : 'Failed to add purchase');
-          }
-        }}
-      />
-
-      {/* Purchase List Modal */}
-      <PurchaseListModal
-        visible={purchaseListVisible}
-        onClose={() => {
-          setPurchaseListVisible(false);
-          setSelectedExpenseType(null);
-        }}
-        expenseType={selectedExpenseType}
-        purchases={selectedExpenseType ? 
-          expensePurchases.filter(p => p.expense_type_id === selectedExpenseType.id)
-            .sort((a, b) => {
-              const dateA = a.purchase_date ? new Date(a.purchase_date).getTime() : new Date(a.created_at).getTime();
-              const dateB = b.purchase_date ? new Date(b.purchase_date).getTime() : new Date(b.created_at).getTime();
-              return dateB - dateA;
-            })
-          : []
-        }
-        onDelete={async (id) => {
-          try {
-            const { error } = await deleteExpensePurchase(id);
-            if (error) throw error;
-            
-            showSuccess('Purchase deleted');
-            await refreshData();
-          } catch (error) {
-            showError(error instanceof Error ? error.message : 'Failed to delete purchase');
-          }
-        }}
-      />
-    </View>
-  );
-}
-
-// Budget Modal Component
-interface BudgetModalProps {
-  visible: boolean;
-  onClose: () => void;
-  expenseTypes: ExpenseType[];
-  expenseBudgets: ExpenseBudget[];
-  onSuccess: (data: { expense_type_id: string; amount: number; start_date: string }) => void;
-}
-
-function BudgetModal({ visible, onClose, expenseTypes, expenseBudgets, onSuccess }: BudgetModalProps) {
-  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
-  const [amount, setAmount] = useState('');
-
-  useEffect(() => {
-    if (visible) {
-      console.log('Budget types:', expenseTypes);
-      setSelectedTypeId(null);
-      setAmount('');
-    }
-  }, [visible, expenseTypes]);
-
-  useEffect(() => {
-    if (selectedTypeId) {
-      const existingBudget = expenseBudgets.find(b => b.expense_type_id === selectedTypeId);
-      if (existingBudget) {
-        setAmount(existingBudget.amount.toString());
-      } else {
-        setAmount('');
-      }
-    }
-  }, [selectedTypeId, expenseBudgets]);
-
-  const handleSave = () => {
-    if (!selectedTypeId || !amount) return;
-
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount < 0) return;
-
-    onSuccess({
-      expense_type_id: selectedTypeId,
-      amount: parsedAmount,
-      start_date: format(new Date(), 'yyyy-MM-dd'),
-    });
-  };
-
-  const pickerItems = expenseTypes.map(type => ({
-    label: type.name,
-    value: type.id,
-  }));
-
-  const handleClose = () => {
-    setSelectedTypeId(null);
-    setAmount('');
-    onClose();
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={globalStyles.modalContainer}
-      >
-        <View style={globalStyles.modalHeader}>
-          <TouchableOpacity onPress={handleClose}>
-            <Text style={globalStyles.cancelButton}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={globalStyles.modalTitle}>Set Budget</Text>
-          <TouchableOpacity onPress={handleSave} disabled={!selectedTypeId || !amount}>
-            <Text style={[globalStyles.saveButton, (!selectedTypeId || !amount) && globalStyles.disabledButton]}>Save</Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={globalStyles.form} keyboardShouldPersistTaps="handled">
-          <View style={globalStyles.inputGroup}>
-            <SelectPicker
-              label="Expense Type"
-              value={selectedTypeId || ''}
-              onValueChange={setSelectedTypeId}
-              items={pickerItems}
-              placeholder="Select expense type..."
-            />
-          </View>
-
-          <View style={globalStyles.inputGroup}>
-            <Text style={globalStyles.label}>Budget Amount</Text>
-            <TextInput
-              style={globalStyles.input}
-              value={amount}
-              onChangeText={setAmount}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
-              placeholderTextColor="#999"
-            />
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
-// Purchase Modal Component
-interface PurchaseModalProps {
-  visible: boolean;
-  onClose: () => void;
-  expenseTypes: ExpenseType[];
-  onSuccess: (data: { expense_type_id: string; amount: number; date: string; notes?: string }) => void;
-}
-
-function PurchaseModal({ visible, onClose, expenseTypes, onSuccess }: PurchaseModalProps) {
-  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
-  const [amount, setAmount] = useState('');
-  const [date, setDate] = useState('');
-  const [notes, setNotes] = useState('');
-
-  useEffect(() => {
-    if (visible) {
-      setSelectedTypeId(null);
-      setAmount('');
-      setDate(format(new Date(), 'yyyy-MM-dd'));
-      setNotes('');
-    }
-  }, [visible]);
-
-  const handleSave = () => {
-    if (!selectedTypeId || !amount || !date) return;
-
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount < 0) return;
-
-    onSuccess({
-      expense_type_id: selectedTypeId,
-      amount: parsedAmount,
-      date,
-      notes: notes.trim() || undefined,
-    });
-  };
-
-  const pickerItems = expenseTypes.map(type => ({
-    label: type.name,
-    value: type.id,
-  }));
-
-  const handleClose = () => {
-    setSelectedTypeId(null);
-    setAmount('');
-    setDate(format(new Date(), 'yyyy-MM-dd'));
-    setNotes('');
-    onClose();
-  };
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
-      >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={handleClose}>
-            <Text style={styles.cancelButton}>Cancel</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Add Purchase</Text>
-          <TouchableOpacity onPress={handleSave} disabled={!selectedTypeId || !amount || !date}>
-            <Text style={[styles.saveButton, (!selectedTypeId || !amount || !date) && styles.disabledButton]}>Save</Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.form} keyboardShouldPersistTaps="handled">
-          <View style={styles.inputGroup}>
-            <SelectPicker
-              label="Expense Type"
-              value={selectedTypeId || ''}
-              onValueChange={setSelectedTypeId}
-              items={pickerItems}
-              placeholder="Select expense type..."
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Amount</Text>
-            <TextInput
-              style={styles.input}
-              value={amount}
-              onChangeText={setAmount}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Date</Text>
-            <TextInput
-              style={styles.input}
-              value={date}
-              onChangeText={setDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Notes (optional)</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Add notes..."
-              multiline
-              numberOfLines={3}
-              placeholderTextColor="#999"
-              textAlignVertical="top"
-            />
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Modal>
-  );
-}
-
-// Purchase List Modal Component
-interface PurchaseListModalProps {
-  visible: boolean;
-  onClose: () => void;
-  expenseType: ExpenseType | null;
-  purchases: ExpensePurchase[];
-  onDelete: (id: string) => void;
-}
-
-function PurchaseListModal({ visible, onClose, expenseType, purchases, onDelete }: PurchaseListModalProps) {
-  const formatAmount = (amount: number) => `$${amount.toFixed(2)}`;
-  const formatDate = (dateStr: string) => format(new Date(dateStr), 'MMM d, yyyy');
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {expenseType?.name || 'Purchases'}
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color="#2c3e50" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.purchaseList}>
-            {purchases.length === 0 ? (
-              <View style={styles.emptyPurchaseList}>
-                <Text style={styles.emptyPurchaseText}>No purchases yet</Text>
-              </View>
-            ) : (
-              purchases.map((purchase) => (
-                <View key={purchase.id} style={styles.purchaseItem}>
-                  <View style={styles.purchaseItemLeft}>
-                    <Text style={styles.purchaseTitle}>
-                      {purchase.description || expenseType?.name || 'Purchase'}
-                    </Text>
-                    {purchase.purchase_date && (
-                      <Text style={styles.purchaseDate}>
-                        {formatDate(purchase.purchase_date)}
-                      </Text>
-                    )}
-                  </View>
-                  <View style={styles.purchaseItemRight}>
-                    {purchase.purchase_amount && (
-                      <Text style={styles.purchaseAmount}>
-                        {formatAmount(purchase.purchase_amount)}
-                      </Text>
-                    )}
-                    <TouchableOpacity
-                      onPress={() => onDelete(purchase.id)}
-                      style={styles.deleteButton}
-                    >
-                      <Ionicons name="trash-outline" size={18} color="#e74c3c" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))
-            )}
-          </ScrollView>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.closeButton]}
-              onPress={onClose}
-            >
-              <Text style={styles.saveButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
       </View>
-    </Modal>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ecf0f1',
-  },
-  headerButtons: {
-    flexDirection: 'row',
-    gap: 10,
+    backgroundColor: '#f5f6fa',
   },
   headerButton: {
-    paddingHorizontal: 16,
     paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 8,
   },
   headerButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ecf0f1',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: '#3498db',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#7f8c8d',
+  },
+  activeTabText: {
+    color: '#3498db',
+    fontWeight: '600',
+  },
+  weekSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ecf0f1',
+  },
+  weekArrow: {
+    padding: 8,
+  },
+  weekLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  weekLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  todayButton: {
+    padding: 4,
   },
   content: {
     flex: 1,
@@ -625,223 +526,114 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 18,
+    fontWeight: '600',
     color: '#7f8c8d',
     marginTop: 16,
-    fontWeight: '600',
   },
   emptyStateSubtext: {
     fontSize: 14,
     color: '#95a5a6',
     marginTop: 8,
+    textAlign: 'center',
   },
-  expenseRow: {
+  categoryGroup: {
+    marginBottom: 20,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  categoryName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+  },
+  categoryTotal: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#27ae60',
+  },
+  categoryCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
-  expenseRowContent: {
-    flex: 1,
-  },
-  expenseTypeName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 4,
-  },
-  expenseAmount: {
-    fontSize: 14,
-    color: '#27ae60',
-    fontWeight: '500',
-  },
-  overBudget: {
-    color: '#e74c3c',
-  },
-
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  cancelButton: {
-    color: '#007AFF',
-    fontSize: 16,
-  },
-  saveButton: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  form: {
-    flex: 1,
-    padding: 20,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  bottomSheetOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  bottomSheetBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  bottomSheetContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '85%',
-  },
-  bottomSheetHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#ddd',
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalHeader: {
+  purchaseRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingVertical: 12,
+  },
+  purchaseRowBorder: {
     borderBottomWidth: 1,
     borderBottomColor: '#ecf0f1',
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-  },
-  modalBody: {
-    padding: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-    color: '#333',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  modalFooter: {
+  purchaseLeft: {
+    flex: 1,
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    alignItems: 'center',
     gap: 12,
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#ecf0f1',
-  },
-  modalButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  cancelButton: {
-    backgroundColor: '#ecf0f1',
-  },
-  cancelButtonText: {
-    color: '#7f8c8d',
-    fontWeight: '600',
-  },
-  saveButton: {
-    backgroundColor: '#3498db',
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  closeButton: {
-    backgroundColor: '#2c3e50',
-    flex: 1,
-  },
-  purchaseList: {
-    maxHeight: 400,
-    padding: 20,
-  },
-  emptyPurchaseList: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyPurchaseText: {
-    fontSize: 16,
-    color: '#95a5a6',
-  },
-  purchaseItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
-  },
-  purchaseItemLeft: {
-    flex: 1,
-  },
-  purchaseTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 2,
   },
   purchaseDate: {
     fontSize: 13,
+    fontWeight: '600',
     color: '#7f8c8d',
-    marginBottom: 4,
+    minWidth: 50,
   },
-  purchaseNotes: {
-    fontSize: 13,
-    color: '#7f8c8d',
-  },
-  purchaseItemRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  purchaseDescription: {
+    fontSize: 15,
+    color: '#2c3e50',
+    flex: 1,
   },
   purchaseAmount: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#27ae60',
+    color: '#2c3e50',
+    marginLeft: 12,
   },
   deleteButton: {
-    padding: 4,
+    backgroundColor: '#e74c3c',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#ecf0f1',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  footerLabel: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2c3e50',
+  },
+  footerAmount: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#27ae60',
+  },
+  footerBudget: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#7f8c8d',
   },
 });

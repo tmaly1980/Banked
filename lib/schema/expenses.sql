@@ -32,11 +32,15 @@ CREATE TABLE IF NOT EXISTS expense_budgets (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users NOT NULL,
   expense_type_id UUID REFERENCES expense_types ON DELETE CASCADE NOT NULL,
-  start_date DATE NOT NULL,
-  end_date DATE,
+  effective_from DATE NOT NULL,
+  effective_to DATE,
+  start_mmdd TEXT(4),
+  end_mmdd TEXT(4),
+  frequency TEXT NOT NULL DEFAULT 'once' CHECK (frequency IN ('once', 'weekly', 'monthly', 'yearly')),
   amount NUMERIC NOT NULL,
+  notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-  UNIQUE(user_id, expense_type_id, start_date)
+  UNIQUE(user_id, expense_type_id, effective_from)
 );
 
 ALTER TABLE expense_budgets ENABLE ROW LEVEL SECURITY;
@@ -91,8 +95,9 @@ CREATE POLICY "Users can delete their own expense purchases"
 
 -- Create indexes for expense_budgets
 CREATE INDEX idx_expense_budgets_user_id ON expense_budgets(user_id);
-CREATE INDEX idx_expense_budgets_start_date ON expense_budgets(start_date);
+CREATE INDEX idx_expense_budgets_effective_from ON expense_budgets(effective_from);
 CREATE INDEX idx_expense_budgets_expense_type_id ON expense_budgets(expense_type_id);
+CREATE INDEX idx_expense_budgets_frequency ON expense_budgets(frequency);
 
 -- Create indexes for expense_purchases
 CREATE INDEX idx_expense_purchases_user_id ON expense_purchases(user_id);
