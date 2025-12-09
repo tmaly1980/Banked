@@ -1,4 +1,5 @@
 import { BillPayment } from '@/types';
+import { PaymentModel } from './PaymentModel';
 
 export interface Bill {
   id: string;
@@ -28,7 +29,7 @@ export class BillModel {
   notes?: string;
   created_at: string;
   updated_at: string;
-  payments: BillPayment[];
+  payments: PaymentModel[];
 
   constructor(bill: Bill, payments: BillPayment[] = []) {
     this.id = bill.id;
@@ -43,7 +44,7 @@ export class BillModel {
     this.notes = bill.notes;
     this.created_at = bill.created_at;
     this.updated_at = bill.updated_at;
-    this.payments = payments;
+    this.payments = PaymentModel.fromDatabaseArray(payments);
   }
 
   // Calculate total amount paid on this bill
@@ -100,10 +101,10 @@ export class BillModel {
 
   // Get the next date (scheduled payment date or due date)
   get next_date(): Date | null {
-    // Check for scheduled payment (payment_date > today)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
+    // Check for scheduled payment (payment_date > today)
     const scheduledPayment = this.payments.find(payment => {
       const paymentDate = new Date(payment.payment_date);
       paymentDate.setHours(0, 0, 0, 0);
@@ -114,15 +115,53 @@ export class BillModel {
       return new Date(scheduledPayment.payment_date);
     }
     
-    // Fall back to regular due date
+    // For recurring bills, find the most recent due date that hasn't been paid
+    if (this.due_day) {
+      // Get the most recent payment date
+      const sortedPayments = [...this.payments]
+        .sort((a, b) => new Date(b.lastPaymentDate).getTime() - new Date(a.lastPaymentDate).getTime());
+      
+      const lastPayment = sortedPayments[0];
+
+      console.log('Last payment for bill', this.id, ':', lastPayment);
+      
+      if (lastPayment) {
+        const lastPaymentDate = new Date(lastPayment.lastPaymentDate);
+        console.log('Last payment date:', lastPayment.lastPaymentDate);
+        lastPaymentDate.setHours(0, 0, 0, 0);
+        
+        // Calculate the due date for the month after the last payment
+        const year = lastPaymentDate.getFullYear();
+        const month = lastPaymentDate.getMonth();
+        
+        // Try the same month first
+        let nextDue = new Date(year, month, this.due_day);
+        
+        // If that's before the payment date, use next month
+        if (nextDue <= lastPaymentDate) {
+          nextDue = new Date(year, month + 1, this.due_day);
+        }
+        
+        return nextDue;
+      }
+    }
+    
+    // Fall back to regular due date calculation
     return this.getNextDueDate();
   }
 
   // Check if bill is overdue
   get isOverdue(): boolean {
-    const nextDue = this.getNextDueDate();
+    const nextDue = this.next_date;
     if (!nextDue) return false;
-    return nextDue < new Date() && !this.isPaid;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(nextDue);
+    dueDate.setHours(0, 0, 0, 0);
+    
+    // Bill is overdue if the next_date is in the past
+    return dueDate < today;
   }
 
   // Get days until due (negative if overdue)
@@ -153,7 +192,7 @@ export class BillModel {
 
   // Add a payment to this bill
   addPayment(payment: BillPayment): void {
-    this.payments.push(payment);
+    this.payments.push(new PaymentModel(payment));
   }
 
   // Static method to create from database result with payments

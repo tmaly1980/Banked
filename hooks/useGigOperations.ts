@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Gig, GigWithPaychecks, Paycheck } from '@/types';
+import { Gig, GigWithDeposits, Deposit } from '@/types';
 
 export const useGigOperations = (
   userId: string | undefined,
@@ -63,15 +63,16 @@ export const useGigOperations = (
     }
   }, [userId, loadGigs]);
 
-  const linkPaycheckToGig = useCallback(async (gigId: string, paycheckId: string) => {
+  const linkDepositToGig = useCallback(async (gigId: string, depositId: string) => {
     if (!userId) return { error: new Error('User not authenticated') };
 
     try {
       const { error } = await supabase
-        .from('gig_paychecks')
+        .from('gig_deposits')
         .insert({
           gig_id: gigId,
-          paycheck_id: paycheckId,
+          deposit_id: depositId,
+          user_id: userId,
         });
 
       if (error) throw error;
@@ -82,15 +83,15 @@ export const useGigOperations = (
     }
   }, [userId, loadGigs]);
 
-  const unlinkPaycheckFromGig = useCallback(async (gigId: string, paycheckId: string) => {
+  const unlinkDepositFromGig = useCallback(async (gigId: string, depositId: string) => {
     if (!userId) return { error: new Error('User not authenticated') };
 
     try {
       const { error } = await supabase
-        .from('gig_paychecks')
+        .from('gig_deposits')
         .delete()
         .eq('gig_id', gigId)
-        .eq('paycheck_id', paycheckId);
+        .eq('deposit_id', depositId);
 
       if (error) throw error;
       await loadGigs();
@@ -104,7 +105,7 @@ export const useGigOperations = (
     createGig,
     updateGig,
     deleteGig,
-    linkPaycheckToGig,
-    unlinkPaycheckFromGig,
+    linkDepositToGig,
+    unlinkDepositFromGig,
   };
 };

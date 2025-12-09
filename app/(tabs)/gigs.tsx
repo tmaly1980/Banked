@@ -1,240 +1,155 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  RefreshControl,
-  Alert,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBills } from '@/contexts/BillsContext';
-import { WeeklyGigGroup, GigWithPaychecks, Paycheck } from '@/types';
-import { format, parseISO } from 'date-fns';
-import { groupGigsByWeek, formatWeekLabel, formatAmount } from '@/lib/utils';
 import GigFormModal from '@/components/modals/GigFormModal';
-import LinkPaychecksModal from '@/components/modals/LinkPaychecksModal';
-import ViewGigModal from '@/components/modals/ViewGigModal';
+import WeeklyWorkScheduleModal from '@/components/modals/WeeklyWorkScheduleModal';
 import TabScreenHeader from '@/components/TabScreenHeader';
-import WeeklyCard from '@/components/WeeklyCard';
+import TodayView from '@/components/gigs/TodayView';
+import WeekView from '@/components/gigs/WeekView';
+import AllGigsView from '@/components/gigs/AllGigsView';
+
+type GigTab = 'today' | 'week' | 'all';
 
 export default function GigsScreen() {
-  const { gigs, paychecks, loading, refreshData, deleteGig, updateGig } = useBills();
+  const { refreshData } = useBills();
+  const [activeTab, setActiveTab] = useState<GigTab>('today');
   const [gigFormVisible, setGigFormVisible] = useState(false);
-  const [linkPaychecksVisible, setLinkPaychecksVisible] = useState(false);
-  const [viewGigVisible, setViewGigVisible] = useState(false);
-  const [editingGig, setEditingGig] = useState<GigWithPaychecks | null>(null);
-  const [selectedGig, setSelectedGig] = useState<GigWithPaychecks | null>(null);
-  const [viewingGig, setViewingGig] = useState<GigWithPaychecks | null>(null);
+  const [scheduleModalVisible, setScheduleModalVisible] = useState(false);
+  const [defaultStartDate, setDefaultStartDate] = useState<string | undefined>(undefined);
+  const [defaultEndDate, setDefaultEndDate] = useState<string | undefined>(undefined);
+  const [currentWeekStart, setCurrentWeekStart] = useState<string | undefined>(undefined);
+  const [currentWeekEnd, setCurrentWeekEnd] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     refreshData();
   }, []);
 
-  // Group gigs by week using shared utility
-  const weeklyGroups = useMemo(() => {
-    return groupGigsByWeek(gigs);
-  }, [gigs]);
+  const handleWeekChange = (startDate: string, endDate: string) => {
+    setCurrentWeekStart(startDate);
+    setCurrentWeekEnd(endDate);
+  };
 
   const handleAddGig = () => {
-    setEditingGig(null);
+    // If on week tab, pre-fill with current week dates
+    if (activeTab === 'week' && currentWeekStart && currentWeekEnd) {
+      setDefaultStartDate(currentWeekStart);
+      setDefaultEndDate(currentWeekEnd);
+    } else {
+      setDefaultStartDate(undefined);
+      setDefaultEndDate(undefined);
+    }
     setGigFormVisible(true);
   };
 
-  const handleEditGig = (gig: GigWithPaychecks) => {
-    setEditingGig(gig);
-    setGigFormVisible(true);
-  };
-
-  const handleDeleteGig = (gig: GigWithPaychecks) => {
-    Alert.alert(
-      'Delete Gig',
-      `Are you sure you want to delete "${gig.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const { error } = await deleteGig(gig.id);
-            if (error) {
-              Alert.alert('Error', error.message);
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleLinkPaychecks = (gig: GigWithPaychecks) => {
-    setSelectedGig(gig);
-    setLinkPaychecksVisible(true);
-  };
-
-  const handleViewGig = (gig: GigWithPaychecks) => {
-    setViewingGig(gig);
-    setViewGigVisible(true);
-  };
-
-  const handleUpdateGig = async (updates: any) => {
-    if (!viewingGig) return;
-
-    const { error } = await updateGig(viewingGig.id, updates);
-    if (error) {
-      Alert.alert('Error', error.message);
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'today':
+        return <TodayView />;
+      case 'week':
+        return <WeekView onWeekChange={handleWeekChange} />;
+      case 'all':
+        return <AllGigsView />;
+      default:
+        return <TodayView />;
     }
   };
 
-  const formatHours = (hours?: number) => {
-    if (!hours) return 'N/A';
-    return `${hours.toFixed(1)}h`;
-  };
-
-  const formatDateRange = (startDate: string, endDate: string) => {
-    const start = format(parseISO(startDate), 'MMM d, yyyy');
-    const end = format(parseISO(endDate), 'MMM d, yyyy');
-    return `${start} - ${end}`;
-  };
-
-  // Get unlinked paychecks (not associated with any gig)
-  const getUnlinkedPaychecks = (): Paycheck[] => {
-    const linkedPaycheckIds = new Set(
-      gigs.flatMap(gig => gig.paychecks.map(pc => pc.id))
-    );
-    return paychecks.filter(pc => !linkedPaycheckIds.has(pc.id));
-  };
-
   return (
-    <View style={styles.container}>
-      <TabScreenHeader
-        title="Gigs"
-        rightContent={
-          <TouchableOpacity style={styles.addButton} onPress={handleAddGig}>
-            <Text style={styles.addButtonText}>+ Gig</Text>
-          </TouchableOpacity>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <TabScreenHeader
+          title="Gigs"
+          rightContent={
+          <View style={styles.headerButtons}>
+            <TouchableOpacity 
+              style={styles.scheduleButton} 
+              onPress={() => setScheduleModalVisible(true)}
+            >
+              <Ionicons name="calendar-outline" size={24} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.addButton} onPress={handleAddGig}>
+              <Text style={styles.addButtonText}>+ Gig</Text>
+            </TouchableOpacity>
+          </View>
         }
       />
 
-      {/* Weekly Groups */}
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refreshData} />
-        }
-      >
-        {weeklyGroups.filter(group => group.gigs.length > 0).length === 0 ? (
-          <View style={styles.emptyState}>
-            <Ionicons name="briefcase-outline" size={64} color="#bdc3c7" />
-            <Text style={styles.emptyStateText}>No gigs yet</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Tap the + button to add your first gig
-            </Text>
-          </View>
-        ) : (
-          weeklyGroups
-            .filter(group => group.gigs.length > 0)
-            .map((group, index) => {
-          const headerRight = (
-            <View style={styles.weekTotals}>
-              <Text style={styles.weekTotalAmount}>
-                {formatAmount(group.totalAmount)}
-              </Text>
-              {group.totalHours > 0 && (
-                <Text style={styles.weekTotalHours}>
-                  {formatHours(group.totalHours)}
-                </Text>
-              )}
-            </View>
-          );
+      {/* Tab Navigation */}
+      <View style={styles.tabNavigation}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'today' && styles.activeTab]}
+          onPress={() => setActiveTab('today')}
+        >
+          <Text style={[styles.tabText, activeTab === 'today' && styles.activeTabText]}>
+            Today
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'week' && styles.activeTab]}
+          onPress={() => setActiveTab('week')}
+        >
+          <Text style={[styles.tabText, activeTab === 'week' && styles.activeTabText]}>
+            Week
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'all' && styles.activeTab]}
+          onPress={() => setActiveTab('all')}
+        >
+          <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
+            All Gigs
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-          return (
-            <WeeklyCard
-              key={index}
-              title={formatWeekLabel(group.startDate, group.endDate)}
-              headerRight={headerRight}
-            >
-              <View style={styles.gigsList}>
-                  {group.gigs.map(gig => (
-                    <TouchableOpacity
-                      key={gig.id}
-                      style={styles.gigItem}
-                      onPress={() => handleViewGig(gig)}
-                    >
-                      <View style={styles.gigRow}>
-                        <View style={styles.gigMainInfo}>
-                          <Text style={styles.gigName}>{gig.name}</Text>
-                          <Text style={styles.gigDateRange}>
-                            {formatDateRange(gig.start_date, gig.end_date)}
-                          </Text>
-                        </View>
-                        <View style={styles.gigAmountInfo}>
-                          <Text style={styles.gigAmount}>
-                            {formatAmount(gig.total_amount)}
-                          </Text>
-                          {gig.total_hours && (
-                            <Text style={styles.gigHours}>
-                              {formatHours(gig.total_hours)}
-                            </Text>
-                          )}
-                        </View>
-                        <Ionicons
-                          name="chevron-forward"
-                          size={20}
-                          color="#7f8c8d"
-                        />
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-            </WeeklyCard>
-          );
-        }))}
-      </ScrollView>
+      {/* Tab Content */}
+      {renderTabContent()}
 
       {/* Modals */}
       <GigFormModal
         visible={gigFormVisible}
-        gig={editingGig}
+        gig={null}
         onClose={() => {
           setGigFormVisible(false);
-          setEditingGig(null);
+          setDefaultStartDate(undefined);
+          setDefaultEndDate(undefined);
         }}
+        defaultStartDate={defaultStartDate}
+        defaultEndDate={defaultEndDate}
       />
 
-      <LinkPaychecksModal
-        visible={linkPaychecksVisible}
-        gig={selectedGig}
-        availablePaychecks={getUnlinkedPaychecks()}
-        onClose={() => {
-          setLinkPaychecksVisible(false);
-          setSelectedGig(null);
-        }}
+      <WeeklyWorkScheduleModal
+        visible={scheduleModalVisible}
+        onClose={() => setScheduleModalVisible(false)}
       />
-
-      <ViewGigModal
-        visible={viewGigVisible}
-        gig={viewingGig}
-        onClose={() => {
-          setViewGigVisible(false);
-          setViewingGig(null);
-        }}
-        onUpdate={handleUpdateGig}
-        onEdit={() => {
-          if (viewingGig) {
-            setViewGigVisible(false);
-            handleEditGig(viewingGig);
-          }
-        }}
-      />
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#2c3e50',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#ecf0f1',
+    backgroundColor: '#f5f5f5',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  scheduleButton: {
+    padding: 4,
   },
   addButton: {
     backgroundColor: '#27ae60',
@@ -247,79 +162,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
-  scrollView: {
-    flex: 1,
-    padding: 16,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 100,
-  },
-  emptyStateText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#7f8c8d',
-    marginTop: 16,
-  },
-  emptyStateSubtext: {
-    fontSize: 14,
-    color: '#95a5a6',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  weekTotals: {
+  tabNavigation: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  weekTotalAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#27ae60',
-  },
-  weekTotalHours: {
-    fontSize: 14,
-    color: '#7f8c8d',
-  },
-  gigsList: {
-    paddingHorizontal: 16,
-  },
-  gigItem: {
-    paddingVertical: 12,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#f8f9fa',
+    borderBottomColor: '#e0e0e0',
   },
-  gigRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  gigMainInfo: {
+  tab: {
     flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  gigName: {
-    fontSize: 16,
+  activeTab: {
+    borderBottomColor: '#3498db',
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#7f8c8d',
+  },
+  activeTabText: {
+    color: '#3498db',
     fontWeight: '600',
-    color: '#2c3e50',
-    marginBottom: 4,
-  },
-  gigDateRange: {
-    fontSize: 12,
-    color: '#7f8c8d',
-  },
-  gigAmountInfo: {
-    alignItems: 'flex-end',
-  },
-  gigAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#27ae60',
-  },
-  gigHours: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    marginTop: 2,
   },
 });

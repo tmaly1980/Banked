@@ -8,14 +8,14 @@ import {
 } from 'react-native';
 import DateInput from '@/components/DateInput';
 import PillPicker from '@/components/PillPicker';
-import { DayOfWeek, RecurrenceUnit, RecurringPaycheck } from '@/types';
+import { DayOfWeek, RecurrenceUnit, RecurringDeposit } from '@/types';
 
-interface AddRecurringPaycheckFormProps {
-  editingRecurring?: RecurringPaycheck | null;
+interface AddRecurringDepositFormProps {
+  editingRecurring?: RecurringDeposit | null;
   onFormChange?: () => void;
 }
 
-export interface RecurringPaycheckFormData {
+export interface RecurringDepositFormData {
   amount: string;
   startDate: string;
   endDate: string;
@@ -27,8 +27,8 @@ export interface RecurringPaycheckFormData {
   lastBusinessDayOfMonth: boolean;
 }
 
-export interface RecurringPaycheckFormRef {
-  getFormData: () => RecurringPaycheckFormData;
+export interface RecurringDepositFormRef {
+  getFormData: () => RecurringDepositFormData;
   resetForm: () => void;
   validateForm: () => boolean;
 }
@@ -48,7 +48,7 @@ const DAYS_OF_WEEK: { label: string; value: DayOfWeek }[] = [
   { label: 'Sat', value: 'saturday' },
 ];
 
-const AddRecurringPaycheckForm = forwardRef<RecurringPaycheckFormRef, AddRecurringPaycheckFormProps>(
+const AddRecurringDepositForm = forwardRef<RecurringDepositFormRef, AddRecurringDepositFormProps>(
   ({ editingRecurring, onFormChange }, ref) => {
     const [amount, setAmount] = useState('');
     const [startDate, setStartDate] = useState('');
@@ -62,9 +62,9 @@ const AddRecurringPaycheckForm = forwardRef<RecurringPaycheckFormRef, AddRecurri
 
     // Pre-populate form when editing
     useEffect(() => {
-      console.log('[AddRecurringPaycheckForm] editingRecurring changed:', editingRecurring);
+      console.log('[AddRecurringDepositForm] editingRecurring changed:', editingRecurring);
       if (editingRecurring) {
-        console.log('[AddRecurringPaycheckForm] Populating form with:', {
+        console.log('[AddRecurringDepositForm] Populating form with:', {
           amount: editingRecurring.amount,
           start_date: editingRecurring.start_date,
           end_date: editingRecurring.end_date,
@@ -105,7 +105,7 @@ const AddRecurringPaycheckForm = forwardRef<RecurringPaycheckFormRef, AddRecurri
 
     // Expose form data and reset method
     useImperativeHandle(ref, () => ({
-      getFormData: (): RecurringPaycheckFormData => ({
+      getFormData: (): RecurringDepositFormData => ({
         amount,
         startDate,
         endDate,
@@ -257,9 +257,9 @@ const AddRecurringPaycheckForm = forwardRef<RecurringPaycheckFormRef, AddRecurri
   );
 });
 
-AddRecurringPaycheckForm.displayName = 'AddRecurringPaycheckForm';
+AddRecurringDepositForm.displayName = 'AddRecurringDepositForm';
 
-export default AddRecurringPaycheckForm;
+export default AddRecurringDepositForm;
 
 const styles = StyleSheet.create({
   inputGroup: {

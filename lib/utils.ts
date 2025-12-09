@@ -1,5 +1,5 @@
 import { startOfWeek, endOfWeek, addWeeks, format, isSameWeek, parseISO } from 'date-fns';
-import { WeeklyGroup, ExpenseBudgetGroup, ExpenseBudget, ExpenseType, ExpenseBudgetWithType, WeeklyGigGroup, GigWithPaychecks } from '../types';
+import { WeeklyGroup, ExpenseBudgetGroup, ExpenseBudget, ExpenseType, ExpenseBudgetWithType, WeeklyGigGroup, GigWithDeposits } from '../types';
 import { BillModel } from '@/models/BillModel';
 
 export const getWeekRange = (date: Date) => ({
@@ -20,7 +20,7 @@ export const getNext6Weeks = (): WeeklyGroup[] => {
       endDate: weekEnd,
       bills: [],
       totalBills: 0,
-      totalPaychecks: 0,
+      totalDeposits: 0,
       carryoverBalance: 0,
     });
   }
@@ -90,7 +90,7 @@ export const groupExpensesByWeek = (
   return groups;
 };
 
-export const groupGigsByWeek = (gigs: GigWithPaychecks[]): WeeklyGigGroup[] => {
+export const groupGigsByWeek = (gigs: GigWithDeposits[]): WeeklyGigGroup[] => {
   const groups: WeeklyGigGroup[] = [];
   const today = new Date();
 

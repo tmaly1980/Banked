@@ -6,31 +6,31 @@ import {
   StyleSheet,
 } from 'react-native';
 import DateInput from '@/components/DateInput';
-import { Paycheck, RecurringPaycheck } from '@/types';
-import { formatDateForDB } from '@/utils/paycheckHelpers';
+import { Deposit, RecurringDeposit } from '@/types';
+import { formatDateForDB } from '@/utils/depositHelpers';
 import { timestampToDate } from '@/lib/dateUtils';
 
-interface AddOneTimePaycheckFormProps {
-  editingPaycheck?: Paycheck | null;
-  editingRecurring?: RecurringPaycheck | null;
+interface AddOneTimeDepositFormProps {
+  editingDeposit?: Deposit | null;
+  editingRecurring?: RecurringDeposit | null;
   onFormChange?: () => void;
 }
 
-export interface OneTimePaycheckFormData {
+export interface OneTimeDepositFormData {
   name: string;
   amount: string;
   date: string;
   notes: string;
 }
 
-export interface OneTimePaycheckFormRef {
-  getFormData: () => OneTimePaycheckFormData;
+export interface OneTimeDepositFormRef {
+  getFormData: () => OneTimeDepositFormData;
   resetForm: () => void;
   validateForm: () => boolean;
 }
 
-const AddOneTimePaycheckForm = forwardRef<OneTimePaycheckFormRef, AddOneTimePaycheckFormProps>(
-  ({ editingPaycheck, editingRecurring, onFormChange }, ref) => {
+const AddOneTimeDepositForm = forwardRef<OneTimeDepositFormRef, AddOneTimeDepositFormProps>(
+  ({ editingDeposit, editingRecurring, onFormChange }, ref) => {
     const [name, setName] = useState('');
     const [amount, setAmount] = useState('');
     const [date, setDate] = useState('');
@@ -41,18 +41,18 @@ const AddOneTimePaycheckForm = forwardRef<OneTimePaycheckFormRef, AddOneTimePayc
       onFormChange?.();
     }, [name, amount, date, notes]);
 
-    // Load editing data - handle both editing existing paycheck and switching from recurring
+    // Load editing data - handle both editing existing deposit and switching from recurring
     useEffect(() => {
-      console.log('[AddOneTimePaycheckForm] Loading data:', { editingPaycheck, editingRecurring });
-      if (editingPaycheck) {
-        console.log('[AddOneTimePaycheckForm] Populating with paycheck:', editingPaycheck);
-        setName(editingPaycheck.name || '');
-        setAmount(editingPaycheck.amount.toString());
-        setDate(editingPaycheck.date ? timestampToDate(editingPaycheck.date) : '');
-        setNotes(editingPaycheck.notes || '');
+      console.log('[AddOneTimeDepositForm] Loading data:', { editingDeposit, editingRecurring });
+      if (editingDeposit) {
+        console.log('[AddOneTimeDepositForm] Populating with deposit:', editingDeposit);
+        setName(editingDeposit.name || '');
+        setAmount(editingDeposit.amount.toString());
+        setDate(editingDeposit.date ? timestampToDate(editingDeposit.date) : '');
+        setNotes(editingDeposit.notes || '');
       } else if (editingRecurring) {
         // When switching from recurring to once, pre-fill with recurring data
-        console.log('[AddOneTimePaycheckForm] Populating with recurring:', editingRecurring);
+        console.log('[AddOneTimeDepositForm] Populating with recurring:', editingRecurring);
         setName('');
         setAmount(editingRecurring.amount.toString());
         setDate(editingRecurring.start_date);
@@ -64,11 +64,11 @@ const AddOneTimePaycheckForm = forwardRef<OneTimePaycheckFormRef, AddOneTimePayc
         setDate('');
         setNotes('');
       }
-    }, [editingPaycheck, editingRecurring]);
+    }, [editingDeposit, editingRecurring]);
 
     // Expose form data and reset method
     useImperativeHandle(ref, () => ({
-      getFormData: (): OneTimePaycheckFormData => ({
+      getFormData: (): OneTimeDepositFormData => ({
         name,
         amount,
         date,
@@ -132,9 +132,9 @@ const AddOneTimePaycheckForm = forwardRef<OneTimePaycheckFormRef, AddOneTimePayc
   }
 );
 
-AddOneTimePaycheckForm.displayName = 'AddOneTimePaycheckForm';
+AddOneTimeDepositForm.displayName = 'AddOneTimeDepositForm';
 
-export default AddOneTimePaycheckForm;
+export default AddOneTimeDepositForm;
 
 const styles = StyleSheet.create({
   inputGroup: {

@@ -10,15 +10,15 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { GigWithPaychecks, ChecklistItem } from '@/types';
+import { GigWithDeposits, ChecklistItem } from '@/types';
 import { format, parseISO } from 'date-fns';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 
 interface ViewGigModalProps {
   visible: boolean;
   onClose: () => void;
-  gig: GigWithPaychecks | null;
-  onUpdate: (updates: Partial<GigWithPaychecks>) => Promise<void>;
+  gig: GigWithDeposits | null;
+  onUpdate: (updates: Partial<GigWithDeposits>) => Promise<void>;
   onEdit?: () => void;
 }
 
@@ -146,23 +146,26 @@ export default function ViewGigModal({
           <ScrollView style={styles.content}>
             {/* Gig Info */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Date Range</Text>
+              <Text style={styles.sectionLabel}>Due Date</Text>
               <Text style={styles.sectionValue}>
-                {formatDateRange(gig.start_date, gig.end_date)}
+                {format(parseISO(gig.due_date), 'MMMM d, yyyy')}
               </Text>
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Total Amount</Text>
-              <Text style={styles.sectionValue}>{formatAmount(gig.total_amount)}</Text>
+              <Text style={styles.sectionLabel}>Estimated Hours</Text>
+              <Text style={styles.sectionValue}>{formatHours(gig.est_hours_total)}</Text>
             </View>
 
-            {gig.total_hours && (
-              <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Total Hours</Text>
-                <Text style={styles.sectionValue}>{formatHours(gig.total_hours)}</Text>
-              </View>
-            )}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Hours Logged</Text>
+              <Text style={styles.sectionValue}>{formatHours(gig.hours_logged)}</Text>
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Hours Remaining</Text>
+              <Text style={styles.sectionValue}>{formatHours(gig.hours_remaining)}</Text>
+            </View>
 
             {gig.description && (
               <View style={styles.section}>
@@ -171,19 +174,20 @@ export default function ViewGigModal({
               </View>
             )}
 
-            {/* Linked Paychecks */}
-            {gig.paychecks && gig.paychecks.length > 0 && (
+            {/* Linked Deposits */}
+            {gig.deposits && gig.deposits.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionLabel}>Linked Paychecks</Text>
-                {gig.paychecks
-                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                  .map((paycheck) => (
-                  <View key={paycheck.id} style={styles.paycheckItem}>
-                    <Text style={styles.paycheckDate}>
-                      {format(parseISO(paycheck.date), 'MMM d, yyyy')}
+                <Text style={styles.sectionLabel}>Linked Deposits</Text>
+                {gig.deposits
+                  .filter(d => d.date)
+                  .sort((a, b) => new Date(a.date!).getTime() - new Date(b.date!).getTime())
+                  .map((deposit) => (
+                  <View key={deposit.id} style={styles.depositItem}>
+                    <Text style={styles.depositDate}>
+                      {format(parseISO(deposit.date!), 'MMM d, yyyy')}
                     </Text>
-                    <Text style={styles.paycheckAmount}>
-                      {formatAmount(paycheck.amount)}
+                    <Text style={styles.depositAmount}>
+                      {formatAmount(deposit.amount)}
                     </Text>
                   </View>
                 ))}
@@ -346,7 +350,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  paycheckItem: {
+  depositItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -356,11 +360,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 8,
   },
-  paycheckDate: {
+  depositDate: {
     fontSize: 14,
     color: '#666',
   },
-  paycheckAmount: {
+  depositAmount: {
     fontSize: 16,
     fontWeight: '600',
     color: '#27ae60',

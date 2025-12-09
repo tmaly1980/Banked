@@ -19,15 +19,15 @@ export default function TabScreenHeader({ title, rightContent, style }: TabScree
 const styles = StyleSheet.create({
   header: {
     backgroundColor: '#2c3e50',
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingTop: 0,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
   },

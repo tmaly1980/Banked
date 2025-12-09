@@ -12,6 +12,7 @@ import {
   Platform,
   Pressable,
   Animated,
+  SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -92,7 +93,10 @@ export default function ExpensesScreen() {
     // Filter purchases for selected week
     const purchasesInWeek = expensePurchases.filter(p => {
       if (!p.purchase_date) return false;
-      const purchaseDate = new Date(p.purchase_date);
+      // Parse date at noon to avoid timezone shifts
+      const dateStr = p.purchase_date.split('T')[0];
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const purchaseDate = new Date(year, month - 1, day, 12, 0, 0);
       return purchaseDate >= weekStart && purchaseDate <= weekEnd;
     });
 
@@ -106,8 +110,13 @@ export default function ExpensesScreen() {
       const typePurchases = purchasesInWeek
         .filter(p => p.expense_type_id === typeId)
         .sort((a, b) => {
-          const dateA = new Date(a.purchase_date!).getTime();
-          const dateB = new Date(b.purchase_date!).getTime();
+          // Parse dates to avoid timezone shifts
+          const dateStrA = a.purchase_date!.split('T')[0];
+          const dateStrB = b.purchase_date!.split('T')[0];
+          const [yearA, monthA, dayA] = dateStrA.split('-').map(Number);
+          const [yearB, monthB, dayB] = dateStrB.split('-').map(Number);
+          const dateA = new Date(yearA, monthA - 1, dayA).getTime();
+          const dateB = new Date(yearB, monthB - 1, dayB).getTime();
           return dateA - dateB;
         });
 
@@ -185,11 +194,19 @@ export default function ExpensesScreen() {
 
   const handlePurchaseAdded = async (data: { description?: string; expense_type_id: string; amount: number; purchase_date: string }) => {
     try {
+      // Convert YYYY-MM-DD to ISO string at noon UTC to avoid timezone shifts
+      let isoDate = data.purchase_date;
+      if (data.purchase_date) {
+        const [year, month, day] = data.purchase_date.split('-').map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+        isoDate = date.toISOString();
+      }
+      
       const purchaseData = {
         expense_type_id: data.expense_type_id,
         description: data.description,
         amount: data.amount,
-        purchase_date: data.purchase_date,
+        purchase_date: isoDate,
       };
       
       const { data: purchase, error } = await createExpensePurchase(purchaseData);
@@ -303,8 +320,9 @@ export default function ExpensesScreen() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={styles.container}>
-      <TabScreenHeader
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+        <TabScreenHeader
         title="Expenses"
         rightContent={
           <TouchableOpacity
@@ -399,7 +417,7 @@ export default function ExpensesScreen() {
                     <Text style={styles.categoryName}>{group.type.name}</Text>
                     <Text style={[styles.categoryTotal, isOverBudget && styles.overBudget]}>
                       {formatAmount(group.total)}
-                      {budgetAmount > 0 && ` / ${formatAmount(budgetAmount)}`}
+                      {budgetAmount > 0 ? ` / ${formatAmount(budgetAmount)}` : ''}
                     </Text>
                   </TouchableOpacity>
                   <View style={styles.categoryCard}>
@@ -417,7 +435,13 @@ export default function ExpensesScreen() {
                       >
                         <View style={styles.purchaseLeft}>
                           <Text style={styles.purchaseDate}>
-                            {format(new Date(purchase.purchase_date!), 'MMM d')}
+                            {(() => {
+                              const dateStr = purchase.purchase_date!;
+                              // Parse ISO date string to avoid timezone issues
+                              const date = new Date(dateStr);
+                              const [year, month, day] = dateStr.split('T')[0].split('-').map(Number);
+                              return format(new Date(year, month - 1, day), 'MMM d');
+                            })()}
                           </Text>
                           <Text style={styles.purchaseDescription}>
                             {purchase.description || group.type.name}
@@ -530,14 +554,19 @@ export default function ExpensesScreen() {
         onSave={handleSaveBudget}
       />
       </View>
+      </SafeAreaView>
     </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#2c3e50',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f5f6fa',
+    backgroundColor: '#f5f5f5',
   },
   headerButton: {
     paddingVertical: 8,

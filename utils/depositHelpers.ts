@@ -12,7 +12,7 @@ import {
   subDays,
   getDay,
 } from 'date-fns';
-import { RecurringPaycheck, DayOfWeek } from '@/types';
+import { RecurringDeposit, DayOfWeek } from '@/types';
 
 /**
  * Maps day of week string to date-fns day number
@@ -53,7 +53,7 @@ function getDateForDayOfWeek(startDate: Date, dayOfWeek: DayOfWeek): Date {
 }
 
 /**
- * Generates a single monthly paycheck date based on the recurring rules
+ * Generates a single monthly deposit date based on the recurring rules
  */
 function generateMonthlyDate(
   baseDate: Date,
@@ -88,47 +88,47 @@ function generateMonthlyDate(
 }
 
 /**
- * Generates paycheck instance dates from a recurring paycheck within a date range
+ * Generates deposit instance dates from a recurring deposit within a date range
  */
-export function generateRecurringPaycheckInstances(
-  recurringPaycheck: RecurringPaycheck,
+export function generateRecurringDepositInstances(
+  recurringDeposit: RecurringDeposit,
   rangeStart: Date,
   rangeEnd: Date
 ): Date[] {
   const instances: Date[] = [];
-  const startDate = parseISO(recurringPaycheck.start_date);
-  const endDate = recurringPaycheck.end_date ? parseISO(recurringPaycheck.end_date) : null;
+  const startDate = parseISO(recurringDeposit.start_date);
+  const endDate = recurringDeposit.end_date ? parseISO(recurringDeposit.end_date) : null;
   
   // Determine the actual start date for generation (latest of recurring start or range start)
   let currentDate = isBefore(startDate, rangeStart) ? rangeStart : startDate;
   
   // For weekly recurrence, align to the correct day of week
-  if (recurringPaycheck.recurrence_unit === 'week' && recurringPaycheck.day_of_week) {
-    currentDate = getDateForDayOfWeek(currentDate, recurringPaycheck.day_of_week);
+  if (recurringDeposit.recurrence_unit === 'week' && recurringDeposit.day_of_week) {
+    currentDate = getDateForDayOfWeek(currentDate, recurringDeposit.day_of_week);
     
     // If we're before the recurring start date, move forward
     while (isBefore(currentDate, startDate)) {
-      currentDate = addWeeks(currentDate, recurringPaycheck.interval);
+      currentDate = addWeeks(currentDate, recurringDeposit.interval);
     }
   }
   
   // For monthly recurrence, align to the correct day
-  if (recurringPaycheck.recurrence_unit === 'month') {
+  if (recurringDeposit.recurrence_unit === 'month') {
     currentDate = generateMonthlyDate(
       currentDate,
-      recurringPaycheck.day_of_month,
-      recurringPaycheck.last_day_of_month,
-      recurringPaycheck.last_business_day_of_month
+      recurringDeposit.day_of_month,
+      recurringDeposit.last_day_of_month,
+      recurringDeposit.last_business_day_of_month
     );
     
     // If we're before the recurring start date, move forward
     while (isBefore(currentDate, startDate)) {
-      currentDate = addMonths(currentDate, recurringPaycheck.interval);
+      currentDate = addMonths(currentDate, recurringDeposit.interval);
       currentDate = generateMonthlyDate(
         currentDate,
-        recurringPaycheck.day_of_month,
-        recurringPaycheck.last_day_of_month,
-        recurringPaycheck.last_business_day_of_month
+        recurringDeposit.day_of_month,
+        recurringDeposit.last_day_of_month,
+        recurringDeposit.last_business_day_of_month
       );
     }
   }
@@ -144,15 +144,15 @@ export function generateRecurringPaycheckInstances(
     }
     
     // Move to next occurrence
-    if (recurringPaycheck.recurrence_unit === 'week') {
-      currentDate = addWeeks(currentDate, recurringPaycheck.interval);
+    if (recurringDeposit.recurrence_unit === 'week') {
+      currentDate = addWeeks(currentDate, recurringDeposit.interval);
     } else {
-      currentDate = addMonths(currentDate, recurringPaycheck.interval);
+      currentDate = addMonths(currentDate, recurringDeposit.interval);
       currentDate = generateMonthlyDate(
         currentDate,
-        recurringPaycheck.day_of_month,
-        recurringPaycheck.last_day_of_month,
-        recurringPaycheck.last_business_day_of_month
+        recurringDeposit.day_of_month,
+        recurringDeposit.last_day_of_month,
+        recurringDeposit.last_business_day_of_month
       );
     }
   }
@@ -170,8 +170,8 @@ export function formatDateForDB(date: Date): string {
 /**
  * Gets a human-readable description of the recurring pattern
  */
-export function getRecurrenceDescription(recurringPaycheck: RecurringPaycheck): string {
-  const { recurrence_unit, interval, day_of_week, day_of_month, last_day_of_month, last_business_day_of_month } = recurringPaycheck;
+export function getRecurrenceDescription(recurringDeposit: RecurringDeposit): string {
+  const { recurrence_unit, interval, day_of_week, day_of_month, last_day_of_month, last_business_day_of_month } = recurringDeposit;
   
   const intervalText = interval === 1 ? '' : `every ${interval} `;
   const unitText = interval === 1 ? recurrence_unit : `${recurrence_unit}s`;

@@ -10,9 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { Paycheck } from '@/types';
-import WeeklyPaycheckGroup from '@/components/Paychecks/WeeklyPaycheckGroup';
+import { Deposit } from '@/types';
+import WeeklyDepositGroup from '@/components/Deposits/WeeklyDepositGroup';
 import { useToast } from '@/components/CustomToast';
+import { format } from 'date-fns';
 
 interface ExpenseRow {
   id: string;
@@ -22,35 +23,46 @@ interface ExpenseRow {
   isNewType: boolean;
 }
 
-interface PaycheckWeekModalProps {
+interface ExpensePurchase {
+  id: string;
+  description?: string;
+  purchase_date?: string;
+  purchase_amount?: number;
+  estimated_amount?: number;
+  expense_type_id: string;
+}
+
+interface DepositWeekModalProps {
   visible: boolean;
   onClose: () => void;
   startDate: Date | null;
   endDate: Date | null;
-  paychecks: Paycheck[];
+  deposits: Deposit[];
   total: number;
   existingExpenseTypes: Array<{ id: string; name: string; default_amount?: number }>;
   existingWeeklyExpenses: Array<{ expense_type_id: string; amount: number }>;
+  expensePurchases: ExpensePurchase[];
   onSaveExpenses: (expenses: Array<{ expense_type_id: string | null; expense_type_name: string; amount: number }>) => Promise<void>;
-  onViewPaycheck: (paycheck: Paycheck) => void;
-  onEditPaycheck: (paycheck: Paycheck) => void;
-  onDeletePaycheck: (paycheck: Paycheck) => void;
+  onViewDeposit: (deposit: Deposit) => void;
+  onEditDeposit: (deposit: Deposit) => void;
+  onDeleteDeposit: (deposit: Deposit) => void;
 }
 
-export default function PaycheckWeekModal({
+export default function DepositWeekModal({
   visible,
   onClose,
   startDate,
   endDate,
-  paychecks,
+  deposits,
   total,
   existingExpenseTypes,
   existingWeeklyExpenses,
+  expensePurchases,
   onSaveExpenses,
-  onViewPaycheck,
-  onEditPaycheck,
-  onDeletePaycheck,
-}: PaycheckWeekModalProps) {
+  onViewDeposit,
+  onEditDeposit,
+  onDeleteDeposit,
+}: DepositWeekModalProps) {
   const toast = useToast();
   const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -136,7 +148,7 @@ export default function PaycheckWeekModal({
       
       setHasChanges(false);
     } catch (error) {
-      console.error('[PaycheckWeekModal] Save error:', error);
+      console.error('[DepositWeekModal] Save error:', error);
       toast.show({
         type: 'error',
         text1: 'Error saving expenses',
@@ -160,12 +172,30 @@ export default function PaycheckWeekModal({
     return amount < 0 ? `-${formatted}` : formatted;
   };
 
+  const getWeekExpensePurchases = () => {
+    if (!startDate || !endDate) return [];
+    
+    return expensePurchases.filter(purchase => {
+      if (!purchase.purchase_date) return false;
+      // Parse date at noon to avoid timezone shifts
+      const dateStr = purchase.purchase_date.split('T')[0];
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const purchaseDate = new Date(year, month - 1, day, 12, 0, 0);
+      return purchaseDate >= startDate && purchaseDate <= endDate;
+    });
+  };
+
   const calculateAdjustedTotal = () => {
     const expensesTotal = expenseRows.reduce((sum, row) => {
       const amount = parseFloat(row.amount);
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
-    return total - expensesTotal;
+    
+    const purchasesTotal = getWeekExpensePurchases().reduce((sum, purchase) => {
+      return sum + (purchase.purchase_amount || purchase.estimated_amount || 0);
+    }, 0);
+    
+    return total - expensesTotal - purchasesTotal;
   };
 
   const adjustedTotal = calculateAdjustedTotal();
@@ -193,7 +223,7 @@ export default function PaycheckWeekModal({
                 </Text>
               </TouchableOpacity>
               
-              <Text style={styles.headerTitle}>Paychecks for Week</Text>
+              <Text style={styles.headerTitle}>Net Income</Text>
               
               {hasChanges ? (
                 <TouchableOpacity 
@@ -214,50 +244,58 @@ export default function PaycheckWeekModal({
               style={styles.content}
               keyboardShouldPersistTaps="handled"
             >
-              <WeeklyPaycheckGroup
+              <WeeklyDepositGroup
                 startDate={startDate}
                 endDate={endDate}
-                paychecks={paychecks}
+                deposits={deposits}
                 total={total}
-                onViewPaycheck={onViewPaycheck}
-                onEditPaycheck={onEditPaycheck}
-                onDeletePaycheck={onDeletePaycheck}
+                onViewDeposit={onViewDeposit}
+                onEditDeposit={onEditDeposit}
+                onDeleteDeposit={onDeleteDeposit}
               />
 
-              <View style={styles.expensesSection}>
-                <Text style={styles.sectionTitle}>Weekly Expenses</Text>
-                
-                {expenseRows.map((row) => (
-                  <View key={row.id} style={styles.expenseInputRow}>
-                    <TextInput
-                      style={[styles.expenseNameInput, !row.isNewType && styles.inputDisabled]}
-                      value={row.expenseTypeName}
-                      onChangeText={(value) => handleUpdateExpenseRow(row.id, 'expenseTypeName', value)}
-                      placeholder="Food, Gas, etc."
-                      editable={row.isNewType}
-                    />
-                    
-                    <TextInput
-                      style={styles.expenseAmountInput}
-                      value={row.amount}
-                      onChangeText={(value) => handleUpdateExpenseRow(row.id, 'amount', value)}
-                      placeholder="0.00"
-                      keyboardType="decimal-pad"
-                    />
+              {/* Expense Purchases */}
+              {getWeekExpensePurchases().length > 0 && (
+                <View style={styles.purchasesSection}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Expense Purchases</Text>
+                    <Text style={styles.sectionTotal}>
+                      -{formatAmount(getWeekExpensePurchases().reduce((sum, p) => 
+                        sum + (p.purchase_amount || p.estimated_amount || 0), 0
+                      ))}
+                    </Text>
                   </View>
-                ))}
+                  {getWeekExpensePurchases().map(purchase => {
+                    const amount = purchase.purchase_amount || purchase.estimated_amount || 0;
+                    const expenseType = existingExpenseTypes.find(t => t.id === purchase.expense_type_id);
+                    
+                    // Format date
+                    let dateDisplay = '';
+                    if (purchase.purchase_date) {
+                      const dateStr = purchase.purchase_date.split('T')[0];
+                      const [year, month, day] = dateStr.split('-').map(Number);
+                      dateDisplay = format(new Date(year, month - 1, day), 'MMM d');
+                    }
+                    
+                    return (
+                      <View key={purchase.id} style={styles.purchaseItem}>
+                        <View style={styles.purchaseLeft}>
+                          {dateDisplay && <Text style={styles.purchaseDate}>{dateDisplay}</Text>}
+                          <Text style={styles.purchaseDescription}>
+                            {purchase.description || expenseType?.name || 'Purchase'}
+                          </Text>
+                        </View>
+                        <Text style={styles.purchaseAmount}>-{formatAmount(amount)}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
 
-                <TouchableOpacity style={styles.addExpenseButton} onPress={handleAddExpenseRow}>
-                  <Text style={styles.addExpenseButtonText}>Add Expense</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.adjustedTotalSection}>
-                <Text style={styles.adjustedTotalLabel}>Adjusted Total</Text>
-                <Text style={[
-                  styles.adjustedTotalAmount,
-                  adjustedTotal < 0 && styles.negativeAmount
-                ]}>
+              {/* Adjusted Total */}
+              <View style={[styles.adjustedTotalSection, adjustedTotal < 0 && styles.negativeTotalSection]}>
+                <Text style={styles.adjustedTotalLabel}>Net Total</Text>
+                <Text style={[styles.adjustedTotalAmount, adjustedTotal < 0 && styles.negativeAmount]}>
                   {formatAmount(adjustedTotal)}
                 </Text>
               </View>
@@ -330,7 +368,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#2c3e50',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  sectionTotal: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#e74c3c',
   },
   expenseInputRow: {
     flexDirection: 'row',
@@ -372,6 +420,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  purchasesSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+  },
+  purchaseItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  purchaseLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  purchaseDate: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+    minWidth: 45,
+  },
+  purchaseDescription: {
+    fontSize: 15,
+    color: '#2c3e50',
+    flex: 1,
+  },
+  purchaseAmount: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#e74c3c',
+  },
   adjustedTotalSection: {
     backgroundColor: 'white',
     borderRadius: 12,
@@ -382,6 +466,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#3498db',
+  },
+  negativeTotalSection: {
+    borderColor: '#e74c3c',
   },
   adjustedTotalLabel: {
     fontSize: 18,

@@ -25,11 +25,29 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="paychecks"
+        name="bills"
         options={{
-          title: 'Paychecks',
+          title: 'Bills',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="receipt" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="deposits"
+        options={{
+          title: 'Deposits',
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="currency-usd" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="income"
+        options={{
+          title: 'Income',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="cash" size={size} color={color} />
           ),
         }}
       />
@@ -43,21 +61,42 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="personal"
+        options={{
+          title: 'Personal',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="folder" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="gigs"
         options={{
-          title: 'Gigs',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="briefcase" size={size} color={color} />
-          ),
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="planner"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="triage"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
-          ),
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="planner2"
+        options={{
+          href: null,
         }}
       />
     </Tabs>

@@ -101,9 +101,10 @@ export default function AddPurchaseModal({
       const selectedType = expenseTypes.find(t => t.id === selectedTypeId);
       if (selectedType) {
         try {
-          const date = new Date(value);
-          if (!isNaN(date.getTime())) {
-            const formattedDate = format(date, 'MM/dd');
+          // Parse date components directly to avoid timezone issues
+          const [year, month, day] = value.split('-').map(Number);
+          if (year && month && day) {
+            const formattedDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
             const autoDescription = `${selectedType.name} ${formattedDate}`;
             setDescription(autoDescription);
           }

@@ -166,7 +166,7 @@ export function getProgressColor(percentage: number): string {
 
 /**
  * Gets a color for bill payment status (green when income covers bills, red when insufficient)
- * @param income Amount of income/paychecks available
+ * @param income Amount of income/deposits available
  * @param bills Total bills to pay
  * @returns Hex color string
  */

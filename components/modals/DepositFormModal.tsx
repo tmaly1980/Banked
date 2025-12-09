@@ -11,72 +11,72 @@ import {
   Alert,
 } from 'react-native';
 import { useBills } from '@/contexts/BillsContext';
-import { useRecurringPaychecks } from '@/hooks/useRecurringPaychecks';
-import { Paycheck } from '@/types';
+import { useRecurringDeposits } from '@/hooks/useRecurringDeposits';
+import { Deposit } from '@/types';
 import { dateToTimestamp } from '@/lib/dateUtils';
 import { InlineAlert } from '@/components/InlineAlert';
 import { useInlineAlert } from '@/hooks/useInlineAlert';
 import PillPicker from '@/components/PillPicker';
-import AddOneTimePaycheckForm from '@/components/forms/AddOneTimePaycheckForm';
-import AddRecurringPaycheckForm from '@/components/forms/AddRecurringPaycheckForm';
+import AddOneTimeDepositForm from '@/components/forms/AddOneTimeDepositForm';
+import AddRecurringDepositForm from '@/components/forms/AddRecurringDepositForm';
 
-type PaycheckMode = 'once' | 'recurring';
+type DepositMode = 'once' | 'recurring';
 
-const PAYCHECK_MODES = [
-  { label: 'Once', value: 'once' as PaycheckMode },
-  { label: 'Recurring', value: 'recurring' as PaycheckMode },
+const DEPOSIT_MODES = [
+  { label: 'Once', value: 'once' as DepositMode },
+  { label: 'Recurring', value: 'recurring' as DepositMode },
 ];
 
-interface PaycheckFormModalProps {
+interface DepositFormModalProps {
   visible: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  editingPaycheck?: Paycheck | null;
+  editingDeposit?: Deposit | null;
   editingRecurringId?: string | null;
 }
 
-export default function PaycheckFormModal({
+export default function DepositFormModal({
   visible,
   onClose,
   onSuccess,
-  editingPaycheck,
+  editingDeposit,
   editingRecurringId,
-}: PaycheckFormModalProps) {
+}: DepositFormModalProps) {
   const { alert, showError, showSuccess, hideAlert } = useInlineAlert();
-  const { createPaycheck, updatePaycheck, deletePaycheck } = useBills();
-  const { createRecurringPaycheck, updateRecurringPaycheck, recurringPaychecks, deleteRecurringPaycheck } = useRecurringPaychecks();
-  const [mode, setMode] = useState<PaycheckMode>('once');
+  const { createDeposit, updateDeposit, deleteDeposit } = useBills();
+  const { createRecurringDeposit, updateRecurringDeposit, recurringDeposits, deleteRecurringDeposit } = useRecurringDeposits();
+  const [mode, setMode] = useState<DepositMode>('once');
   const [loading, setLoading] = useState(false);
   
   const oneTimeFormRef = useRef<any>(null);
   const recurringFormRef = useRef<any>(null);
 
-  // Get the recurring paycheck being edited
+  // Get the recurring deposit being edited
   const editingRecurring = editingRecurringId 
-    ? recurringPaychecks.find(rp => rp.id === editingRecurringId) 
+    ? recurringDeposits.find(rd => rd.id === editingRecurringId) 
     : null;
 
-  console.log('[PaycheckFormModal] State:', {
-    visible,
-    editingRecurringId,
-    editingRecurring: editingRecurring?.id,
-    recurringPaychecksCount: recurringPaychecks.length,
-    allRecurringIds: recurringPaychecks.map(rp => rp.id),
-  });
+  // console.log('[DepositFormModal] State:', {
+  //   visible,
+  //   editingRecurringId,
+  //   editingRecurring: editingRecurring?.id,
+  //   recurringDepositsCount: recurringDeposits.length,
+  //   allRecurringIds: recurringDeposits.map(rd => rd.id),
+  // });
 
   // Reset mode when modal opens/closes
   useEffect(() => {
     if (visible) {
       // If editing recurring, set to recurring mode, otherwise use once
       const initialMode = editingRecurringId ? 'recurring' : 'once';
-      console.log('[PaycheckFormModal] Setting initial mode:', initialMode, {
+      console.log('[DepositFormModal] Setting initial mode:', initialMode, {
         editingRecurringId,
-        editingPaycheck: editingPaycheck?.id,
+        editingDeposit: editingDeposit?.id,
         editingRecurring: editingRecurring?.id,
       });
       setMode(initialMode);
     }
-  }, [visible, editingPaycheck, editingRecurringId]);
+  }, [visible, editingDeposit, editingRecurringId]);
 
   // Auto-hide alert when mode changes
   useEffect(() => {
@@ -107,29 +107,29 @@ export default function PaycheckFormModal({
         const formData = oneTimeFormRef.current.getFormData();
         const amountNum = parseFloat(formData.amount);
         
-        const paycheckData = {
+        const depositData = {
           name: formData.name.trim() || undefined,
           amount: amountNum,
           date: formData.date ? dateToTimestamp(formData.date) : null,
           notes: formData.notes.trim() || undefined,
         };
 
-        console.log('[PaycheckFormModal] Submitting one-time paycheck:', {
-          editingPaycheck: editingPaycheck?.id,
-          paycheckData,
+        console.log('[DepositFormModal] Submitting one-time deposit:', {
+          editingDeposit: editingDeposit?.id,
+          depositData,
         });
 
-        if (editingPaycheck) {
-          const { error } = await updatePaycheck(editingPaycheck.id, paycheckData);
-          console.log('[PaycheckFormModal] Update result:', { error });
+        if (editingDeposit) {
+          const { error } = await updateDeposit(editingDeposit.id, depositData);
+          console.log('[DepositFormModal] Update result:', { error });
           if (error) throw error;
         } else {
-          const { error } = await createPaycheck(paycheckData);
-          console.log('[PaycheckFormModal] Create result:', { error });
+          const { error } = await createDeposit(depositData);
+          console.log('[DepositFormModal] Create result:', { error });
           if (error) throw error;
         }
 
-        showSuccess(`Paycheck ${editingPaycheck ? 'updated' : 'added'} successfully`);
+        showSuccess(`Deposit ${editingDeposit ? 'updated' : 'added'} successfully`);
       } else {
         // Validate recurring form
         if (!recurringFormRef.current?.validateForm()) {
@@ -154,28 +154,28 @@ export default function PaycheckFormModal({
           last_business_day_of_month: formData.lastBusinessDayOfMonth,
         };
 
-        console.log('[PaycheckFormModal] Submitting recurring paycheck:', {
+        console.log('[DepositFormModal] Submitting recurring deposit:', {
           editingRecurringId,
           recurringData,
         });
 
         if (editingRecurringId) {
-          const { error } = await updateRecurringPaycheck(editingRecurringId, recurringData);
-          console.log('[PaycheckFormModal] Recurring update result:', { error });
+          const { error } = await updateRecurringDeposit(editingRecurringId, recurringData);
+          console.log('[DepositFormModal] Recurring update result:', { error });
           if (error) throw error;
-          showSuccess('Recurring paycheck updated successfully');
+          showSuccess('Recurring deposit updated successfully');
         } else {
-          const { error } = await createRecurringPaycheck(recurringData);
-          console.log('[PaycheckFormModal] Recurring create result:', { error });
+          const { error } = await createRecurringDeposit(recurringData);
+          console.log('[DepositFormModal] Recurring create result:', { error });
           if (error) throw error;
-          showSuccess('Recurring paycheck created successfully');
+          showSuccess('Recurring deposit created successfully');
         }
       }
       
       handleClose();
       onSuccess();
     } catch (error) {
-      console.error('[PaycheckFormModal] Error:', error);
+      console.error('[DepositFormModal] Error:', error);
       showError(error instanceof Error ? error.message : 'An error occurred');
     } finally {
       setLoading(false);
@@ -183,17 +183,17 @@ export default function PaycheckFormModal({
   };
 
   const handleDelete = () => {
-    console.log('[PaycheckFormModal] Delete clicked:', { editingRecurringId, editingRecurring: editingRecurring?.id, editingPaycheck: editingPaycheck?.id });
+    console.log('[DepositFormModal] Delete clicked:', { editingRecurringId, editingRecurring: editingRecurring?.id, editingDeposit: editingDeposit?.id });
     const formatAmount = (amount: number) => `$${amount.toFixed(2)}`;
     
     if (editingRecurringId) {
-      // Delete recurring paycheck - use editingRecurring if available, otherwise just confirm with ID
+      // Delete recurring deposit - use editingRecurring if available, otherwise just confirm with ID
       const message = editingRecurring
-        ? `Are you sure you want to delete this recurring paycheck of ${formatAmount(editingRecurring.amount)}? This will remove all future instances.`
-        : 'Are you sure you want to delete this recurring paycheck? This will remove all future instances.';
+        ? `Are you sure you want to delete this recurring deposit of ${formatAmount(editingRecurring.amount)}? This will remove all future instances.`
+        : 'Are you sure you want to delete this recurring deposit? This will remove all future instances.';
         
       Alert.alert(
-        'Delete Recurring Paycheck',
+        'Delete Recurring Deposit',
         message,
         [
           {
@@ -206,16 +206,16 @@ export default function PaycheckFormModal({
             onPress: async () => {
               setLoading(true);
               try {
-                console.log('[PaycheckFormModal] Deleting recurring paycheck:', editingRecurringId);
-                const { error } = await deleteRecurringPaycheck(editingRecurringId);
+                console.log('[DepositFormModal] Deleting recurring deposit:', editingRecurringId);
+                const { error } = await deleteRecurringDeposit(editingRecurringId);
                 if (error) throw error;
 
-                showSuccess('Recurring paycheck deleted successfully');
+                showSuccess('Recurring deposit deleted successfully');
 
                 handleClose();
                 onSuccess();
               } catch (error) {
-                console.error('[PaycheckFormModal] Delete recurring error:', error);
+                console.error('[DepositFormModal] Delete recurring error:', error);
                 showError(error instanceof Error ? error.message : 'An error occurred');
               } finally {
                 setLoading(false);
@@ -224,10 +224,10 @@ export default function PaycheckFormModal({
           },
         ]
       );
-    } else if (editingPaycheck) {
+    } else if (editingDeposit) {
       Alert.alert(
-        'Delete Paycheck',
-        `Are you sure you want to delete this paycheck of ${formatAmount(editingPaycheck.amount)}?`,
+        'Delete Deposit',
+        `Are you sure you want to delete this deposit of ${formatAmount(editingDeposit.amount)}?`,
         [
           {
             text: 'Cancel',
@@ -239,15 +239,15 @@ export default function PaycheckFormModal({
             onPress: async () => {
               setLoading(true);
               try {
-                const { error } = await deletePaycheck(editingPaycheck.id);
+                const { error } = await deleteDeposit(editingDeposit.id);
                 if (error) throw error;
 
-                showSuccess('Paycheck deleted successfully');
+                showSuccess('Deposit deleted successfully');
 
                 handleClose();
                 onSuccess();
               } catch (error) {
-                console.error('[PaycheckFormModal] Delete error:', error);
+                console.error('[DepositFormModal] Delete error:', error);
                 showError(error instanceof Error ? error.message : 'An error occurred');
               } finally {
                 setLoading(false);
@@ -270,7 +270,7 @@ export default function PaycheckFormModal({
             <Text style={styles.cancelButton}>Cancel</Text>
           </TouchableOpacity>
           <Text style={styles.title}>
-            {editingPaycheck || editingRecurringId ? 'Edit' : 'Add'} {editingRecurringId ? 'Recurring ' : ''}Paycheck
+            {editingDeposit || editingRecurringId ? 'Edit' : 'Add'} {editingRecurringId ? 'Recurring ' : ''}Deposit
           </Text>
           <TouchableOpacity onPress={handleSubmit} disabled={loading}>
             <Text style={[styles.saveButton, loading && styles.disabledButton]}>
@@ -287,25 +287,25 @@ export default function PaycheckFormModal({
             onDismiss={hideAlert}
           />
 
-          {!editingPaycheck && (
+          {!editingDeposit && (
             <View style={styles.modePickerGroup}>
               <PillPicker
-                options={PAYCHECK_MODES}
+                options={DEPOSIT_MODES}
                 selectedValue={mode}
-                onSelect={(value) => setMode(value as PaycheckMode)}
+                onSelect={(value) => setMode(value as DepositMode)}
               />
             </View>
           )}
 
           {mode === 'once' ? (
-            <AddOneTimePaycheckForm
+            <AddOneTimeDepositForm
               ref={oneTimeFormRef}
-              editingPaycheck={editingPaycheck}
+              editingDeposit={editingDeposit}
               editingRecurring={editingRecurring}
               onFormChange={() => hideAlert()}
             />
           ) : (
-            <AddRecurringPaycheckForm
+            <AddRecurringDepositForm
               ref={recurringFormRef}
               editingRecurring={editingRecurring}
               onFormChange={() => hideAlert()}
@@ -313,7 +313,7 @@ export default function PaycheckFormModal({
           )}
         </ScrollView>
 
-        {(editingPaycheck || editingRecurringId) && (
+        {(editingDeposit || editingRecurringId) && (
           <View style={styles.deleteButtonContainer}>
             <TouchableOpacity
               style={styles.deleteButton}
@@ -321,7 +321,7 @@ export default function PaycheckFormModal({
               disabled={loading}
             >
               <Text style={styles.deleteButtonText}>
-                Delete {editingRecurringId ? 'Recurring ' : ''}Paycheck
+                Delete {editingRecurringId ? 'Recurring ' : ''}Deposit
               </Text>
             </TouchableOpacity>
           </View>

@@ -10,45 +10,45 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBills } from '@/contexts/BillsContext';
-import { GigWithPaychecks, Paycheck } from '@/types';
+import { GigWithDeposits, Deposit } from '@/types';
 import { format, parseISO } from 'date-fns';
 
-interface LinkPaychecksModalProps {
+interface LinkDepositsModalProps {
   visible: boolean;
-  gig: GigWithPaychecks | null;
-  availablePaychecks: Paycheck[];
+  gig: GigWithDeposits | null;
+  availableDeposits: Deposit[];
   onClose: () => void;
 }
 
-export default function LinkPaychecksModal({
+export default function LinkDepositsModal({
   visible,
   gig,
-  availablePaychecks,
+  availableDeposits,
   onClose,
-}: LinkPaychecksModalProps) {
-  const { linkPaycheckToGig, unlinkPaycheckFromGig } = useBills();
+}: LinkDepositsModalProps) {
+  const { linkDepositToGig, unlinkDepositFromGig } = useBills();
   const [loading, setLoading] = useState(false);
 
   if (!gig) return null;
 
-  const handleLinkPaycheck = async (paycheck: Paycheck) => {
+  const handleLinkDeposit = async (deposit: Deposit) => {
     setLoading(true);
     try {
-      const { error } = await linkPaycheckToGig(gig.id, paycheck.id);
+      const { error } = await linkDepositToGig(gig.id, deposit.id);
       if (error) {
         Alert.alert('Error', error.message);
       }
     } catch (err) {
-      Alert.alert('Error', 'Failed to link paycheck');
+      Alert.alert('Error', 'Failed to link deposit');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUnlinkPaycheck = async (paycheck: Paycheck) => {
+  const handleUnlinkDeposit = async (deposit: Deposit) => {
     Alert.alert(
-      'Unlink Paycheck',
-      'Are you sure you want to unlink this paycheck?',
+      'Unlink Deposit',
+      'Are you sure you want to unlink this deposit?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -57,12 +57,12 @@ export default function LinkPaychecksModal({
           onPress: async () => {
             setLoading(true);
             try {
-              const { error } = await unlinkPaycheckFromGig(gig.id, paycheck.id);
+              const { error } = await unlinkDepositFromGig(gig.id, deposit.id);
               if (error) {
                 Alert.alert('Error', error.message);
               }
             } catch (err) {
-              Alert.alert('Error', 'Failed to unlink paycheck');
+              Alert.alert('Error', 'Failed to unlink deposit');
             } finally {
               setLoading(false);
             }
@@ -76,7 +76,7 @@ export default function LinkPaychecksModal({
     return `$${amount.toFixed(2)}`;
   };
 
-  const totalLinkedAmount = gig.paychecks.reduce((sum, pc) => sum + pc.amount, 0);
+  const totalLinkedAmount = gig.deposits.reduce((sum, d) => sum + d.amount, 0);
 
   return (
     <Modal
@@ -90,7 +90,7 @@ export default function LinkPaychecksModal({
           {/* Header */}
           <View style={styles.modalHeader}>
             <View>
-              <Text style={styles.modalTitle}>Link Paychecks</Text>
+              <Text style={styles.modalTitle}>Link Deposits</Text>
               <Text style={styles.gigName}>{gig.name}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
@@ -107,7 +107,7 @@ export default function LinkPaychecksModal({
               </Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Linked Paychecks:</Text>
+              <Text style={styles.summaryLabel}>Linked Deposits:</Text>
               <Text
                 style={[
                   styles.summaryAmount,
@@ -133,27 +133,27 @@ export default function LinkPaychecksModal({
           </View>
 
           <ScrollView style={styles.scrollView}>
-            {/* Currently Linked Paychecks */}
-            {gig.paychecks.length > 0 && (
+            {/* Currently Linked Deposits */}
+            {gig.deposits.length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>
-                  Linked Paychecks ({gig.paychecks.length})
+                  Linked Deposits ({gig.deposits.length})
                 </Text>
-                {gig.paychecks.map(paycheck => (
-                  <View key={paycheck.id} style={styles.paycheckItem}>
-                    <View style={styles.paycheckInfo}>
-                      <Text style={styles.paycheckDate}>
-                        {paycheck.date ? format(parseISO(paycheck.date), 'MMM d, yyyy') : 'No date'}
+                {gig.deposits.map(deposit => (
+                  <View key={deposit.id} style={styles.depositItem}>
+                    <View style={styles.depositInfo}>
+                      <Text style={styles.depositDate}>
+                        {deposit.date ? format(parseISO(deposit.date), 'MMM d, yyyy') : 'No date'}
                       </Text>
-                      {paycheck.name && (
-                        <Text style={styles.paycheckName}>{paycheck.name}</Text>
+                      {deposit.name && (
+                        <Text style={styles.depositName}>{deposit.name}</Text>
                       )}
-                      <Text style={styles.paycheckAmount}>
-                        {formatAmount(paycheck.amount)}
+                      <Text style={styles.depositAmount}>
+                        {formatAmount(deposit.amount)}
                       </Text>
                     </View>
                     <TouchableOpacity
-                      onPress={() => handleUnlinkPaycheck(paycheck)}
+                      onPress={() => handleUnlinkDeposit(deposit)}
                       style={styles.unlinkButton}
                       disabled={loading}
                     >
@@ -164,31 +164,31 @@ export default function LinkPaychecksModal({
               </View>
             )}
 
-            {/* Available Paychecks */}
+            {/* Available Deposits */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>
-                Available Paychecks ({availablePaychecks.length})
+                Available Deposits ({availableDeposits.length})
               </Text>
-              {availablePaychecks.length === 0 ? (
+              {availableDeposits.length === 0 ? (
                 <Text style={styles.emptyText}>
-                  No unlinked paychecks available
+                  No unlinked deposits available
                 </Text>
               ) : (
-                availablePaychecks.map(paycheck => (
-                  <View key={paycheck.id} style={styles.paycheckItem}>
-                    <View style={styles.paycheckInfo}>
-                      <Text style={styles.paycheckDate}>
-                        {paycheck.date ? format(parseISO(paycheck.date), 'MMM d, yyyy') : 'No date'}
+                availableDeposits.map(deposit => (
+                  <View key={deposit.id} style={styles.depositItem}>
+                    <View style={styles.depositInfo}>
+                      <Text style={styles.depositDate}>
+                        {deposit.date ? format(parseISO(deposit.date), 'MMM d, yyyy') : 'No date'}
                       </Text>
-                      {paycheck.name && (
-                        <Text style={styles.paycheckName}>{paycheck.name}</Text>
+                      {deposit.name && (
+                        <Text style={styles.depositName}>{deposit.name}</Text>
                       )}
-                      <Text style={styles.paycheckAmount}>
-                        {formatAmount(paycheck.amount)}
+                      <Text style={styles.depositAmount}>
+                        {formatAmount(deposit.amount)}
                       </Text>
                     </View>
                     <TouchableOpacity
-                      onPress={() => handleLinkPaycheck(paycheck)}
+                      onPress={() => handleLinkDeposit(deposit)}
                       style={styles.linkButton}
                       disabled={loading}
                     >
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 20,
   },
-  paycheckItem: {
+  depositItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -301,21 +301,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 8,
   },
-  paycheckInfo: {
+  depositInfo: {
     flex: 1,
   },
-  paycheckDate: {
+  depositDate: {
     fontSize: 14,
     fontWeight: '600',
     color: '#2c3e50',
     marginBottom: 2,
   },
-  paycheckName: {
+  depositName: {
     fontSize: 12,
     color: '#7f8c8d',
     marginBottom: 4,
   },
-  paycheckAmount: {
+  depositAmount: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#27ae60',

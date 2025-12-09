@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  SafeAreaView,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import TabScreenHeader from '@/components/TabScreenHeader';
@@ -38,10 +39,11 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <TabScreenHeader title="Profile" />
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <TabScreenHeader title="Profile" />
 
-      <ScrollView style={styles.content}>
+        <ScrollView style={styles.content}>
         {/* Profile Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Information</Text>
@@ -84,14 +86,19 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#ecf0f1',
+    backgroundColor: '#f5f5f5',
   },
   content: {
     flex: 1,

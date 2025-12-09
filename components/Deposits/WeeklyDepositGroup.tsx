@@ -5,30 +5,30 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { Paycheck } from '@/types';
+import { Deposit } from '@/types';
 import { format } from 'date-fns';
 import WeeklyCard from '@/components/WeeklyCard';
 import { formatAmount } from '@/lib/utils';
 
-interface WeeklyPaycheckGroupProps {
+interface WeeklyDepositGroupProps {
   startDate: Date;
   endDate: Date;
-  paychecks: Paycheck[];
+  deposits: Deposit[];
   total: number;
-  onViewPaycheck: (paycheck: Paycheck) => void;
-  onEditPaycheck: (paycheck: Paycheck) => void;
-  onDeletePaycheck: (paycheck: Paycheck) => void;
+  onViewDeposit: (deposit: Deposit) => void;
+  onEditDeposit: (deposit: Deposit) => void;
+  onDeleteDeposit: (deposit: Deposit) => void;
 }
 
-export default function WeeklyPaycheckGroup({
+export default function WeeklyDepositGroup({
   startDate,
   endDate,
-  paychecks,
+  deposits,
   total,
-  onViewPaycheck,
-  onEditPaycheck,
-  onDeletePaycheck,
-}: WeeklyPaycheckGroupProps) {
+  onViewDeposit,
+  onEditDeposit,
+  onDeleteDeposit,
+}: WeeklyDepositGroupProps) {
   const formatWeekLabel = (startDate: Date, endDate: Date): string => {
     const start = format(startDate, 'MMM d');
     const end = format(endDate, 'MMM d');
@@ -37,7 +37,7 @@ export default function WeeklyPaycheckGroup({
 
   const subheading = (
     <View style={styles.totalRow}>
-      <Text style={styles.totalLabel}>Total:</Text>
+      <Text style={styles.totalLabel}>Total Income:</Text>
       <Text style={styles.totalAmount}>
         {formatAmount(total)}
       </Text>
@@ -49,25 +49,25 @@ export default function WeeklyPaycheckGroup({
       title={formatWeekLabel(startDate, endDate)}
       subheading={subheading}
     >
-      {/* Paychecks List */}
-      <View style={styles.paychecksList}>
-        {paychecks
+      {/* Deposits List */}
+      <View style={styles.depositsList}>
+        {deposits
           .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-          .map((paycheck) => (
+          .map((deposit) => (
           <TouchableOpacity
-            key={paycheck.id}
-            style={styles.paycheckItem}
-            onPress={() => onEditPaycheck(paycheck)}
+            key={deposit.id}
+            style={styles.depositItem}
+            onPress={() => onEditDeposit(deposit)}
           >
-            <View style={styles.paycheckRow}>
-              <Text style={styles.paycheckDate}>
-                {paycheck.date ? format(new Date(paycheck.date), 'MMM d') : 'No date'}
+            <View style={styles.depositRow}>
+              <Text style={styles.depositDate}>
+                {deposit.date ? format(new Date(deposit.date), 'MMM d') : 'No date'}
               </Text>
-              <Text style={styles.paycheckName} numberOfLines={1}>
-                {paycheck.name || 'Paycheck'}
+              <Text style={styles.depositName} numberOfLines={1}>
+                {deposit.name || 'Deposit'}
               </Text>
-              <Text style={styles.paycheckAmount}>
-                {formatAmount(paycheck.amount)}
+              <Text style={styles.depositAmount}>
+                {formatAmount(deposit.amount)}
               </Text>
             </View>
           </TouchableOpacity>
@@ -97,32 +97,32 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#27ae60',
   },
-  paychecksList: {
+  depositsList: {
     paddingHorizontal: 16,
   },
-  paycheckItem: {
+  depositItem: {
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#f8f9fa',
   },
-  paycheckRow: {
+  depositRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  paycheckDate: {
+  depositDate: {
     fontSize: 14,
     fontWeight: '500',
     color: '#2c3e50',
     width: 50,
   },
-  paycheckName: {
+  depositName: {
     fontSize: 14,
     fontWeight: '500',
     color: '#2c3e50',
     flex: 1,
   },
-  paycheckAmount: {
+  depositAmount: {
     fontSize: 14,
     fontWeight: '600',
     color: '#27ae60',

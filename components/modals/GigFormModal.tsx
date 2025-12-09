@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useBills } from '@/contexts/BillsContext';
-import { GigWithPaychecks } from '@/types';
+import { GigWithDeposits } from '@/types';
 import { format, parseISO, endOfWeek, startOfWeek } from 'date-fns';
 import DateInput from '@/components/DateInput';
 import { InlineAlert } from '@/components/InlineAlert';
@@ -20,19 +20,19 @@ import { useInlineAlert } from '@/hooks/useInlineAlert';
 
 interface GigFormModalProps {
   visible: boolean;
-  gig: GigWithPaychecks | null;
+  gig: GigWithDeposits | null;
   onClose: () => void;
+  defaultStartDate?: string;
+  defaultEndDate?: string;
 }
 
-export default function GigFormModal({ visible, gig, onClose }: GigFormModalProps) {
+export default function GigFormModal({ visible, gig, onClose, defaultStartDate, defaultEndDate }: GigFormModalProps) {
   const { createGig, updateGig } = useBills();
   const { alert, showError, showSuccess, hideAlert } = useInlineAlert();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [totalHours, setTotalHours] = useState('');
-  const [totalAmount, setTotalAmount] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -40,40 +40,29 @@ export default function GigFormModal({ visible, gig, onClose }: GigFormModalProp
       // Editing existing gig
       setName(gig.name);
       setDescription(gig.description || '');
-      setStartDate(gig.start_date);
-      setEndDate(gig.end_date);
-      setTotalHours(gig.total_hours?.toString() || '');
-      setTotalAmount(gig.total_amount.toString());
+      setEndDate(gig.due_date);
+      setTotalHours(gig.est_hours_total?.toString() || '');
     } else if (visible) {
       // Adding new gig
       resetForm();
+      // Pre-fill end date if provided
+      if (defaultEndDate) setEndDate(defaultEndDate);
     }
-  }, [visible, gig]);
+  }, [visible, gig, defaultStartDate, defaultEndDate]);
 
   // Auto-hide alert when form changes
   useEffect(() => {
     if (alert.visible) {
       hideAlert();
     }
-  }, [name, description, startDate, endDate, totalHours, totalAmount]);
+  }, [name, description, endDate, totalHours]);
 
   const resetForm = () => {
     setName('');
     setDescription('');
-    setStartDate('');
     setEndDate('');
     setTotalHours('');
-    setTotalAmount('');
     hideAlert();
-  };
-
-  const handleStartDateChange = (date: string) => {
-    setStartDate(date);
-    // If no end date set, default to end of week
-    if (date && !endDate) {
-      const weekEnd = endOfWeek(parseISO(date), { weekStartsOn: 0 });
-      setEndDate(format(weekEnd, 'yyyy-MM-dd'));
-    }
   };
 
   const handleSave = async () => {
@@ -83,26 +72,8 @@ export default function GigFormModal({ visible, gig, onClose }: GigFormModalProp
       return;
     }
 
-    if (!startDate) {
-      showError('Please select a start date');
-      return;
-    }
-
     if (!endDate) {
-      showError('Please select an end date');
-      return;
-    }
-
-    const start = parseISO(startDate);
-    const end = parseISO(endDate);
-    
-    if (end < start) {
-      showError('End date must be after start date');
-      return;
-    }
-
-    if (!totalAmount.trim() || isNaN(parseFloat(totalAmount)) || parseFloat(totalAmount) <= 0) {
-      showError('Please enter a valid total amount');
+      showError('Please select a due date');
       return;
     }
 
@@ -114,13 +85,12 @@ export default function GigFormModal({ visible, gig, onClose }: GigFormModalProp
 
     setSaving(true);
 
+    // Use end date as the due date
     const gigData = {
       name: name.trim(),
       description: description.trim() || undefined,
-      start_date: startDate,
-      end_date: endDate,
-      total_hours: hours,
-      total_amount: parseFloat(totalAmount),
+      due_date: endDate,
+      est_hours_total: hours || 0,
     };
 
     try {
@@ -140,6 +110,7 @@ export default function GigFormModal({ visible, gig, onClose }: GigFormModalProp
         onClose();
       }, 1000);
     } catch (error) {
+      console.error('[GigFormModal] Error saving gig:', error);
       showError(error instanceof Error ? error.message : 'Failed to save gig');
     } finally {
       setSaving(false);
@@ -150,8 +121,7 @@ export default function GigFormModal({ visible, gig, onClose }: GigFormModalProp
     <Modal
       visible={visible}
       animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
+      presentationStyle="pageSheet"
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -160,11 +130,16 @@ export default function GigFormModal({ visible, gig, onClose }: GigFormModalProp
         <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={onClose} disabled={saving}>
+              <Text style={styles.cancelButton}>Cancel</Text>
+            </TouchableOpacity>
             <Text style={styles.modalTitle}>
               {gig ? 'Edit Gig' : 'Add Gig'}
             </Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={28} color="#2c3e50" />
+            <TouchableOpacity onPress={handleSave} disabled={saving}>
+              <Text style={[styles.saveButton, saving && styles.disabledButton]}>
+                {saving ? 'Saving...' : 'Save'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -189,6 +164,7 @@ export default function GigFormModal({ visible, gig, onClose }: GigFormModalProp
                 onChangeText={setName}
                 placeholder="e.g., Web Development Project"
                 placeholderTextColor="#95a5a6"
+                autoCapitalize="words"
               />
             </View>
 
@@ -206,36 +182,7 @@ export default function GigFormModal({ visible, gig, onClose }: GigFormModalProp
               />
             </View>
 
-            {/* Start Date and End Date Row */}
-            <View style={styles.rowContainer}>
-              <View style={styles.halfWidth}>
-                <Text style={styles.label}>Start Date *</Text>
-                <DateInput
-                  label=""
-                  value={startDate}
-                  onChangeDate={handleStartDateChange}
-                  placeholder="Start date"
-                  required={true}
-                />
-              </View>
-              <View style={styles.halfWidth}>
-                <Text style={styles.label}>End Date *</Text>
-                <DateInput
-                  label=""
-                  value={endDate}
-                  onChangeDate={setEndDate}
-                  placeholder="End date"
-                  required={true}
-                />
-                {startDate && !gig && (
-                  <Text style={styles.helperText}>
-                    Defaults to end of week
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {/* Total Hours and Total Amount Row */}
+            {/* Total Hours and Due Date Row */}
             <View style={styles.rowContainer}>
               <View style={styles.halfWidth}>
                 <Text style={styles.label}>Total Hours</Text>
@@ -249,42 +196,17 @@ export default function GigFormModal({ visible, gig, onClose }: GigFormModalProp
                 />
               </View>
               <View style={styles.halfWidth}>
-                <Text style={styles.label}>Total Amount *</Text>
-                <View style={styles.amountInputWrapper}>
-                  <Text style={styles.dollarSign}>$</Text>
-                  <TextInput
-                    style={styles.amountInput}
-                    value={totalAmount}
-                    onChangeText={setTotalAmount}
-                    placeholder="0.00"
-                    placeholderTextColor="#95a5a6"
-                    keyboardType="decimal-pad"
-                  />
-                </View>
+                <Text style={styles.label}>Due Date *</Text>
+                <DateInput
+                  label=""
+                  value={endDate}
+                  onChangeDate={setEndDate}
+                  placeholder="MM/DD/YYYY"
+                  required={true}
+                />
               </View>
             </View>
           </ScrollView>
-
-          {/* Action Buttons */}
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              onPress={onClose}
-              style={[styles.button, styles.cancelButton]}
-              disabled={saving}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={handleSave}
-              style={[styles.button, styles.saveButton]}
-              disabled={saving}
-            >
-              <Text style={styles.saveButtonText}>
-                {saving ? 'Saving...' : gig ? 'Update' : 'Create'}
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -294,33 +216,43 @@ export default function GigFormModal({ visible, gig, onClose }: GigFormModalProp
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'white',
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%',
+    flex: 1,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e1e8ed',
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#2c3e50',
   },
-  closeButton: {
-    padding: 4,
+  cancelButton: {
+    color: '#007AFF',
+    fontSize: 16,
+    minWidth: 60,
+  },
+  saveButton: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+    minWidth: 60,
+    textAlign: 'right',
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   formContainer: {
-    padding: 16,
+    flex: 1,
+    padding: 20,
   },
   inputGroup: {
     marginBottom: 16,
@@ -377,34 +309,5 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     marginTop: 4,
     fontStyle: 'italic',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e1e8ed',
-  },
-  button: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#ecf0f1',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
-  },
-  saveButton: {
-    backgroundColor: '#3498db',
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
   },
 });

@@ -30,21 +30,21 @@ export interface BillPayment {
   created_at: string;
 }
 
-export interface Paycheck {
+export interface Deposit {
   id: string;
   user_id: string;
   name?: string;
   amount: number;
   date: string | null;
   notes?: string;
-  recurring_paycheck_id?: string;
+  recurring_deposit_id?: string;
   created_at: string;
 }
 
 export type DayOfWeek = 'sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday';
 export type RecurrenceUnit = 'week' | 'month';
 
-export interface RecurringPaycheck {
+export interface RecurringDeposit {
   id: string;
   user_id: string;
   amount: number;
@@ -112,14 +112,14 @@ export interface WeeklyGroup {
   endDate: Date;
   bills: BillModel[];
   totalBills: number;
-  totalPaychecks: number;
-  carryoverBalance: number;
+  totalDeposits: number;
+  carryoverBalance?: number;
 }
 
-export interface WeeklyPaycheckGroup {
+export interface WeeklyDepositGroup {
   startDate: Date;
   endDate: Date;
-  paychecks: Paycheck[];
+  deposits: Deposit[];
   total: number;
 }
 
@@ -135,30 +135,64 @@ export interface Gig {
   user_id: string;
   name: string;
   description?: string;
-  start_date: string;
-  end_date: string;
-  total_hours?: number;
-  total_amount: number;
+  due_date: string;
+  est_hours_total: number;
+  hours_logged: number;
+  hours_remaining: number;
+  is_completed: boolean;
   checklist: ChecklistItem[];
   created_at: string;
   updated_at: string;
 }
 
-export interface GigPaycheck {
+export interface GigDeposit {
   id: string;
   gig_id: string;
-  paycheck_id: string;
+  deposit_id: string;
   created_at: string;
 }
 
-export interface GigWithPaychecks extends Gig {
-  paychecks: Paycheck[];
+export interface GigWithDeposits extends Gig {
+  deposits: Deposit[];
 }
 
 export interface WeeklyGigGroup {
   startDate: Date;
   endDate: Date;
-  gigs: GigWithPaychecks[];
+  gigs: GigWithDeposits[];
   totalAmount: number;
   totalHours: number;
+}
+
+export interface FinancialGoal {
+  id: string;
+  user_id: string;
+  name: string;
+  description?: string;
+  target_amount: number;
+  remaining_amount?: number;
+  due_date?: string;
+  due_month?: string; // Format: YYYY-MM
+  due_week?: string; // Format: YYYY-Www
+  bill_id?: string;
+  status: 'active' | 'completed' | 'cancelled';
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BillSuggestion {
+  bill: Bill;
+  relevance: 'name_match' | 'amount_match';
+  score: number;
+}
+
+export interface IncomeSource {
+  id: string;
+  user_id: string;
+  name: string;
+  frequency: 'daily' | 'weekly' | 'bi-weekly' | 'monthly';
+  pending_earnings: number;
+  created_at: string;
+  updated_at: string;
 }

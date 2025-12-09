@@ -20,7 +20,7 @@ interface WeeklyBillGroupProps {
   onViewBill: (bill: BillModel) => void;
   onEditBill: (bill: BillModel) => void;
   onDeleteBill: (bill: BillModel) => void;
-  onPaycheckTotalPress?: () => void;
+  onDepositTotalPress?: () => void;
 }
 
 const getProgressBarColor = (progressPercentage: number) => {
@@ -42,10 +42,10 @@ export default function WeeklyBillGroup({
   onViewBill,
   onEditBill,
   onDeleteBill,
-  onPaycheckTotalPress,
+  onDepositTotalPress,
 }: WeeklyBillGroupProps) {
   const progressPercentage = group.totalBills > 0 
-    ? Math.min((group.totalPaychecks / group.totalBills) * 100, 100)
+    ? Math.min((group.totalDeposits / group.totalBills) * 100, 100)
     : 0;
 
   const getPriorityColor = (priority: string) => {
@@ -91,7 +91,7 @@ export default function WeeklyBillGroup({
 
   const daysToGo = getDaysToGo();
 
-  const headerRight = daysToGo !== null && group.totalPaychecks < group.totalBills ? (
+  const headerRight = daysToGo !== null && group.totalDeposits < group.totalBills ? (
     <Text style={styles.daysToGo}>
       {daysToGo === 0 ? 'Today' : daysToGo === 1 ? '1 day to go' : `${daysToGo} days to go`}
     </Text>
@@ -99,11 +99,11 @@ export default function WeeklyBillGroup({
 
   const subheading = (
     <ProgressBar
-      current={group.totalPaychecks}
+      current={group.totalDeposits}
       total={group.totalBills}
       formatAmount={formatAmount}
-      onLeftPress={onPaycheckTotalPress}
-      leftPressable={!!onPaycheckTotalPress}
+      onLeftPress={onDepositTotalPress}
+      leftPressable={!!onDepositTotalPress}
     />
   );
 

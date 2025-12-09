@@ -7,67 +7,68 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
+  SafeAreaView,
 } from 'react-native';
 import { useBills } from '@/contexts/BillsContext';
-import { useRecurringPaychecks } from '@/hooks/useRecurringPaychecks';
-import { usePaycheckInstances, PaycheckInstance } from '@/contexts/PaychecksContext';
+import { useRecurringDeposits } from '@/hooks/useRecurringDeposits';
+import { useDepositInstances, DepositInstance } from '@/contexts/DepositsContext';
 import TabScreenHeader from '@/components/TabScreenHeader';
-import { Paycheck, WeeklyPaycheckGroup } from '@/types';
+import { Deposit, WeeklyDepositGroup } from '@/types';
 import { formatAmount } from '@/lib/utils';
-import PaycheckFormModal from '@/components/modals/PaycheckFormModal';
-import PaycheckDetailsModal from '@/components/modals/PaycheckDetailsModal';
-import WeeklyPaycheckGroupComponent from '@/components/Paychecks/WeeklyPaycheckGroup';
+import DepositFormModal from '@/components/modals/DepositFormModal';
+import DepositDetailsModal from '@/components/modals/DepositDetailsModal';
+import WeeklyDepositGroupComponent from '@/components/Deposits/WeeklyDepositGroup';
 import { format, startOfWeek, endOfWeek, isWithinInterval, addWeeks, subWeeks } from 'date-fns';
 import { globalStyles } from '@/lib/globalStyles';
-import { generateRecurringPaycheckInstances, formatDateForDB } from '@/utils/paycheckHelpers';
+import { generateRecurringDepositInstances, formatDateForDB } from '@/utils/depositHelpers';
 
-export default function PaychecksScreen() {
-  const { deletePaycheck } = useBills();
-  const { recurringPaychecks, loadRecurringPaychecks } = useRecurringPaychecks();
-  const { allPaycheckInstances, loading, refreshPaychecks } = usePaycheckInstances();
-  const [weeklyGroups, setWeeklyGroups] = useState<WeeklyPaycheckGroup[]>([]);
-  const [unknownPaychecks, setUnknownPaychecks] = useState<PaycheckInstance[]>([]);
+export default function DepositsScreen() {
+  const { deleteDeposit } = useBills();
+  const { recurringDeposits, loadRecurringDeposits } = useRecurringDeposits();
+  const { allDepositInstances, loading, refreshDeposits } = useDepositInstances();
+  const [weeklyGroups, setWeeklyGroups] = useState<WeeklyDepositGroup[]>([]);
+  const [unknownDeposits, setUnknownDeposits] = useState<DepositInstance[]>([]);
   const [unknownTotal, setUnknownTotal] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
-  const [editingPaycheck, setEditingPaycheck] = useState<Paycheck | null>(null);
+  const [editingDeposit, setEditingDeposit] = useState<Deposit | null>(null);
   const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
-  const [selectedPaycheck, setSelectedPaycheck] = useState<Paycheck | null>(null);
+  const [selectedDeposit, setSelectedDeposit] = useState<Deposit | null>(null);
 
   useEffect(() => {
-    // Group paychecks by week
-    const { groups, unknown, unknownTotal } = groupPaychecksByWeek(allPaycheckInstances);
+    // Group deposits by week
+    const { groups, unknown, unknownTotal } = groupDepositsByWeek(allDepositInstances);
     setWeeklyGroups(groups);
-    setUnknownPaychecks(unknown);
+    setUnknownDeposits(unknown);
     setUnknownTotal(unknownTotal);
-  }, [allPaycheckInstances]);
+  }, [allDepositInstances]);
 
-  const groupPaychecksByWeek = (paychecks: PaycheckInstance[]): { 
-    groups: WeeklyPaycheckGroup[]; 
-    unknown: PaycheckInstance[];
+  const groupDepositsByWeek = (deposits: DepositInstance[]): { 
+    groups: WeeklyDepositGroup[]; 
+    unknown: DepositInstance[];
     unknownTotal: number;
   } => {
-    if (paychecks.length === 0) return { groups: [], unknown: [], unknownTotal: 0 };
+    if (deposits.length === 0) return { groups: [], unknown: [], unknownTotal: 0 };
 
     // Create a map of weeks
-    const weeksMap = new Map<string, WeeklyPaycheckGroup>();
-    const unknownPaychecks: PaycheckInstance[] = [];
+    const weeksMap = new Map<string, WeeklyDepositGroup>();
+    const unknownDeposits: DepositInstance[] = [];
     let unknownTotal = 0;
 
-    paychecks.forEach((paycheck) => {
+    deposits.forEach((deposit) => {
       // Check if date is missing, null, or invalid
-      if (!paycheck.date || paycheck.date.trim() === '') {
-        unknownPaychecks.push(paycheck);
-        unknownTotal += paycheck.amount;
+      if (!deposit.date || deposit.date.trim() === '') {
+        unknownDeposits.push(deposit);
+        unknownTotal += deposit.amount;
         return;
       }
 
-      const date = new Date(paycheck.date);
+      const date = new Date(deposit.date);
       
       // Check if date is invalid
       if (isNaN(date.getTime())) {
-        unknownPaychecks.push(paycheck);
-        unknownTotal += paycheck.amount;
+        unknownDeposits.push(deposit);
+        unknownTotal += deposit.amount;
         return;
       }
 
@@ -79,14 +80,14 @@ export default function PaychecksScreen() {
         weeksMap.set(weekKey, {
           startDate: weekStart,
           endDate: weekEnd,
-          paychecks: [],
+          deposits: [],
           total: 0,
         });
       }
 
       const group = weeksMap.get(weekKey)!;
-      group.paychecks.push(paycheck);
-      group.total += paycheck.amount;
+      group.deposits.push(deposit);
+      group.total += deposit.amount;
     });
 
     // Convert to array and sort by week (chronological order - oldest first)
@@ -94,87 +95,87 @@ export default function PaychecksScreen() {
       (a, b) => a.startDate.getTime() - b.startDate.getTime()
     );
 
-    return { groups, unknown: unknownPaychecks, unknownTotal };
+    return { groups, unknown: unknownDeposits, unknownTotal };
   };
 
   const formatAmount = (amount: number) => {
     return `$${amount.toFixed(2)}`;
   };
 
-  const handleAddPaycheck = () => {
-    setEditingPaycheck(null);
+  const handleAddDeposit = () => {
+    setEditingDeposit(null);
     setEditingRecurringId(null);
     setModalVisible(true);
   };
 
-  const handlePaycheckSuccess = async () => {
-    console.log('🔄 Refreshing all paycheck data...');
-    await refreshPaychecks();
+  const handleDepositSuccess = async () => {
+    console.log('🔄 Refreshing all deposit data...');
+    await refreshDeposits();
   };
 
-  const handleViewPaycheck = async (paycheck: Paycheck) => {
-    // If it's a generated instance, we need to allow editing it (which creates an actual paycheck)
-    if ((paycheck as PaycheckInstance).isGenerated) {
-      await handleEditPaycheck(paycheck);
+  const handleViewDeposit = async (deposit: Deposit) => {
+    // If it's a generated instance, we need to allow editing it (which creates an actual deposit)
+    if ((deposit as DepositInstance).isGenerated) {
+      await handleEditDeposit(deposit);
     } else {
-      setEditingPaycheck(paycheck);
+      setEditingDeposit(deposit);
       setEditingRecurringId(null);
       setModalVisible(true);
     }
   };
 
-  const handleEditPaycheck = async (paycheck: Paycheck) => {
-    const instance = paycheck as PaycheckInstance;
+  const handleEditDeposit = async (deposit: Deposit) => {
+    const instance = deposit as DepositInstance;
     
-    // If this is a generated instance, edit the recurring paycheck instead
-    if (instance.isGenerated && instance.recurring_paycheck_id) {
-      console.log('📝 Editing recurring paycheck:', instance.recurring_paycheck_id);
-      console.log('📝 Current recurring paychecks:', recurringPaychecks.map(rp => rp.id));
+    // If this is a generated instance, edit the recurring deposit instead
+    if (instance.isGenerated && instance.recurring_deposit_id) {
+      console.log('📝 Editing recurring deposit:', instance.recurring_deposit_id);
+      console.log('📝 Current recurring deposits:', recurringDeposits.map(rd => rd.id));
       
-      // Ensure recurring paychecks are loaded
-      if (recurringPaychecks.length === 0) {
-        console.log('📝 Loading recurring paychecks...');
-        await loadRecurringPaychecks();
+      // Ensure recurring deposits are loaded
+      if (recurringDeposits.length === 0) {
+        console.log('📝 Loading recurring deposits...');
+        await loadRecurringDeposits();
       }
       
       // Reload to ensure we have fresh data
-      const { data } = await loadRecurringPaychecks();
-      console.log('📝 Loaded recurring paychecks:', data?.length, data?.map(rp => rp.id));
+      const { data } = await loadRecurringDeposits();
+      console.log('📝 Loaded recurring deposits:', data?.length, data?.map(rd => rd.id));
       
-      const recurring = data?.find(rp => rp.id === instance.recurring_paycheck_id);
-      console.log('📝 Found recurring paycheck:', recurring);
+      const recurring = data?.find(rd => rd.id === instance.recurring_deposit_id);
+      console.log('📝 Found recurring deposit:', recurring);
       
       if (!recurring) {
-        Alert.alert('Error', 'Could not find recurring paycheck to edit');
+        Alert.alert('Error', 'Could not find recurring deposit to edit');
         return;
       }
       
-      setEditingRecurringId(instance.recurring_paycheck_id);
-      setEditingPaycheck(null);
+      setEditingRecurringId(instance.recurring_deposit_id);
+      setEditingDeposit(null);
       setModalVisible(true);
     } else {
-      // Regular one-time paycheck
-      setEditingPaycheck(paycheck);
+      // Regular one-time deposit
+      setEditingDeposit(deposit);
       setEditingRecurringId(null);
       setModalVisible(true);
     }
   };
 
-  const handleDeletePaycheck = async (paycheck: Paycheck) => {
+  const handleDeleteDeposit = async (deposit: Deposit) => {
     Alert.alert(
-      'Delete Paycheck',
-      `Are you sure you want to delete this paycheck of ${formatAmount(paycheck.amount)}?`,
+      'Delete Deposit',
+      `Are you sure you want to delete this deposit of ${formatAmount(deposit.amount)}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            const { error } = await deletePaycheck(paycheck.id);
+            const { error } = await deleteDeposit(deposit.id);
             if (error) {
               Alert.alert('Error', error.message);
             } else {
-              Alert.alert('Success', 'Paycheck deleted successfully');
+              Alert.alert('Success', 'Deposit deleted successfully');
             }
           },
         },
@@ -183,15 +184,16 @@ export default function PaychecksScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <TabScreenHeader
-        title="Paychecks"
-        rightContent={
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <TabScreenHeader
+          title="Deposits"
+          rightContent={
           <TouchableOpacity
             style={styles.addButton}
-            onPress={handleAddPaycheck}
+            onPress={handleAddDeposit}
           >
-            <Text style={styles.addButtonText}>+ Paycheck</Text>
+            <Text style={styles.addButtonText}>+ Deposit</Text>
           </TouchableOpacity>
         }
       />
@@ -201,36 +203,36 @@ export default function PaychecksScreen() {
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refreshPaychecks} />
+          <RefreshControl refreshing={loading} onRefresh={refreshDeposits} />
         }
       >
-        {weeklyGroups.length > 0 || unknownPaychecks.length > 0 ? (
+        {weeklyGroups.length > 0 || unknownDeposits.length > 0 ? (
           <>
             {/* Unknown Group */}
-            {unknownPaychecks.length > 0 && (
+            {unknownDeposits.length > 0 && (
               <View style={styles.unknownGroup}>
                 <View style={styles.unknownHeader}>
                   <Text style={styles.unknownLabel}>Upcoming</Text>
                   <Text style={styles.unknownTotal}>{formatAmount(unknownTotal)}</Text>
                 </View>
-                {unknownPaychecks.map((paycheck) => (
+                {unknownDeposits.map((deposit) => (
                   <TouchableOpacity
-                    key={paycheck.id}
-                    style={styles.unknownPaycheckItem}
-                    onPress={() => handleEditPaycheck(paycheck)}
+                    key={deposit.id}
+                    style={styles.unknownDepositItem}
+                    onPress={() => handleEditDeposit(deposit)}
                   >
-                    <View style={styles.unknownPaycheckInfo}>
-                      <Text style={styles.unknownPaycheckName}>
-                        {paycheck.name || 'Paycheck'}
+                    <View style={styles.unknownDepositInfo}>
+                      <Text style={styles.unknownDepositName}>
+                        {deposit.name || 'Deposit'}
                       </Text>
-                      {paycheck.notes && (
-                        <Text style={styles.unknownPaycheckNotes} numberOfLines={1}>
-                          {paycheck.notes}
+                      {deposit.notes && (
+                        <Text style={styles.unknownDepositNotes} numberOfLines={1}>
+                          {deposit.notes}
                         </Text>
                       )}
                     </View>
-                    <Text style={styles.unknownPaycheckAmount}>
-                      {formatAmount(paycheck.amount)}
+                    <Text style={styles.unknownDepositAmount}>
+                      {formatAmount(deposit.amount)}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -239,48 +241,53 @@ export default function PaychecksScreen() {
 
             {/* Weekly Groups */}
             {weeklyGroups.map((group, index) => (
-              <WeeklyPaycheckGroupComponent
+              <WeeklyDepositGroupComponent
                 key={index}
                 startDate={group.startDate}
                 endDate={group.endDate}
-                paychecks={group.paychecks}
+                deposits={group.deposits}
                 total={group.total}
-                onViewPaycheck={handleViewPaycheck}
-                onEditPaycheck={handleEditPaycheck}
-                onDeletePaycheck={handleDeletePaycheck}
+                onViewDeposit={handleViewDeposit}
+                onEditDeposit={handleEditDeposit}
+                onDeleteDeposit={handleDeleteDeposit}
               />
             ))}
           </>
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No paychecks yet</Text>
+            <Text style={styles.emptyText}>No deposits yet</Text>
             <Text style={styles.emptySubtext}>
-              Tap the + Paycheck button to add one
+              Tap the + Deposit button to add one
             </Text>
           </View>
         )}
       </ScrollView>
 
-      {/* Add/Edit Paycheck Modal */}
-      <PaycheckFormModal
+      {/* Add/Edit Deposit Modal */}
+      <DepositFormModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onSuccess={handlePaycheckSuccess}
-        editingPaycheck={editingPaycheck}
+        onSuccess={handleDepositSuccess}
+        editingDeposit={editingDeposit}
         editingRecurringId={editingRecurringId}
       />
 
-      {/* Paycheck Details Modal */}
-      <PaycheckDetailsModal
+      {/* Deposit Details Modal */}
+      <DepositDetailsModal
         visible={detailsVisible}
         onClose={() => setDetailsVisible(false)}
-        paycheck={selectedPaycheck}
+        deposit={selectedDeposit}
       />
     </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#2c3e50',
+  },
   container: {
     ...globalStyles.screenContainer,
   },
@@ -346,7 +353,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#95a5a6',
   },
-  unknownPaycheckItem: {
+  unknownDepositItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -354,25 +361,25 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#ecf0f1',
   },
-  unknownPaycheckInfo: {
+  unknownDepositInfo: {
     flex: 1,
     marginRight: 12,
   },
-  unknownPaycheckName: {
+  unknownDepositName: {
     fontSize: 14,
     fontWeight: '600',
     color: '#2c3e50',
     marginBottom: 2,
   },
-  unknownPaycheckNotes: {
+  unknownDepositNotes: {
     fontSize: 12,
     color: '#95a5a6',
     fontStyle: 'italic',
   },
-  unknownPaycheckActions: {
+  unknownDepositActions: {
     alignItems: 'flex-end',
   },
-  unknownPaycheckAmount: {
+  unknownDepositAmount: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#27ae60',

@@ -1,18 +1,18 @@
 import { useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Paycheck } from '@/types';
+import { Deposit } from '@/types';
 
-export const usePaycheckOperations = (userId: string | undefined, loadPaychecks: () => Promise<void>) => {
-  const createPaycheck = useCallback(async (
-    paycheck: Omit<Paycheck, 'id' | 'user_id' | 'created_at'>
+export const useDepositOperations = (userId: string | undefined, loadDeposits: () => Promise<void>) => {
+  const createDeposit = useCallback(async (
+    deposit: Omit<Deposit, 'id' | 'user_id' | 'created_at'>
   ) => {
     if (!userId) return { data: null, error: new Error('User not authenticated') };
 
     try {
       const { data, error } = await supabase
-        .from('paychecks')
+        .from('deposits')
         .insert({
-          ...paycheck,
+          ...deposit,
           user_id: userId,
         })
         .select()
@@ -20,60 +20,60 @@ export const usePaycheckOperations = (userId: string | undefined, loadPaychecks:
 
       if (error) throw error;
 
-      // Refresh paychecks
-      await loadPaychecks();
+      // Refresh deposits
+      await loadDeposits();
 
       return { data, error: null };
     } catch (err) {
       return { data: null, error: err as Error };
     }
-  }, [userId, loadPaychecks]);
+  }, [userId, loadDeposits]);
 
-  const updatePaycheck = useCallback(async (id: string, updates: Partial<Paycheck>) => {
+  const updateDeposit = useCallback(async (id: string, updates: Partial<Deposit>) => {
     if (!userId) return { error: new Error('User not authenticated') };
 
     try {
       const { error } = await supabase
-        .from('paychecks')
+        .from('deposits')
         .update(updates)
         .eq('id', id)
         .eq('user_id', userId);
 
       if (error) throw error;
 
-      // Refresh paychecks
-      await loadPaychecks();
+      // Refresh deposits
+      await loadDeposits();
 
       return { error: null };
     } catch (err) {
       return { error: err as Error };
     }
-  }, [userId, loadPaychecks]);
+  }, [userId, loadDeposits]);
 
-  const deletePaycheck = useCallback(async (id: string) => {
+  const deleteDeposit = useCallback(async (id: string) => {
     if (!userId) return { error: new Error('User not authenticated') };
 
     try {
       const { error } = await supabase
-        .from('paychecks')
+        .from('deposits')
         .delete()
         .eq('id', id)
         .eq('user_id', userId);
 
       if (error) throw error;
 
-      // Refresh paychecks
-      await loadPaychecks();
+      // Refresh deposits
+      await loadDeposits();
 
       return { error: null };
     } catch (err) {
       return { error: err as Error };
     }
-  }, [userId, loadPaychecks]);
+  }, [userId, loadDeposits]);
 
   return {
-    createPaycheck,
-    updatePaycheck,
-    deletePaycheck,
+    createDeposit,
+    updateDeposit,
+    deleteDeposit,
   };
 };

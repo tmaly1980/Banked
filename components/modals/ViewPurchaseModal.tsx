@@ -13,7 +13,6 @@ import {
   ActionSheetIOS,
   Platform,
   FlatList,
-  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
@@ -77,7 +76,7 @@ export default function ViewPurchaseModal({
       const estimatedTotal = purchase.estimated_amount || budget || 0;
       setPurchaseAmount(purchase.purchase_amount?.toString() || estimatedTotal.toString());
       setPurchaseDate(
-        purchase.purchase_date ? format(new Date(purchase.purchase_date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
+        purchase.purchase_date ? purchase.purchase_date.split('T')[0] : format(new Date(), 'yyyy-MM-dd')
       );
       setDescriptionText(purchase.description || '');
       setEditingDescription(false);
@@ -164,9 +163,10 @@ export default function ViewPurchaseModal({
     // Auto-generate description if date is valid and description is empty
     if (value && !descriptionText && expenseType) {
       try {
-        const date = new Date(value);
-        if (!isNaN(date.getTime())) {
-          const formattedDate = format(date, 'MM/dd');
+        // Parse date components directly to avoid timezone issues
+        const [year, month, day] = value.split('-').map(Number);
+        if (year && month && day) {
+          const formattedDate = `${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
           const autoDescription = `${expenseType.name} ${formattedDate}`;
           setDescriptionText(autoDescription);
           await onUpdate(purchase.id, { description: autoDescription });
@@ -178,8 +178,11 @@ export default function ViewPurchaseModal({
 
     // Save the date
     try {
-      const date = new Date(value);
-      if (!isNaN(date.getTime())) {
+      // Parse date components to avoid timezone issues
+      const [year, month, day] = value.split('-').map(Number);
+      if (year && month && day) {
+        // Create date at noon UTC to avoid timezone shifts
+        const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
         await onUpdate(purchase.id, { purchase_date: date.toISOString() });
       }
     } catch (e) {
@@ -317,9 +320,13 @@ export default function ViewPurchaseModal({
       return;
     }
 
+    // Parse date components to avoid timezone issues
+    const [year, month, day] = purchaseDate.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    
     await onUpdate(purchase.id, {
       purchase_amount: amount,
-      purchase_date: new Date(purchaseDate).toISOString(),
+      purchase_date: date.toISOString(),
     });
 
     setShowPurchaseForm(false);
@@ -553,14 +560,8 @@ export default function ViewPurchaseModal({
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'position' : 'height'}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        contentContainerStyle={{ flex: 1 }}
-      >
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <View style={styles.container}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={styles.container}>
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose}>
               <Text style={styles.closeButton}>Close</Text>
@@ -801,10 +802,7 @@ export default function ViewPurchaseModal({
         )}
         </View>
       </GestureHandlerRootView>
-      </KeyboardAvoidingView>
-
-      {/* Move to Purchase Modal */}
-      <Modal
+    <Modal
         visible={moveToPurchaseModalVisible}
         transparent={true}
         animationType="slide"

@@ -1,33 +1,35 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
-import { BillPayment, Paycheck, ExpenseType, ExpenseBudget, GigWithPaychecks, Gig, ExpensePurchase } from '@/types';
+import { BillPayment, Deposit, ExpenseType, ExpenseBudget, GigWithDeposits, Gig, ExpensePurchase } from '@/types';
 import { BillModel, Bill } from '@/models/BillModel';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 import { useBillOperations } from '@/hooks/useBillOperations';
 import { usePaymentOperations } from '@/hooks/usePaymentOperations';
-import { usePaycheckOperations } from '@/hooks/usePaycheckOperations';
+import { useDepositOperations } from '@/hooks/useDepositOperations';
 import { useExpenseOperations } from '@/hooks/useExpenseOperations';
 import { useGigOperations } from '@/hooks/useGigOperations';
 import { useRealtimeSubscriptions } from '@/hooks/useRealtimeSubscriptions';
 
 interface BillsContextType {
   bills: BillModel[];
-  paychecks: Paycheck[];
+  overdueBills: BillModel[];
+  deposits: Deposit[];
   expenseTypes: ExpenseType[];
   expenseBudgets: ExpenseBudget[];
   expensePurchases: ExpensePurchase[];
-  gigs: GigWithPaychecks[];
+  gigs: GigWithDeposits[];
   loading: boolean;
   error: string | null;
   loadBills: () => Promise<void>;
-  loadPaychecks: () => Promise<void>;
+  loadOverdueBills: () => Promise<void>;
+  loadDeposits: () => Promise<void>;
   loadBillPayments: (billId: string) => Promise<BillPayment[]>;
   createBill: (bill: Omit<Bill, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<{ data: Bill | null; error: Error | null }>;
   updateBill: (id: string, updates: Partial<Bill>) => Promise<{ error: Error | null }>;
   deleteBill: (id: string) => Promise<{ error: Error | null }>;
-  createPaycheck: (paycheck: Omit<Paycheck, 'id' | 'user_id' | 'created_at'>) => Promise<{ data: Paycheck | null; error: Error | null }>;
-  updatePaycheck: (id: string, updates: Partial<Paycheck>) => Promise<{ error: Error | null }>;
-  deletePaycheck: (id: string) => Promise<{ error: Error | null }>;
+  createDeposit: (deposit: Omit<Deposit, 'id' | 'user_id' | 'created_at'>) => Promise<{ data: Deposit | null; error: Error | null }>;
+  updateDeposit: (id: string, updates: Partial<Deposit>) => Promise<{ error: Error | null }>;
+  deleteDeposit: (id: string) => Promise<{ error: Error | null }>;
   addBillPayment: (billId: string, amount: number, paymentDate: string, appliedDate?: string, isPaid?: boolean) => Promise<{ data: BillPayment | null; error: Error | null }>;
   updateBillPayment: (paymentId: string, amount: number, paymentDate: string, appliedDate?: string, isPaid?: boolean) => Promise<{ data: BillPayment | null; error: Error | null }>;
   deleteBillPayment: (paymentId: string) => Promise<{ error: Error | null }>;
@@ -64,8 +66,8 @@ interface BillsContextType {
   createGig: (gig: Omit<Gig, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<{ data: Gig | null; error: Error | null }>;
   updateGig: (id: string, updates: Partial<Gig>) => Promise<{ error: Error | null }>;
   deleteGig: (id: string) => Promise<{ error: Error | null }>;
-  linkPaycheckToGig: (gigId: string, paycheckId: string) => Promise<{ error: Error | null }>;
-  unlinkPaycheckFromGig: (gigId: string, paycheckId: string) => Promise<{ error: Error | null }>;
+  linkDepositToGig: (gigId: string, depositId: string) => Promise<{ error: Error | null }>;
+  unlinkDepositFromGig: (gigId: string, depositId: string) => Promise<{ error: Error | null }>;
   refreshData: () => Promise<void>;
 }
 
@@ -74,13 +76,61 @@ const BillsContext = createContext<BillsContextType | undefined>(undefined);
 export const BillsProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const [bills, setBills] = useState<BillModel[]>([]);
-  const [paychecks, setPaychecks] = useState<Paycheck[]>([]);
+  const [overdueBills, setOverdueBills] = useState<BillModel[]>([]);
+  const [deposits, setDeposits] = useState<Deposit[]>([]);
   const [expenseTypes, setExpenseTypes] = useState<ExpenseType[]>([]);
   const [expenseBudgets, setExpenseBudgets] = useState<ExpenseBudget[]>([]);
   const [expensePurchases, setExpensePurchases] = useState<ExpensePurchase[]>([]);
-  const [gigs, setGigs] = useState<GigWithPaychecks[]>([]);
+  const [gigs, setGigs] = useState<GigWithDeposits[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const loadBillPayments = useCallback(async (billId: string): Promise<BillPayment[]> => {
+    if (!user) return [];
+    
+    const { data, error } = await supabase
+      .from('bill_payments')
+      .select('*')
+      .eq('bill_id', billId)
+      .eq('user_id', user.id);
+    
+    if (error) {
+      console.error('Error loading bill payments:', error);
+      return [];
+    }
+    
+    return data || [];
+  }, [user]);
+
+  const loadOverdueBills = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase.rpc('get_overdue_bills', {
+        p_user_id: user.id
+      });
+
+      if (error) {
+        console.error('Error loading overdue bills:', error);
+        setError(error.message);
+        return;
+      }
+
+      if (data) {
+        // Convert to BillModel instances with payments
+        const overdueBillModels = await Promise.all(
+          data.map(async (bill: any) => {
+            const payments = await loadBillPayments(bill.id);
+            return BillModel.fromDatabase(bill, payments);
+          })
+        );
+        setOverdueBills(overdueBillModels);
+      }
+    } catch (err) {
+      console.error('Error loading overdue bills:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error');
+    }
+  }, [user?.id, loadBillPayments]);
 
   const loadBills = useCallback(async () => {
     if (!user) {
@@ -129,27 +179,27 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user]);
 
-  const loadPaychecks = useCallback(async () => {
+  const loadDeposits = useCallback(async () => {
     if (!user) {
-      setPaychecks([]);
+      setDeposits([]);
       return;
     }
 
     try {
       setError(null);
 
-      const { data, error: paychecksError } = await supabase
-        .from('paychecks')
+      const { data, error: depositsError } = await supabase
+        .from('deposits')
         .select('*')
         .eq('user_id', user.id)
         .order('date', { ascending: false });
 
-      if (paychecksError) throw paychecksError;
+      if (depositsError) throw depositsError;
 
-      setPaychecks(data || []);
+      setDeposits(data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load paychecks');
-      console.error('Error loading paychecks:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load deposits');
+      console.error('Error loading deposits:', err);
     }
   }, [user]);
 
@@ -181,7 +231,8 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
         .order('effective_from', { ascending: false });
 
       if (error) throw error;
-      setExpenseBudgets(data || []);
+      // Force new array reference to ensure React detects the change
+      setExpenseBudgets([...(data || [])]);
     } catch (err) {
       console.error('[BillsContext] Error loading expense budgets:', err);
     }
@@ -201,7 +252,8 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setExpensePurchases(data || []);
+      // Force new array reference to ensure React detects the change
+      setExpensePurchases([...(data || [])]);
     } catch (err) {
       console.error('[BillsContext] Error loading expense purchases:', err);
     }
@@ -219,41 +271,41 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
         .from('gigs')
         .select('*')
         .eq('user_id', user.id)
-        .order('start_date', { ascending: false });
+        .order('due_date', { ascending: false });
 
       if (gigsError) throw gigsError;
 
-      // Load gig-paycheck relationships
-      const { data: gigPaychecksData, error: gpError } = await supabase
-        .from('gig_paychecks')
+      // Load gig-deposit relationships
+      const { data: gigDepositsData, error: gpError } = await supabase
+        .from('gig_deposits')
         .select('*');
 
       if (gpError) throw gpError;
 
-      // Load paychecks
-      const { data: paychecksData, error: paychecksError } = await supabase
-        .from('paychecks')
+      // Load deposits
+      const { data: depositsData, error: depositsError } = await supabase
+        .from('deposits')
         .select('*')
         .eq('user_id', user.id);
 
-      if (paychecksError) throw paychecksError;
+      if (depositsError) throw depositsError;
 
       // Combine data
-      const gigsWithPaychecks: GigWithPaychecks[] = (gigsData || []).map(gig => {
-        const linkedPaycheckIds = (gigPaychecksData || [])
+      const gigsWithDeposits: GigWithDeposits[] = (gigsData || []).map(gig => {
+        const linkedDepositIds = (gigDepositsData || [])
           .filter(gp => gp.gig_id === gig.id)
-          .map(gp => gp.paycheck_id);
+          .map(gp => gp.deposit_id);
         
-        const linkedPaychecks = (paychecksData || [])
-          .filter(pc => linkedPaycheckIds.includes(pc.id));
+        const linkedDeposits = (depositsData || [])
+          .filter(d => linkedDepositIds.includes(d.id));
 
         return {
           ...gig,
-          paychecks: linkedPaychecks,
+          deposits: linkedDeposits,
         };
       });
 
-      setGigs(gigsWithPaychecks);
+      setGigs(gigsWithDeposits);
     } catch (err) {
       console.error('[BillsContext] Error loading gigs:', err);
     }
@@ -263,8 +315,9 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     try {
       setLoading(true);
       await Promise.all([
-        loadBills(), 
-        loadPaychecks(), 
+        loadBills(),
+        loadOverdueBills(), 
+        loadDeposits(), 
         loadExpenseTypes(), 
         loadExpenseBudgets(), 
         loadExpensePurchases(), 
@@ -275,12 +328,12 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setLoading(false);
     }
-  }, [loadBills, loadPaychecks, loadExpenseTypes, loadExpenseBudgets, loadExpensePurchases, loadGigs]);
+  }, [loadBills, loadOverdueBills, loadDeposits, loadExpenseTypes, loadExpenseBudgets, loadExpensePurchases, loadGigs]);
 
   // Use custom hooks for operations
   const billOps = useBillOperations(user?.id, loadBills);
   const paymentOps = usePaymentOperations(user?.id, loadBills);
-  const paycheckOps = usePaycheckOperations(user?.id, loadPaychecks);
+  const depositOps = useDepositOperations(user?.id, loadDeposits);
   const expenseOps = useExpenseOperations(user?.id, loadExpenseTypes, loadExpenseBudgets, loadExpensePurchases);
   const gigOps = useGigOperations(user?.id, loadGigs);
   
@@ -303,7 +356,8 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
 
   const value = {
     bills,
-    paychecks,
+    overdueBills,
+    deposits,
     expenseTypes,
     expenseBudgets,
     expensePurchases,
@@ -311,9 +365,10 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     loading,
     error,
     loadBills,
-    loadPaychecks,
+    loadOverdueBills,
+    loadDeposits,
     ...billOps,
-    ...paycheckOps,
+    ...depositOps,
     ...paymentOps,
     ...expenseOps,
     ...gigOps,

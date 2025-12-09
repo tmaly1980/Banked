@@ -9,25 +9,25 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { Paycheck } from '@/types';
+import { Deposit } from '@/types';
 import { format } from 'date-fns';
 
-interface PaycheckDetailsModalProps {
+interface DepositDetailsModalProps {
   visible: boolean;
   onClose: () => void;
-  paycheck: Paycheck | null;
+  deposit: Deposit | null;
 }
 
-export default function PaycheckDetailsModal({
+export default function DepositDetailsModal({
   visible,
   onClose,
-  paycheck,
-}: PaycheckDetailsModalProps) {
+  deposit,
+}: DepositDetailsModalProps) {
   const formatAmount = (amount: number) => {
     return `$${amount.toFixed(2)}`;
   };
 
-  if (!paycheck) return null;
+  if (!deposit) return null;
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
@@ -39,41 +39,41 @@ export default function PaycheckDetailsModal({
           <TouchableOpacity onPress={onClose}>
             <Text style={styles.closeButton}>Close</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Paycheck Details</Text>
+          <Text style={styles.title}>Deposit Details</Text>
           <View style={{ width: 50 }} />
         </View>
 
         <ScrollView style={styles.content}>
-          {/* Paycheck Info */}
+          {/* Deposit Info */}
           <View style={styles.section}>
-            <Text style={styles.paycheckName}>
-              {paycheck.name || 'Paycheck'}
+            <Text style={styles.depositName}>
+              {deposit.name || 'Deposit'}
             </Text>
-            <Text style={styles.paycheckAmount}>
-              {formatAmount(paycheck.amount)}
+            <Text style={styles.depositAmount}>
+              {formatAmount(deposit.amount)}
             </Text>
             
             <View style={styles.infoGrid}>
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>Date</Text>
                 <Text style={styles.infoValue}>
-                  {paycheck.date ? format(new Date(paycheck.date), 'MMM d, yyyy') : 'No date'}
+                  {deposit.date ? format(new Date(deposit.date), 'MMM d, yyyy') : 'No date'}
                 </Text>
               </View>
               
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>Created</Text>
                 <Text style={styles.infoValue}>
-                  {format(new Date(paycheck.created_at), 'MMM d, yyyy')}
+                  {format(new Date(deposit.created_at), 'MMM d, yyyy')}
                 </Text>
               </View>
             </View>
 
             {/* Notes */}
-            {paycheck.notes && (
+            {deposit.notes && (
               <View style={styles.notesContainer}>
                 <Text style={styles.notesLabel}>Notes</Text>
-                <Text style={styles.notesText}>{paycheck.notes}</Text>
+                <Text style={styles.notesText}>{deposit.notes}</Text>
               </View>
             )}
           </View>
@@ -112,13 +112,13 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
-  paycheckName: {
+  depositName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#2c3e50',
     marginBottom: 4,
   },
-  paycheckAmount: {
+  depositAmount: {
     fontSize: 32,
     fontWeight: 'bold',
     color: '#27ae60',
