@@ -275,9 +275,9 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
 
       if (gigsError) throw gigsError;
 
-      // Load gig-deposit relationships
-      const { data: gigDepositsData, error: gpError } = await supabase
-        .from('gig_deposits')
+      // Load gig-paycheck relationships
+      const { data: gigPaychecksData, error: gpError } = await supabase
+        .from('gig_paychecks')
         .select('*');
 
       if (gpError) throw gpError;
@@ -292,12 +292,12 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
 
       // Combine data
       const gigsWithDeposits: GigWithDeposits[] = (gigsData || []).map(gig => {
-        const linkedDepositIds = (gigDepositsData || [])
+        const linkedPaycheckIds = (gigPaychecksData || [])
           .filter(gp => gp.gig_id === gig.id)
-          .map(gp => gp.deposit_id);
+          .map(gp => gp.paycheck_id);
         
         const linkedDeposits = (depositsData || [])
-          .filter(d => linkedDepositIds.includes(d.id));
+          .filter(d => linkedPaycheckIds.includes(d.id));
 
         return {
           ...gig,

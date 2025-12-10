@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import BottomSheetModal from './BottomSheetModal';
 
 interface AccountBalanceModalProps {
   visible: boolean;
@@ -128,97 +128,44 @@ export default function AccountBalanceModal({
   };
 
   return (
-    <Modal
+    <BottomSheetModal
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
+      onClose={onClose}
+      onSave={handleSave}
+      title="Set Account Balance"
+      saveDisabled={loading}
     >
-      <View style={styles.overlay}>
-        <View style={styles.modal}>
-          {/* Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.cancelButton}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={styles.title}>Set Account Balance</Text>
-            <TouchableOpacity onPress={handleSave} disabled={loading}>
-              <Text style={[styles.saveButton, loading && styles.disabledButton]}>
-                Save
-              </Text>
-            </TouchableOpacity>
+      {/* Content */}
+      {fetching ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3498db" />
+        </View>
+      ) : (
+        <View style={styles.content}>
+          <Text style={styles.label}>Current Balance</Text>
+          <View style={styles.inputContainer}>
+            <Text style={styles.dollarSign}>$</Text>
+            <TextInput
+              style={styles.input}
+              value={balance}
+              onChangeText={(text) => setBalance(formatAmount(text))}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor="#999"
+              autoFocus
+            />
           </View>
 
-          {/* Content */}
-          {fetching ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#3498db" />
-            </View>
-          ) : (
-            <View style={styles.content}>
-              <Text style={styles.label}>Current Balance</Text>
-              <View style={styles.inputContainer}>
-                <Text style={styles.dollarSign}>$</Text>
-                <TextInput
-                  style={styles.input}
-                  value={balance}
-                  onChangeText={(text) => setBalance(formatAmount(text))}
-                  keyboardType="decimal-pad"
-                  placeholder="0.00"
-                  placeholderTextColor="#999"
-                  autoFocus
-                />
-              </View>
-
-              <Text style={styles.helpText}>
-                Enter your current account balance to track your finances
-              </Text>
-            </View>
-          )}
+          <Text style={styles.helpText}>
+            Enter your current account balance to track your finances
+          </Text>
         </View>
-      </View>
-    </Modal>
+      )}
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modal: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
-  },
-  cancelButton: {
-    fontSize: 16,
-    color: '#e74c3c',
-  },
-  saveButton: {
-    fontSize: 16,
-    color: '#3498db',
-    fontWeight: '600',
-  },
-  disabledButton: {
-    opacity: 0.5,
-  },
   loadingContainer: {
     padding: 40,
     alignItems: 'center',

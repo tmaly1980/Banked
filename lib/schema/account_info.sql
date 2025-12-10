@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS account_info (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   account_balance NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  daily_earnings_goal NUMERIC(12, 0) DEFAULT 0,
   balance_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

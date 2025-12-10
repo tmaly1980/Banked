@@ -3,46 +3,77 @@ import {
   View,
   Text,
   StyleSheet,
-  Modal,
   TouchableOpacity,
   FlatList,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useIncome } from '@/contexts/IncomeContext';
 import { IncomeSource } from '@/types';
+import { supabase } from '@/lib/supabase';
+import Calculator from '@/components/Calculator';
+import BottomSheetModal from './BottomSheetModal';
 
 interface PendingEarningsModalProps {
   visible: boolean;
   onClose: () => void;
+  dailyEarningsGoal: number;
+  onGoalUpdate: (newGoal: number) => void;
 }
 
-export default function PendingEarningsModal({ visible, onClose }: PendingEarningsModalProps) {
+export default function PendingEarningsModal({ visible, onClose, dailyEarningsGoal, onGoalUpdate }: PendingEarningsModalProps) {
   const { incomeSources, updateIncomeSource } = useIncome();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalValue, setGoalValue] = useState('');
+  const [showCalculator, setShowCalculator] = useState(false);
+  const [calculatorSource, setCalculatorSource] = useState<IncomeSource | null>(null);
 
-  const handleStartEdit = (source: IncomeSource) => {
-    setEditingId(source.id);
-    setEditValue(source.pending_earnings.toFixed(2));
+  const handleOpenCalculator = (source: IncomeSource) => {
+    setCalculatorSource(source);
+    setShowCalculator(true);
   };
 
-  const handleSaveEdit = async (source: IncomeSource) => {
-    const newValue = parseFloat(editValue) || 0;
+  const handleCalculatorConfirm = async (value: number) => {
+    if (!calculatorSource) return;
+    
     try {
-      await updateIncomeSource(source.id, { pending_earnings: newValue });
-      setEditingId(null);
+      await updateIncomeSource(calculatorSource.id, { pending_earnings: value });
+      setCalculatorSource(null);
     } catch (err) {
       console.error('Error updating pending earnings:', err);
       alert('Failed to update earnings');
     }
   };
 
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditValue('');
+  const handleStartGoalEdit = () => {
+    setEditingGoal(true);
+    setGoalValue(dailyEarningsGoal.toFixed(2));
+  };
+
+  const handleSaveGoalEdit = async () => {
+    const newGoal = parseFloat(goalValue) || 0;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('account_info')
+        .update({ daily_earnings_goal: newGoal })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      onGoalUpdate(newGoal);
+      setEditingGoal(false);
+    } catch (err) {
+      console.error('Error updating daily earnings goal:', err);
+      alert('Failed to update goal');
+    }
+  };
+
+  const handleCancelGoalEdit = () => {
+    setEditingGoal(false);
+    setGoalValue('');
   };
 
   const totalPendingEarnings = incomeSources.reduce(
@@ -51,8 +82,6 @@ export default function PendingEarningsModal({ visible, onClose }: PendingEarnin
   );
 
   const renderIncomeSource = ({ item }: { item: IncomeSource }) => {
-    const isEditing = editingId === item.id;
-
     return (
       <View style={styles.sourceRow}>
         <View style={styles.sourceInfo}>
@@ -60,117 +89,87 @@ export default function PendingEarningsModal({ visible, onClose }: PendingEarnin
           <Text style={styles.sourceFrequency}>{item.frequency}</Text>
         </View>
         
-        {isEditing ? (
-          <View style={styles.editContainer}>
-            <TextInput
-              style={styles.editInput}
-              value={editValue}
-              onChangeText={setEditValue}
-              keyboardType="decimal-pad"
-              autoFocus
-              selectTextOnFocus
-              onSubmitEditing={() => handleSaveEdit(item)}
-              onBlur={() => handleCancelEdit()}
-            />
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={() => handleSaveEdit(item)}
-            >
-              <Ionicons name="checkmark" size={20} color="#2ecc71" />
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.amountContainer}
-            onPress={() => handleStartEdit(item)}
-          >
-            <Text style={styles.amount}>${item.pending_earnings.toFixed(2)}</Text>
-            <Ionicons name="pencil" size={16} color="#95a5a6" style={styles.editIcon} />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.amountContainer}
+          onPress={() => handleOpenCalculator(item)}
+        >
+          <Text style={styles.amount}>${item.pending_earnings.toFixed(2)}</Text>
+        </TouchableOpacity>
       </View>
     );
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <KeyboardAvoidingView
-        style={styles.modalOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <>
+      <BottomSheetModal
+        visible={visible}
+        onClose={onClose}
+        title="Pending Earnings"
       >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Pending Earnings</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={28} color="#7f8c8d" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.totalSection}>
-            <Text style={styles.totalLabel}>Total Pending</Text>
-            <Text style={styles.totalAmount}>${totalPendingEarnings.toFixed(2)}</Text>
-          </View>
-
-          <FlatList
-            data={incomeSources}
-            renderItem={renderIncomeSource}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No income sources</Text>
-                <Text style={styles.emptySubtext}>Add income sources in the Income tab</Text>
-              </View>
-            }
-          />
+        <View style={styles.totalSection}>
+          <Text style={styles.totalLabel}>Total Pending</Text>
+          <Text style={styles.totalAmount}>${totalPendingEarnings.toFixed(2)}</Text>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+
+        <View style={styles.goalSection}>
+          <Text style={styles.goalLabel}>Daily Earnings Goal</Text>
+          {editingGoal ? (
+            <View style={styles.editContainer}>
+              <Text style={styles.dollarSign}>$</Text>
+              <TextInput
+                style={styles.input}
+                value={goalValue}
+                onChangeText={setGoalValue}
+                keyboardType="decimal-pad"
+                autoFocus
+                selectTextOnFocus
+                onSubmitEditing={handleSaveGoalEdit}
+                onBlur={handleCancelGoalEdit}
+              />
+              <TouchableOpacity onPress={handleSaveGoalEdit}>
+                <Ionicons name="checkmark" size={24} color="#27ae60" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.goalAmountContainer}
+              onPress={handleStartGoalEdit}
+            >
+              <Text style={styles.goalAmount}>${dailyEarningsGoal.toFixed(2)}</Text>
+              <Ionicons name="pencil" size={16} color="#95a5a6" style={styles.editIcon} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <FlatList
+          data={incomeSources}
+          renderItem={renderIncomeSource}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No income sources</Text>
+              <Text style={styles.emptySubtext}>Add income sources in the Income tab</Text>
+            </View>
+          }
+        />
+      </BottomSheetModal>
+
+      <Calculator
+        visible={showCalculator}
+        onClose={() => {
+          setShowCalculator(false);
+          setCalculatorSource(null);
+        }}
+        initialValue={calculatorSource?.pending_earnings || 0}
+        onConfirm={handleCalculatorConfirm}
+        title={calculatorSource?.name || "Pending Earnings"}
+      />
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalSheet: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ecf0f1',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-  },
   totalSection: {
     backgroundColor: '#2ecc71',
     padding: 20,
@@ -183,6 +182,30 @@ const styles = StyleSheet.create({
   },
   totalAmount: {
     fontSize: 32,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  goalSection: {
+    backgroundColor: '#3498db',
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ecf0f1',
+  },
+  goalLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.95)',
+  },
+  goalAmountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  goalAmount: {
+    fontSize: 18,
     fontWeight: 'bold',
     color: 'white',
   },
@@ -212,12 +235,22 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     textTransform: 'capitalize',
   },
+  amountActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   amountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+  },
+  calculatorButton: {
+    padding: 8,
+    backgroundColor: '#e3f2fd',
     borderRadius: 8,
   },
   amount: {

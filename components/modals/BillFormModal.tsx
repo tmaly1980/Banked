@@ -23,8 +23,8 @@ import { globalStyles } from '@/lib/globalStyles';
 
 interface BillFormModalProps {
   visible: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
+  onClose?: () => void;
+  onSuccess?: () => void;
   editingBill?: BillModel | null;
 }
 
@@ -70,7 +70,7 @@ export default function BillFormModal({
 
   const handleClose = () => {
     resetForm();
-    onClose();
+    onClose?.();
   };
 
   const validateForm = () => {
@@ -125,8 +125,8 @@ export default function BillFormModal({
       showSuccess(`Bill ${editingBill ? 'updated' : 'added'} successfully`);
       
       resetForm();
-      onSuccess();
-      onClose();
+      onSuccess?.();
+      onClose?.();
     } catch (error) {
       showError(error instanceof Error ? error.message : 'An error occurred');
     } finally {

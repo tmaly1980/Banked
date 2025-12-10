@@ -68,10 +68,10 @@ export const useGigOperations = (
 
     try {
       const { error } = await supabase
-        .from('gig_deposits')
+        .from('gig_paychecks')
         .insert({
           gig_id: gigId,
-          deposit_id: depositId,
+          paycheck_id: depositId,
           user_id: userId,
         });
 
@@ -88,10 +88,10 @@ export const useGigOperations = (
 
     try {
       const { error } = await supabase
-        .from('gig_deposits')
+        .from('gig_paychecks')
         .delete()
         .eq('gig_id', gigId)
-        .eq('deposit_id', depositId);
+        .eq('paycheck_id', depositId);
 
       if (error) throw error;
       await loadGigs();

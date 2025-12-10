@@ -16,7 +16,8 @@ import { FinancialGoal, Bill, BillSuggestion } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBills } from '@/contexts/BillsContext';
-import { format, addMonths, addWeeks, startOfWeek } from 'date-fns';
+import { format, addMonths, addWeeks, startOfWeek, addDays, isBefore, parseISO } from 'date-fns';
+import DateInput from '@/components/DateInput';
 
 interface FinancialGoalFormModalProps {
   visible: boolean;
@@ -85,6 +86,8 @@ export default function FinancialGoalFormModal({
       setStatus(goal.status);
     } else {
       resetForm();
+      // Pre-select current month
+      setDueMonth(format(new Date(), 'yyyy-MM'));
     }
   }, [goal, visible]);
 
@@ -176,12 +179,40 @@ export default function FinancialGoalFormModal({
     setName('');
     setDescription('');
     setTargetAmount('');
-    setDueMonth('');
+    setDueMonth(format(new Date(), 'yyyy-MM')); // Pre-select current month
     setDueWeek('');
     setDueDate('');
     setSelectedBillId(null);
     setStatus('active');
     setBillSuggestions([]);
+  };
+
+  const selectBill = (billId: string) => {
+    setSelectedBillId(billId);
+    setBillSuggestions([]);
+    
+    // Auto-fill target amount from bill
+    const bill = bills.find(b => b.id === billId);
+    if (bill) {
+      setTargetAmount(bill.amount.toString());
+      
+      // If bill has a due_date, use it (even if overdue)
+      if (bill.due_date) {
+        setDueDate(bill.due_date);
+      } else if (bill.due_day) {
+        // Recurring bill with due_day
+        const today = new Date();
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+        
+        // Create date for this month's due day
+        let dueThisMonth = new Date(currentYear, currentMonth, bill.due_day);
+        
+        // If already passed this month, use this month's date (overdue)
+        // Otherwise use this month's upcoming date
+        setDueDate(format(dueThisMonth, 'yyyy-MM-dd'));
+      }
+    }
   };
 
   const handleSave = async () => {
@@ -240,11 +271,6 @@ export default function FinancialGoalFormModal({
     }
   };
 
-  const selectBill = (billId: string) => {
-    setSelectedBillId(billId);
-    setBillSuggestions([]);
-  };
-
   const selectedBill = bills.find(b => b.id === selectedBillId);
 
   return (
@@ -255,11 +281,16 @@ export default function FinancialGoalFormModal({
       >
         <View style={styles.modalContent}>
           <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} disabled={loading}>
+              <Text style={styles.cancelButton}>Cancel</Text>
+            </TouchableOpacity>
             <Text style={styles.headerTitle}>
               {goal ? 'Edit' : 'Add'} Financial Goal
             </Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={28} color="#2c3e50" />
+            <TouchableOpacity onPress={handleSave} disabled={loading}>
+              <Text style={[styles.saveButton, loading && styles.saveButtonDisabled]}>
+                {loading ? 'Saving...' : 'Save'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -391,16 +422,12 @@ export default function FinancialGoalFormModal({
               )}
             </View>
 
-            <View style={styles.field}>
-              <Text style={styles.label}>Due Date (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                value={dueDate}
-                onChangeText={setDueDate}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor="#95a5a6"
-              />
-            </View>
+            <DateInput
+              label="Due Date (Optional)"
+              value={dueDate}
+              onChangeDate={setDueDate}
+              placeholder="MM/DD/YYYY"
+            />
 
             <View style={styles.field}>
               <Text style={styles.label}>Description</Text>
@@ -440,25 +467,6 @@ export default function FinancialGoalFormModal({
               </View>
             </View>
           </ScrollView>
-
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={onClose}
-              disabled={loading}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.saveButton, loading && styles.saveButtonDisabled]}
-              onPress={handleSave}
-              disabled={loading}
-            >
-              <Text style={styles.saveButtonText}>
-                {loading ? 'Saving...' : 'Save Goal'}
-              </Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -489,6 +497,19 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#2c3e50',
+  },
+  cancelButton: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#7f8c8d',
+  },
+  saveButton: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3498db',
+  },
+  saveButtonDisabled: {
+    color: '#95a5a6',
   },
   form: {
     padding: 16,
@@ -652,41 +673,6 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
   },
   statusButtonTextActive: {
-    color: 'white',
-  },
-  footer: {
-    flexDirection: 'row',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e1e8ed',
-    gap: 12,
-  },
-  cancelButton: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e1e8ed',
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#7f8c8d',
-  },
-  saveButton: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 8,
-    backgroundColor: '#3498db',
-    alignItems: 'center',
-  },
-  saveButtonDisabled: {
-    backgroundColor: '#95a5a6',
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
     color: 'white',
   },
 });

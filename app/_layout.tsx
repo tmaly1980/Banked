@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { BillsProvider } from '@/contexts/BillsContext';
 import { DepositsProvider } from '@/contexts/DepositsContext';
@@ -36,19 +37,21 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <AuthProvider>
-        <BillsProvider>
-          <DepositsProvider>
-            <IncomeProvider>
-              <ToastProvider>
-                <RootLayoutNav />
-              </ToastProvider>
-            </IncomeProvider>
-          </DepositsProvider>
-        </BillsProvider>
-      </AuthProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <AuthProvider>
+          <BillsProvider>
+            <DepositsProvider>
+              <IncomeProvider>
+                <ToastProvider>
+                  <RootLayoutNav />
+                </ToastProvider>
+              </IncomeProvider>
+            </DepositsProvider>
+          </BillsProvider>
+        </AuthProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 

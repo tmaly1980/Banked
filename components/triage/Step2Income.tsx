@@ -8,8 +8,8 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTriage } from '@/contexts/TriageContext';
 import type { IncomeSource, PayFrequency, DailyPay } from '@/contexts/TriageContext';
 

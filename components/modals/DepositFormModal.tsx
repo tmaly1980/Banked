@@ -29,8 +29,8 @@ const DEPOSIT_MODES = [
 
 interface DepositFormModalProps {
   visible: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
+  onClose?: () => void;
+  onSuccess?: () => void;
   editingDeposit?: Deposit | null;
   editingRecurringId?: string | null;
 }
@@ -89,7 +89,7 @@ export default function DepositFormModal({
     oneTimeFormRef.current?.resetForm();
     recurringFormRef.current?.resetForm();
     setMode('once');
-    onClose();
+    onClose?.();
   };
 
   const handleSubmit = async () => {
@@ -173,7 +173,7 @@ export default function DepositFormModal({
       }
       
       handleClose();
-      onSuccess();
+      onSuccess?.();
     } catch (error) {
       console.error('[DepositFormModal] Error:', error);
       showError(error instanceof Error ? error.message : 'An error occurred');

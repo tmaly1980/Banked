@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { supabase } from '@/lib/supabase';
@@ -25,6 +25,7 @@ import { useIncome } from '@/contexts/IncomeContext';
 import { BillModel } from '@/models/BillModel';
 import { FinancialGoal } from '@/types';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isToday, isSameDay, differenceInDays, parseISO } from 'date-fns';
+import AnimatedNumber from '@/components/AnimatedNumber';
 
 type AgendaView = 'daily' | 'weekly' | 'monthly' | 'later';
 
@@ -47,6 +48,7 @@ export default function HomeScreen() {
   const [financialGoals, setFinancialGoals] = useState<FinancialGoal[]>([]);
   const [showPendingEarningsModal, setShowPendingEarningsModal] = useState(false);
   const [nextGoal, setNextGoal] = useState<FinancialGoal | null>(null);
+  const [dailyEarningsGoal, setDailyEarningsGoal] = useState<number>(0);
 
   const loadAccountBalance = async () => {
     if (!user) return;
@@ -54,7 +56,7 @@ export default function HomeScreen() {
     try {
       const { data, error } = await supabase
         .from('account_info')
-        .select('account_balance')
+        .select('account_balance, daily_earnings_goal')
         .eq('user_id', user.id)
         .single();
 
@@ -64,6 +66,7 @@ export default function HomeScreen() {
 
       if (data) {
         setAccountBalance(data.account_balance);
+        setDailyEarningsGoal(data.daily_earnings_goal || 0);
       }
     } catch (err) {
       console.error('Error loading account balance:', err);
@@ -90,10 +93,37 @@ export default function HomeScreen() {
     }
   };
 
+  const loadNextGoal = async () => {
+    if (!user) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('financial_goals')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .not('due_date', 'is', null)
+        .gte('due_date', today)
+        .order('due_date', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading next goal:', error);
+      }
+
+      setNextGoal(data || null);
+    } catch (err) {
+      console.error('Error loading next goal:', err);
+    }
+  };
+
   useEffect(() => {
     loadBills();
     loadAccountBalance();
     loadFinancialGoals();
+    loadNextGoal();
   }, []);
 
   const getDailyBills = () => {
@@ -159,6 +189,19 @@ export default function HomeScreen() {
     setActiveAgenda(view);
   };
 
+  const getNextGoalRemaining = () => {
+    if (!nextGoal) return 0;
+    
+    const availableFunds = (accountBalance || 0) + getTotalPendingEarnings();
+    const remaining = Math.max(0, nextGoal.target_amount - availableFunds);
+    return remaining;
+  };
+
+  const getDaysUntilGoal = () => {
+    if (!nextGoal?.due_date) return 0;
+    return differenceInDays(parseISO(nextGoal.due_date), new Date());
+  };
+
   const getAgendaBills = () => {
     switch (activeAgenda) {
       case 'daily':
@@ -216,20 +259,26 @@ export default function HomeScreen() {
           }
         />
 
-        {/* Account Balance Header */}
-        {accountBalance !== null && (
-          <TouchableOpacity
-            style={styles.balanceHeader}
-            onPress={() => setShowAccountBalanceModal(true)}
-          >
-            <Text style={styles.balanceLabel}>Current Account Balance:</Text>
-            <Text style={styles.balanceAmount}>${accountBalance.toFixed(2)}</Text>
-          </TouchableOpacity>
-        )}
-
         {/* Widget Grid */}
         <ScrollView style={styles.content}>
           <View style={styles.widgetGrid}>
+            {/* Account Balance Widget */}
+            {accountBalance !== null && (
+              <TouchableOpacity
+                style={[styles.widget, styles.widgetBalance]}
+                onPress={() => setShowAccountBalanceModal(true)}
+              >
+                <Ionicons name="wallet" size={32} color="white" />
+                <Text style={styles.widgetTitle}>Account Balance</Text>
+                <AnimatedNumber
+                  value={accountBalance}
+                  style={styles.widgetAmount}
+                  prefix="$"
+                  decimals={2}
+                />
+              </TouchableOpacity>
+            )}
+
             {/* Pending Earnings Widget */}
             <TouchableOpacity
               style={[styles.widget, styles.widgetEarnings]}
@@ -237,8 +286,73 @@ export default function HomeScreen() {
             >
               <Ionicons name="cash" size={32} color="white" />
               <Text style={styles.widgetTitle}>Pending Earnings</Text>
-              <Text style={styles.widgetAmount}>${getTotalPendingEarnings().toFixed(2)}</Text>
+              <View style={styles.earningsAmountRow}>
+                <AnimatedNumber
+                  value={getTotalPendingEarnings()}
+                  style={styles.widgetAmount}
+                  prefix="$"
+                  decimals={0}
+                />
+                {dailyEarningsGoal > 0 && (
+                  <>
+                    <Text style={styles.widgetAmount}> / </Text>
+                    <AnimatedNumber
+                      value={dailyEarningsGoal}
+                      style={styles.widgetAmount}
+                      prefix="$"
+                      decimals={0}
+                    />
+                  </>
+                )}
+              </View>
+              {dailyEarningsGoal > 0 && (
+                <Text style={styles.widgetGoalLabel}>
+                  <AnimatedNumber
+                    value={Math.max(0, dailyEarningsGoal - getTotalPendingEarnings())}
+                    style={styles.widgetGoalText}
+                    prefix="$"
+                    suffix=" To Go"
+                    decimals={0}
+                  />
+                </Text>
+              )}
             </TouchableOpacity>
+
+            {/* Next Financial Goal Widget */}
+            {nextGoal && (
+              <TouchableOpacity
+                style={[styles.widget, styles.widgetGoal]}
+                onPress={() => {
+                  setSelectedGoal(nextGoal);
+                  setShowGoalModal(true);
+                }}
+              >
+                <View style={styles.goalWidgetHeader}>
+                  <Ionicons name="flag" size={28} color="white" />
+                  <Text style={styles.goalDueText}>
+                    Due in {getDaysUntilGoal()} {getDaysUntilGoal() === 1 ? 'Day' : 'Days'}
+                  </Text>
+                </View>
+                <Text style={styles.goalWidgetName} numberOfLines={1}>
+                  {nextGoal.name}
+                </Text>
+                <View style={styles.goalWidgetAmounts}>
+                  <AnimatedNumber
+                    value={nextGoal.target_amount}
+                    style={styles.goalWidgetAmount}
+                    prefix="$"
+                    decimals={2}
+                  />
+                  <AnimatedNumber
+                    value={getNextGoalRemaining()}
+                    style={styles.goalWidgetRemaining}
+                    prefix="$"
+                    suffix=" needed"
+                    decimals={2}
+                  />
+                </View>
+              </TouchableOpacity>
+            )}
 
             {/* Daily Widget */}
             <TouchableOpacity
@@ -280,63 +394,6 @@ export default function HomeScreen() {
               <Text style={styles.widgetCount}>{getWidgetCount('later')} items</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Financial Goals Section */}
-          {financialGoals.length > 0 && (
-            <View style={styles.goalsSection}>
-              <Text style={styles.sectionTitle}>Financial Goals This Month</Text>
-              {financialGoals.map((goal, index) => {
-                // Calculate running balance
-                let runningBalance = accountBalance || 0;
-                for (let i = 0; i < index; i++) {
-                  runningBalance -= financialGoals[i].target_amount;
-                }
-                
-                const remaining = Math.max(0, goal.target_amount - Math.max(0, runningBalance));
-                const progress = goal.target_amount > 0 
-                  ? ((goal.target_amount - remaining) / goal.target_amount) * 100 
-                  : 0;
-
-                return (
-                  <TouchableOpacity
-                    key={goal.id}
-                    style={styles.goalCard}
-                    onPress={() => {
-                      setSelectedGoal(goal);
-                      setShowGoalModal(true);
-                    }}
-                  >
-                    <View style={styles.goalHeader}>
-                      <View style={styles.goalInfo}>
-                        <Text style={styles.goalName}>{goal.name}</Text>
-                        {goal.description && (
-                          <Text style={styles.goalDescription} numberOfLines={1}>
-                            {goal.description}
-                          </Text>
-                        )}
-                      </View>
-                      <View style={styles.goalAmounts}>
-                        <Text style={styles.goalRemaining}>
-                          ${remaining.toFixed(2)} / ${goal.target_amount.toFixed(2)}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={styles.progressBarContainer}>
-                      <View
-                        style={[
-                          styles.progressBar,
-                          { width: `${Math.min(progress, 100)}%` },
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.progressText}>
-                      {progress.toFixed(0)}% funded
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
         </ScrollView>
 
         {/* Floating Action Button */}
@@ -459,6 +516,11 @@ export default function HomeScreen() {
         }}
         onSuccess={() => {
           loadFinancialGoals();
+          loadNextGoal();
+          setShowGoalModal(false);
+          setSelectedGoal(null);
+        }}
+      />
           setShowGoalModal(false);
           setSelectedGoal(null);
         }}
@@ -467,6 +529,8 @@ export default function HomeScreen() {
       <PendingEarningsModal
         visible={showPendingEarningsModal}
         onClose={() => setShowPendingEarningsModal(false)}
+        dailyEarningsGoal={dailyEarningsGoal}
+        onGoalUpdate={setDailyEarningsGoal}
       />
 
       <AgendaModal
@@ -542,7 +606,11 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   widgetEarnings: {
+    flexDirection: 'column',
     backgroundColor: '#2ecc71',
+  },
+  widgetBalance: {
+    backgroundColor: '#1abc9c',
   },
   widgetDaily: {
     backgroundColor: '#3498db',
@@ -556,21 +624,70 @@ const styles = StyleSheet.create({
   widgetLater: {
     backgroundColor: '#95a5a6',
   },
+  widgetGoal: {
+    backgroundColor: '#f39c12',
+  },
   widgetTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: 'white',
     marginTop: 8,
   },
+  earningsAmountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   widgetAmount: {
     fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
   },
+  widgetGoalText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+  widgetGoalLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 4,
+  },
   widgetCount: {
     fontSize: 20,
     fontWeight: 'bold',
     color: 'white',
+  },
+  goalWidgetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  goalDueText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.95)',
+    textTransform: 'uppercase',
+  },
+  goalWidgetName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+    marginTop: 8,
+  },
+  goalWidgetAmounts: {
+    marginTop: 4,
+  },
+  goalWidgetAmount: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  goalWidgetRemaining: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 2,
   },
   fabContainer: {
     position: 'absolute',
@@ -677,13 +794,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 40,
   },
-  balanceHeader: {
-    backgroundColor: '#3498db',
-    padding: 16,
-    // margin: 16,
-    // borderRadius: 12,
-    alignItems: 'center',
-  },
   goalsSection: {
     backgroundColor: '#f8f9fa',
     padding: 16,
@@ -757,16 +867,5 @@ const styles = StyleSheet.create({
     color: '#95a5a6',
     marginTop: 4,
     textAlign: 'right',
-  },
-  balanceLabel: {
-    fontSize: 14,
-    color: '#fff',
-    marginBottom: 4,
-    fontWeight: '500',
-  },
-  balanceAmount: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
   },
 });
