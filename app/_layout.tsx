@@ -38,7 +38,7 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#3498db' }}>
         <AuthProvider>
           <BillsProvider>
             <DepositsProvider>

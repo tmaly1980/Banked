@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useIncome } from '@/contexts/IncomeContext';
 import { IncomeSource } from '@/types';
 import { supabase } from '@/lib/supabase';
-import Calculator from '@/components/Calculator';
+import SessionTimer from '@/components/SessionTimer';
 import BottomSheetModal from './BottomSheetModal';
 
 interface PendingEarningsModalProps {
@@ -19,26 +19,37 @@ interface PendingEarningsModalProps {
   onClose: () => void;
   dailyEarningsGoal: number;
   onGoalUpdate: (newGoal: number) => void;
+  onOpenDetails?: (source: IncomeSource) => void;
 }
 
-export default function PendingEarningsModal({ visible, onClose, dailyEarningsGoal, onGoalUpdate }: PendingEarningsModalProps) {
+export default function PendingEarningsModal({ visible, onClose, dailyEarningsGoal, onGoalUpdate, onOpenDetails }: PendingEarningsModalProps) {
   const { incomeSources, updateIncomeSource } = useIncome();
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalValue, setGoalValue] = useState('');
-  const [showCalculator, setShowCalculator] = useState(false);
-  const [calculatorSource, setCalculatorSource] = useState<IncomeSource | null>(null);
+  const [editingValues, setEditingValues] = useState<Record<string, string>>({});
 
-  const handleOpenCalculator = (source: IncomeSource) => {
-    setCalculatorSource(source);
-    setShowCalculator(true);
+  const handleOpenDetails = (source: IncomeSource) => {
+    if (onOpenDetails) {
+      onOpenDetails(source);
+    }
   };
 
-  const handleCalculatorConfirm = async (value: number) => {
-    if (!calculatorSource) return;
+  const handleAmountChange = (sourceId: string, value: string) => {
+    setEditingValues(prev => ({ ...prev, [sourceId]: value }));
+  };
+
+  const handleAmountSave = async (source: IncomeSource) => {
+    const value = editingValues[source.id];
+    if (value === undefined) return;
     
+    const newAmount = parseFloat(value) || 0;
     try {
-      await updateIncomeSource(calculatorSource.id, { pending_earnings: value });
-      setCalculatorSource(null);
+      await updateIncomeSource(source.id, { pending_earnings: newAmount });
+      setEditingValues(prev => {
+        const updated = { ...prev };
+        delete updated[source.id];
+        return updated;
+      });
     } catch (err) {
       console.error('Error updating pending earnings:', err);
       alert('Failed to update earnings');
@@ -84,17 +95,31 @@ export default function PendingEarningsModal({ visible, onClose, dailyEarningsGo
   const renderIncomeSource = ({ item }: { item: IncomeSource }) => {
     return (
       <View style={styles.sourceRow}>
-        <View style={styles.sourceInfo}>
+        <TouchableOpacity
+          style={styles.sourceInfo}
+          onPress={() => handleOpenDetails(item)}
+        >
           <Text style={styles.sourceName}>{item.name}</Text>
           <Text style={styles.sourceFrequency}>{item.frequency}</Text>
-        </View>
-        
-        <TouchableOpacity
-          style={styles.amountContainer}
-          onPress={() => handleOpenCalculator(item)}
-        >
-          <Text style={styles.amount}>${item.pending_earnings.toFixed(2)}</Text>
         </TouchableOpacity>
+        
+        <SessionTimer
+          incomeSourceId={item.id}
+          incomeSourceName={item.name}
+        />
+        
+        <View style={styles.amountInputContainer}>
+          <Text style={styles.dollarSign}>$</Text>
+          <TextInput
+            style={styles.amountInput}
+            value={editingValues[item.id] !== undefined ? editingValues[item.id] : item.pending_earnings.toFixed(2)}
+            onChangeText={(value) => handleAmountChange(item.id, value)}
+            onSubmitEditing={() => handleAmountSave(item)}
+            onBlur={() => handleAmountSave(item)}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+          />
+        </View>
       </View>
     );
   };
@@ -154,17 +179,6 @@ export default function PendingEarningsModal({ visible, onClose, dailyEarningsGo
           }
         />
       </BottomSheetModal>
-
-      <Calculator
-        visible={showCalculator}
-        onClose={() => {
-          setShowCalculator(false);
-          setCalculatorSource(null);
-        }}
-        initialValue={calculatorSource?.pending_earnings || 0}
-        onConfirm={handleCalculatorConfirm}
-        title={calculatorSource?.name || "Pending Earnings"}
-      />
     </>
   );
 }
@@ -235,29 +249,23 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     textTransform: 'capitalize',
   },
-  amountActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  amountContainer: {
+  amountInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: 4,
     backgroundColor: '#f8f9fa',
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dfe6e9',
   },
-  calculatorButton: {
-    padding: 8,
-    backgroundColor: '#e3f2fd',
-    borderRadius: 8,
-  },
-  amount: {
+  amountInput: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2ecc71',
-    marginRight: 8,
+    minWidth: 80,
+    textAlign: 'right',
+    paddingVertical: 4,
   },
   editIcon: {
     marginLeft: 4,
@@ -265,6 +273,24 @@ const styles = StyleSheet.create({
   editContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  dollarSign: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginRight: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#3498db',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    minWidth: 100,
+    textAlign: 'right',
   },
   editInput: {
     borderWidth: 1,

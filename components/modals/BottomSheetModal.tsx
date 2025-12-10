@@ -38,20 +38,19 @@ export default function BottomSheetModal({
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <TouchableOpacity
           style={styles.modalBackdrop}
           activeOpacity={1}
           onPress={onClose}
         />
-        <KeyboardAvoidingView
-          style={styles.modalSheet}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-        >
+        <View style={styles.modalSheet}>
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={onClose}>
-              <Text style={styles.cancelButton}>{cancelText}</Text>
+              <Text style={styles.cancelButton}>{onSave ? cancelText : 'Close'}</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>{title}</Text>
             {onSave ? (
@@ -65,8 +64,8 @@ export default function BottomSheetModal({
             )}
           </View>
           {children}
-        </KeyboardAvoidingView>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -75,6 +74,7 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalBackdrop: {
     position: 'absolute',
@@ -82,13 +82,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalSheet: {
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '80%',
+    paddingBottom: Platform.OS === 'ios' ? 34 : 0,
   },
   modalHeader: {
     flexDirection: 'row',

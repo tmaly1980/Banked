@@ -20,11 +20,13 @@ import AccountBalanceModal from '@/components/modals/AccountBalanceModal';
 import FinancialGoalFormModal from '@/components/modals/FinancialGoalFormModal';
 import AgendaModal from '@/components/modals/AgendaModal';
 import PendingEarningsModal from '@/components/modals/PendingEarningsModal';
+import WeeklyGoalsModal from '@/components/modals/WeeklyGoalsModal';
+import IncomeSourceDetailsModal from '@/components/modals/IncomeSourceDetailsModal';
 import { useBills } from '@/contexts/BillsContext';
 import { useIncome } from '@/contexts/IncomeContext';
 import { BillModel } from '@/models/BillModel';
 import { FinancialGoal } from '@/types';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isToday, isSameDay, differenceInDays, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isToday, isSameDay, differenceInDays, parseISO, startOfDay } from 'date-fns';
 import AnimatedNumber from '@/components/AnimatedNumber';
 
 type AgendaView = 'daily' | 'weekly' | 'monthly' | 'later';
@@ -47,6 +49,9 @@ export default function HomeScreen() {
   const [selectedGoal, setSelectedGoal] = useState<FinancialGoal | null>(null);
   const [financialGoals, setFinancialGoals] = useState<FinancialGoal[]>([]);
   const [showPendingEarningsModal, setShowPendingEarningsModal] = useState(false);
+  const [showWeeklyGoalsModal, setShowWeeklyGoalsModal] = useState(false);
+  const [showIncomeSourceDetailsModal, setShowIncomeSourceDetailsModal] = useState(false);
+  const [selectedIncomeSource, setSelectedIncomeSource] = useState<any>(null);
   const [nextGoal, setNextGoal] = useState<FinancialGoal | null>(null);
   const [dailyEarningsGoal, setDailyEarningsGoal] = useState<number>(0);
 
@@ -66,10 +71,49 @@ export default function HomeScreen() {
 
       if (data) {
         setAccountBalance(data.account_balance);
-        setDailyEarningsGoal(data.daily_earnings_goal || 0);
       }
+
+      // Load daily goal from weekly_income_goals based on current day
+      await loadDailyGoalFromWeekly();
     } catch (err) {
       console.error('Error loading account balance:', err);
+    }
+  };
+
+  const loadDailyGoalFromWeekly = async () => {
+    if (!user) return;
+
+    try {
+      const today = new Date();
+      const dayName = format(today, 'EEEE').toLowerCase(); // "sunday", "monday", etc.
+      const year = today.getFullYear();
+      const weekStart = startOfWeek(today, { weekStartsOn: 0 });
+      const oneJan = new Date(year, 0, 1);
+      const numberOfDays = Math.floor((weekStart.getTime() - oneJan.getTime()) / (24 * 60 * 60 * 1000));
+      const weekNumber = Math.ceil((numberOfDays + oneJan.getDay() + 1) / 7);
+      const currentYearWeek = `${year}-W${String(weekNumber).padStart(2, '0')}`;
+
+      const { data, error } = await supabase
+        .from('weekly_income_goals')
+        .select('*')
+        .eq('user_id', user.id)
+        .or(`ending_year_week.is.null,ending_year_week.eq.${currentYearWeek}`)
+        .order('starting_year_week', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading weekly goal:', error);
+      }
+
+      if (data) {
+        const dailyFieldName = `${dayName}_income`;
+        setDailyEarningsGoal(data[dailyFieldName] || 0);
+      } else {
+        setDailyEarningsGoal(0);
+      }
+    } catch (err) {
+      console.error('Error loading daily goal from weekly:', err);
     }
   };
 
@@ -199,7 +243,9 @@ export default function HomeScreen() {
 
   const getDaysUntilGoal = () => {
     if (!nextGoal?.due_date) return 0;
-    return differenceInDays(parseISO(nextGoal.due_date), new Date());
+    const today = startOfDay(new Date());
+    const dueDate = startOfDay(parseISO(nextGoal.due_date));
+    return differenceInDays(dueDate, today);
   };
 
   const getAgendaBills = () => {
@@ -460,6 +506,21 @@ export default function HomeScreen() {
                   <Ionicons name="flag" size={24} color="white" />
                 </View>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.fabOption}
+                onPress={() => {
+                  setShowWeeklyGoalsModal(true);
+                  setFabOpen(false);
+                }}
+              >
+                <View style={styles.fabLabel}>
+                  <Text style={styles.fabLabelText}>Set Weekly Income Goals</Text>
+                </View>
+                <View style={styles.fabOptionButton}>
+                  <Ionicons name="calendar" size={24} color="white" />
+                </View>
+              </TouchableOpacity>
             </>
           )}
 
@@ -521,16 +582,28 @@ export default function HomeScreen() {
           setSelectedGoal(null);
         }}
       />
-          setShowGoalModal(false);
-          setSelectedGoal(null);
-        }}
-      />
 
       <PendingEarningsModal
         visible={showPendingEarningsModal}
         onClose={() => setShowPendingEarningsModal(false)}
         dailyEarningsGoal={dailyEarningsGoal}
         onGoalUpdate={setDailyEarningsGoal}
+        onOpenDetails={(source) => {
+          setSelectedIncomeSource(source);
+          setShowIncomeSourceDetailsModal(true);
+        }}
+      />
+
+      <IncomeSourceDetailsModal
+        visible={showIncomeSourceDetailsModal}
+        onClose={() => {
+          setShowIncomeSourceDetailsModal(false);
+          setSelectedIncomeSource(null);
+        }}
+        incomeSource={selectedIncomeSource}
+        onUpdate={() => {
+          loadAccountBalance();
+        }}
       />
 
       <AgendaModal
@@ -539,6 +612,15 @@ export default function HomeScreen() {
         title={getAgendaTitle()}
         bills={getAgendaBills()}
         onBillClick={handleBillClick}
+      />
+
+      <WeeklyGoalsModal
+        visible={showWeeklyGoalsModal}
+        onClose={() => setShowWeeklyGoalsModal(false)}
+        onSuccess={() => {
+          loadAccountBalance();
+          setShowWeeklyGoalsModal(false);
+        }}
       />
 
       {/* Temporary Expense Modal - placeholder */}
