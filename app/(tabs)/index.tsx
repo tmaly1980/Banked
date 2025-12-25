@@ -18,9 +18,11 @@ import DepositFormModal from '@/components/modals/DepositFormModal';
 import BillDetailsModal from '@/components/modals/BillDetailsModal';
 import AccountBalanceModal from '@/components/modals/AccountBalanceModal';
 import FinancialGoalFormModal from '@/components/modals/FinancialGoalFormModal';
+import FinancialGoalDetailsModal from '@/components/modals/FinancialGoalDetailsModal';
 import AgendaModal from '@/components/modals/AgendaModal';
 import PendingEarningsModal from '@/components/modals/PendingEarningsModal';
 import WeeklyGoalsModal from '@/components/modals/WeeklyGoalsModal';
+import WeeklyEarningsModal from '@/components/modals/WeeklyEarningsModal';
 import IncomeSourceDetailsModal from '@/components/modals/IncomeSourceDetailsModal';
 import { useBills } from '@/contexts/BillsContext';
 import { useIncome } from '@/contexts/IncomeContext';
@@ -35,7 +37,10 @@ export default function HomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { bills, loadBills } = useBills();
-  const { getTotalPendingEarnings } = useIncome();
+  const { getTotalPendingEarnings, getTotalDailyEarnings } = useIncome();
+  const [dailyEarnings, setDailyEarnings] = useState<number>(0);
+  const [weeklyEarnings, setWeeklyEarnings] = useState<number>(0);
+  const [weeklyGoal, setWeeklyGoal] = useState<number>(0);
   const [activeAgenda, setActiveAgenda] = useState<AgendaView | null>(null);
   const [fabOpen, setFabOpen] = useState(false);
   const [accountBalance, setAccountBalance] = useState<number | null>(null);
@@ -46,10 +51,12 @@ export default function HomeScreen() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedBill, setSelectedBill] = useState<BillModel | null>(null);
   const [showGoalModal, setShowGoalModal] = useState(false);
+  const [showGoalDetailsModal, setShowGoalDetailsModal] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<FinancialGoal | null>(null);
   const [financialGoals, setFinancialGoals] = useState<FinancialGoal[]>([]);
   const [showPendingEarningsModal, setShowPendingEarningsModal] = useState(false);
   const [showWeeklyGoalsModal, setShowWeeklyGoalsModal] = useState(false);
+  const [showWeeklyEarningsModal, setShowWeeklyEarningsModal] = useState(false);
   const [showIncomeSourceDetailsModal, setShowIncomeSourceDetailsModal] = useState(false);
   const [selectedIncomeSource, setSelectedIncomeSource] = useState<any>(null);
   const [nextGoal, setNextGoal] = useState<FinancialGoal | null>(null);
@@ -117,6 +124,48 @@ export default function HomeScreen() {
     }
   };
 
+  const loadDailyEarnings = async () => {
+    const total = await getTotalDailyEarnings();
+    setDailyEarnings(total);
+  };
+
+  const loadWeeklyEarnings = async () => {
+    if (!user) return;
+
+    try {
+      const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
+      const weekEnd = endOfWeek(new Date(), { weekStartsOn: 0 });
+      
+      const { data, error } = await supabase
+        .from('income_source_daily_earnings')
+        .select('earnings_amount')
+        .eq('user_id', user.id)
+        .gte('date', format(weekStart, 'yyyy-MM-dd'))
+        .lte('date', format(weekEnd, 'yyyy-MM-dd'));
+
+      if (error) throw error;
+
+      const total = data?.reduce((sum, record) => sum + record.earnings_amount, 0) || 0;
+      setWeeklyEarnings(total);
+
+      // Load weekly goal
+      const currentYearWeek = format(weekStart, 'yyyy') + '-W' + format(weekStart, 'ww');
+      const { data: goalData } = await supabase
+        .from('weekly_income_goals')
+        .select('total_income')
+        .eq('user_id', user.id)
+        .or(`ending_year_week.is.null,ending_year_week.gte.${currentYearWeek}`)
+        .lte('starting_year_week', currentYearWeek)
+        .order('starting_year_week', { ascending: false })
+        .limit(1)
+        .single();
+
+      setWeeklyGoal(goalData?.total_income || 0);
+    } catch (err) {
+      console.error('Error loading weekly earnings:', err);
+    }
+  };
+
   const loadFinancialGoals = async () => {
     if (!user) return;
 
@@ -168,6 +217,8 @@ export default function HomeScreen() {
     loadAccountBalance();
     loadFinancialGoals();
     loadNextGoal();
+    loadDailyEarnings();
+    loadWeeklyEarnings();
   }, []);
 
   const getDailyBills = () => {
@@ -299,9 +350,14 @@ export default function HomeScreen() {
         <TabScreenHeader
           title="Home"
           rightContent={
-            <TouchableOpacity onPress={() => router.push('/settings')}>
-              <Ionicons name="settings" size={24} color="white" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <TouchableOpacity onPress={() => router.push('/goals')}>
+                <Ionicons name="flag" size={24} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push('/settings')}>
+                <Ionicons name="settings" size={24} color="white" />
+              </TouchableOpacity>
+            </View>
           }
         />
 
@@ -325,16 +381,16 @@ export default function HomeScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Pending Earnings Widget */}
+            {/* Daily Earnings Widget */}
             <TouchableOpacity
               style={[styles.widget, styles.widgetEarnings]}
               onPress={() => setShowPendingEarningsModal(true)}
             >
               <Ionicons name="cash" size={32} color="white" />
-              <Text style={styles.widgetTitle}>Pending Earnings</Text>
+              <Text style={styles.widgetTitle}>Daily Earnings</Text>
               <View style={styles.earningsAmountRow}>
                 <AnimatedNumber
-                  value={getTotalPendingEarnings()}
+                  value={dailyEarnings}
                   style={styles.widgetAmount}
                   prefix="$"
                   decimals={0}
@@ -354,7 +410,7 @@ export default function HomeScreen() {
               {dailyEarningsGoal > 0 && (
                 <Text style={styles.widgetGoalLabel}>
                   <AnimatedNumber
-                    value={Math.max(0, dailyEarningsGoal - getTotalPendingEarnings())}
+                    value={Math.max(0, dailyEarningsGoal - dailyEarnings)}
                     style={styles.widgetGoalText}
                     prefix="$"
                     suffix=" To Go"
@@ -364,13 +420,41 @@ export default function HomeScreen() {
               )}
             </TouchableOpacity>
 
+            {/* Weekly Earnings Widget */}
+            <TouchableOpacity
+              style={[styles.widget, styles.widgetWeekly]}
+              onPress={() => setShowWeeklyEarningsModal(true)}
+            >
+              <Ionicons name="calendar" size={32} color="white" />
+              <Text style={styles.widgetTitle}>Weekly Earnings</Text>
+              <View style={styles.earningsAmountRow}>
+                <AnimatedNumber
+                  value={weeklyEarnings}
+                  style={styles.widgetAmount}
+                  prefix="$"
+                  decimals={0}
+                />
+                {weeklyGoal > 0 && (
+                  <>
+                    <Text style={styles.widgetAmount}> / </Text>
+                    <AnimatedNumber
+                      value={weeklyGoal}
+                      style={styles.widgetAmount}
+                      prefix="$"
+                      decimals={0}
+                    />
+                  </>
+                )}
+              </View>
+            </TouchableOpacity>
+
             {/* Next Financial Goal Widget */}
             {nextGoal && (
               <TouchableOpacity
                 style={[styles.widget, styles.widgetGoal]}
                 onPress={() => {
                   setSelectedGoal(nextGoal);
-                  setShowGoalModal(true);
+                  setShowGoalDetailsModal(true);
                 }}
               >
                 <View style={styles.goalWidgetHeader}>
@@ -583,6 +667,19 @@ export default function HomeScreen() {
         }}
       />
 
+      <FinancialGoalDetailsModal
+        visible={showGoalDetailsModal}
+        goal={selectedGoal}
+        onClose={() => {
+          setShowGoalDetailsModal(false);
+          setSelectedGoal(null);
+        }}
+        onUpdate={() => {
+          loadFinancialGoals();
+          loadNextGoal();
+        }}
+      />
+
       <PendingEarningsModal
         visible={showPendingEarningsModal}
         onClose={() => setShowPendingEarningsModal(false)}
@@ -620,6 +717,14 @@ export default function HomeScreen() {
         onSuccess={() => {
           loadAccountBalance();
           setShowWeeklyGoalsModal(false);
+        }}
+      />
+
+      <WeeklyEarningsModal
+        visible={showWeeklyEarningsModal}
+        onClose={() => {
+          setShowWeeklyEarningsModal(false);
+          loadWeeklyEarnings(); // Refresh data after closing
         }}
       />
 

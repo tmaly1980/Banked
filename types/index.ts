@@ -175,7 +175,9 @@ export interface FinancialGoal {
   due_month?: string; // Format: YYYY-MM
   due_week?: string; // Format: YYYY-Www
   bill_id?: string;
-  status: 'active' | 'completed' | 'cancelled';
+  status: 'pending' | 'paid' | 'active' | 'completed' | 'cancelled';
+  paid_at?: string;
+  paid_amount?: number;
   sort_order: number;
   created_at: string;
   updated_at: string;

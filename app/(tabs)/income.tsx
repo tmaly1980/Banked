@@ -84,7 +84,7 @@ export default function IncomeScreen() {
 
       {totalPendingEarnings > 0 && (
         <View style={styles.totalCard}>
-          <Text style={styles.totalLabel}>Total Pending Earnings</Text>
+          <Text style={styles.totalLabel}>Total Daily Earnings</Text>
           <Text style={styles.totalAmount}>${totalPendingEarnings.toFixed(2)}</Text>
         </View>
       )}

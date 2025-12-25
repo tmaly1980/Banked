@@ -140,7 +140,7 @@ export default function IncomeSourceFormModal({ visible, onClose, incomeSource }
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Pending Earnings</Text>
+              <Text style={styles.label}>Daily Earnings</Text>
               <TextInput
                 style={styles.input}
                 value={pendingEarnings}

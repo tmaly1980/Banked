@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 import { IncomeSource } from '@/types';
+import { format } from 'date-fns';
 
 interface IncomeContextType {
   incomeSources: IncomeSource[];
@@ -10,6 +11,7 @@ interface IncomeContextType {
   updateIncomeSource: (id: string, updates: Partial<Omit<IncomeSource, 'id' | 'user_id' | 'created_at' | 'updated_at'>>) => Promise<void>;
   deleteIncomeSource: (id: string) => Promise<void>;
   getTotalPendingEarnings: () => number;
+  getTotalDailyEarnings: () => Promise<number>;
 }
 
 const IncomeContext = createContext<IncomeContextType | undefined>(undefined);
@@ -91,6 +93,26 @@ export function IncomeProvider({ children }: { children: ReactNode }) {
     return incomeSources.reduce((sum, source) => sum + (source.pending_earnings || 0), 0);
   };
 
+  const getTotalDailyEarnings = async (): Promise<number> => {
+    if (!user) return 0;
+
+    try {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const { data, error } = await supabase
+        .from('income_source_daily_earnings')
+        .select('earnings_amount')
+        .eq('user_id', user.id)
+        .eq('date', today);
+
+      if (error) throw error;
+
+      return data?.reduce((sum, record) => sum + record.earnings_amount, 0) || 0;
+    } catch (err) {
+      console.error('Error getting total daily earnings:', err);
+      return 0;
+    }
+  };
+
   useEffect(() => {
     loadIncomeSources();
   }, [user]);
@@ -104,6 +126,7 @@ export function IncomeProvider({ children }: { children: ReactNode }) {
         updateIncomeSource,
         deleteIncomeSource,
         getTotalPendingEarnings,
+        getTotalDailyEarnings,
       }}
     >
       {children}

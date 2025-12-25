@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useIncome } from '@/contexts/IncomeContext';
 import { IncomeSource } from '@/types';
 import { supabase } from '@/lib/supabase';
+import { format } from 'date-fns';
 import SessionTimer from '@/components/SessionTimer';
 import BottomSheetModal from './BottomSheetModal';
 
@@ -23,10 +24,79 @@ interface PendingEarningsModalProps {
 }
 
 export default function PendingEarningsModal({ visible, onClose, dailyEarningsGoal, onGoalUpdate, onOpenDetails }: PendingEarningsModalProps) {
-  const { incomeSources, updateIncomeSource } = useIncome();
+  const { incomeSources } = useIncome();
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalValue, setGoalValue] = useState('');
   const [editingValues, setEditingValues] = useState<Record<string, string>>({});
+  const [dailyEarnings, setDailyEarnings] = useState<Record<string, number>>({});
+  const today = format(new Date(), 'yyyy-MM-dd');
+
+  // Load today's earnings for all income sources
+  useEffect(() => {
+    if (visible) {
+      loadTodayEarnings();
+    }
+  }, [visible, incomeSources]);
+
+  const loadTodayEarnings = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('income_source_daily_earnings')
+        .select('income_source_id, earnings_amount')
+        .eq('user_id', user.id)
+        .eq('date', today);
+
+      if (error) throw error;
+
+      // Build earnings map
+      const earningsMap: Record<string, number> = {};
+      data?.forEach(record => {
+        earningsMap[record.income_source_id] = record.earnings_amount;
+      });
+      setDailyEarnings(earningsMap);
+    } catch (err) {
+      console.error('Error loading today\'s earnings:', err);
+    }
+  };
+
+  const handleAmountSave = async (source: IncomeSource) => {
+    const value = editingValues[source.id];
+    if (value === undefined) return;
+    
+    const newAmount = parseFloat(value) || 0;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Upsert into income_source_daily_earnings
+      const { error } = await supabase
+        .from('income_source_daily_earnings')
+        .upsert({
+          user_id: user.id,
+          income_source_id: source.id,
+          date: today,
+          earnings_amount: newAmount,
+        }, {
+          onConflict: 'user_id,income_source_id,date'
+        });
+
+      if (error) throw error;
+
+      // Update local state
+      setDailyEarnings(prev => ({ ...prev, [source.id]: newAmount }));
+      setEditingValues(prev => {
+        const updated = { ...prev };
+        delete updated[source.id];
+        return updated;
+      });
+    } catch (err) {
+      console.error('Error updating daily earnings:', err);
+      alert('Failed to update earnings');
+    }
+  };
 
   const handleOpenDetails = (source: IncomeSource) => {
     if (onOpenDetails) {
@@ -36,24 +106,6 @@ export default function PendingEarningsModal({ visible, onClose, dailyEarningsGo
 
   const handleAmountChange = (sourceId: string, value: string) => {
     setEditingValues(prev => ({ ...prev, [sourceId]: value }));
-  };
-
-  const handleAmountSave = async (source: IncomeSource) => {
-    const value = editingValues[source.id];
-    if (value === undefined) return;
-    
-    const newAmount = parseFloat(value) || 0;
-    try {
-      await updateIncomeSource(source.id, { pending_earnings: newAmount });
-      setEditingValues(prev => {
-        const updated = { ...prev };
-        delete updated[source.id];
-        return updated;
-      });
-    } catch (err) {
-      console.error('Error updating pending earnings:', err);
-      alert('Failed to update earnings');
-    }
   };
 
   const handleStartGoalEdit = () => {
@@ -87,12 +139,14 @@ export default function PendingEarningsModal({ visible, onClose, dailyEarningsGo
     setGoalValue('');
   };
 
-  const totalPendingEarnings = incomeSources.reduce(
-    (sum, source) => sum + source.pending_earnings,
+  const totalDailyEarnings = incomeSources.reduce(
+    (sum, source) => sum + (dailyEarnings[source.id] || 0),
     0
   );
 
   const renderIncomeSource = ({ item }: { item: IncomeSource }) => {
+    const currentEarnings = dailyEarnings[item.id] || 0;
+    
     return (
       <View style={styles.sourceRow}>
         <TouchableOpacity
@@ -112,7 +166,7 @@ export default function PendingEarningsModal({ visible, onClose, dailyEarningsGo
           <Text style={styles.dollarSign}>$</Text>
           <TextInput
             style={styles.amountInput}
-            value={editingValues[item.id] !== undefined ? editingValues[item.id] : item.pending_earnings.toFixed(2)}
+            value={editingValues[item.id] !== undefined ? editingValues[item.id] : currentEarnings.toFixed(2)}
             onChangeText={(value) => handleAmountChange(item.id, value)}
             onSubmitEditing={() => handleAmountSave(item)}
             onBlur={() => handleAmountSave(item)}
@@ -129,11 +183,11 @@ export default function PendingEarningsModal({ visible, onClose, dailyEarningsGo
       <BottomSheetModal
         visible={visible}
         onClose={onClose}
-        title="Pending Earnings"
+        title="Daily Earnings"
       >
         <View style={styles.totalSection}>
-          <Text style={styles.totalLabel}>Total Pending</Text>
-          <Text style={styles.totalAmount}>${totalPendingEarnings.toFixed(2)}</Text>
+          <Text style={styles.totalLabel}>Total Today</Text>
+          <Text style={styles.totalAmount}>${totalDailyEarnings.toFixed(2)}</Text>
         </View>
 
         <View style={styles.goalSection}>
@@ -323,3 +377,4 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
+

@@ -41,7 +41,7 @@ export default function FinancialGoalFormModal({
   const [dueWeek, setDueWeek] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
-  const [status, setStatus] = useState<'active' | 'completed' | 'cancelled'>('active');
+  const [status, setStatus] = useState<'pending' | 'paid' | 'active' | 'completed' | 'cancelled'>('pending');
   const [billSuggestions, setBillSuggestions] = useState<BillSuggestion[]>([]);
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [showWeekPicker, setShowWeekPicker] = useState(false);
@@ -183,7 +183,7 @@ export default function FinancialGoalFormModal({
     setDueWeek('');
     setDueDate('');
     setSelectedBillId(null);
-    setStatus('active');
+    setStatus('pending');
     setBillSuggestions([]);
   };
 
@@ -445,7 +445,7 @@ export default function FinancialGoalFormModal({
             <View style={styles.field}>
               <Text style={styles.label}>Status</Text>
               <View style={styles.statusButtons}>
-                {['active', 'completed', 'cancelled'].map((s) => (
+                {['pending', 'paid', 'active', 'completed', 'cancelled'].map((s) => (
                   <TouchableOpacity
                     key={s}
                     style={[

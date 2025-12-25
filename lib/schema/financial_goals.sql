@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS financial_goals (
   due_month TEXT, -- Format: YYYY-MM
   due_week TEXT, -- Format: YYYY-Www (ISO week)
   bill_id UUID REFERENCES bills(id) ON DELETE SET NULL,
-  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'active', 'completed', 'cancelled')),
+  paid_at TIMESTAMP WITH TIME ZONE,
+  paid_amount DECIMAL(10, 2),
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
