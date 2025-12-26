@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,133 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import TabScreenHeader from '@/components/TabScreenHeader';
+import WeekSummary from '@/components/WeekSummary';
+import { useBills } from '@/contexts/BillsContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { formatDollar } from '@/lib/utils';
+import { BillModel } from '@/models/BillModel';
+import { startOfWeek, endOfWeek, addWeeks, isWithinInterval, format, parseISO } from 'date-fns';
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { bills } = useBills();
+  const { user } = useAuth();
+  const [todayIncome, setTodayIncome] = useState(0);
+  const [thisWeekIncome, setThisWeekIncome] = useState(0);
+  const [nextWeekIncome, setNextWeekIncome] = useState(0);
+  const [todayIncomeData, setTodayIncomeData] = useState<any[]>([]);
+  const [thisWeekIncomeData, setThisWeekIncomeData] = useState<any[]>([]);
+  const [nextWeekIncomeData, setNextWeekIncomeData] = useState<any[]>([]);
+  const [expandedPeriod, setExpandedPeriod] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadIncome = async () => {
+      if (!user) return;
+
+      const today = new Date();
+      const thisWeekEnd = endOfWeek(today, { weekStartsOn: 0 });
+      const nextWeekStart = addWeeks(startOfWeek(today, { weekStartsOn: 0 }), 1);
+      const nextWeekEnd = endOfWeek(nextWeekStart, { weekStartsOn: 0 });
+
+      const { data: incomeData, error } = await supabase.rpc('generate_daily_income', {
+        p_user_id: user.id,
+        p_start_date: format(today, 'yyyy-MM-dd'),
+        p_end_date: format(nextWeekEnd, 'yyyy-MM-dd'),
+      });
+
+      if (!error && incomeData) {
+        let todayTotal = 0;
+        let thisWeek = 0;
+        let nextWeek = 0;
+        const todayData: any[] = [];
+        const thisWeekData: any[] = [];
+        const nextWeekData: any[] = [];
+
+        incomeData.forEach((item: any) => {
+          const incomeDate = parseISO(item.income_date);
+          const amount = parseFloat(item.amount);
+
+          if (format(incomeDate, 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')) {
+            todayTotal += amount;
+            todayData.push(item);
+          }
+
+          if (isWithinInterval(incomeDate, { start: today, end: thisWeekEnd })) {
+            thisWeek += amount;
+            thisWeekData.push(item);
+          } else if (isWithinInterval(incomeDate, { start: nextWeekStart, end: nextWeekEnd })) {
+            nextWeek += amount;
+            nextWeekData.push(item);
+          }
+        });
+
+        setTodayIncome(todayTotal);
+        setThisWeekIncome(thisWeek);
+        setNextWeekIncome(nextWeek);
+        setTodayIncomeData(todayData);
+        setThisWeekIncomeData(thisWeekData);
+        setNextWeekIncomeData(nextWeekData);
+      }
+    };
+
+    loadIncome();
+  }, [user]);
+
+  const togglePeriod = (period: string) => {
+    setExpandedPeriod(expandedPeriod === period ? null : period);
+  };
+
+  const { thisWeekBills, nextWeekBills, thisWeekTotal, nextWeekTotal, todayBills, todayTotal } = useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    const thisWeekEnd = endOfWeek(today, { weekStartsOn: 0 }); // Sunday
+    const nextWeekStart = addWeeks(startOfWeek(today, { weekStartsOn: 0 }), 1);
+    const nextWeekEnd = endOfWeek(nextWeekStart, { weekStartsOn: 0 });
+
+    const todayList: BillModel[] = [];
+    const thisWeek: BillModel[] = [];
+    const nextWeek: BillModel[] = [];
+    let todaySum = 0;
+    let thisTotal = 0;
+    let nextTotal = 0;
+
+    bills.forEach(bill => {
+      if (!bill.next_due_date || bill.deferred_flag) return;
+
+      const dueDate = parseISO(bill.next_due_date);
+      
+      // Calculate bill amount
+      let amount: number;
+      if (bill.is_variable) {
+        amount = bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0;
+      } else {
+        amount = bill.remaining_amount || bill.amount || 0;
+      }
+
+      if (format(dueDate, 'yyyy-MM-dd') === todayStr) {
+        todayList.push(bill);
+        todaySum += amount;
+      }
+
+      if (isWithinInterval(dueDate, { start: today, end: thisWeekEnd })) {
+        thisWeek.push(bill);
+        thisTotal += amount;
+      } else if (isWithinInterval(dueDate, { start: nextWeekStart, end: nextWeekEnd })) {
+        nextWeek.push(bill);
+        nextTotal += amount;
+      }
+    });
+
+    return {
+      todayBills: todayList,
+      todayTotal: todaySum,
+      thisWeekBills: thisWeek,
+      nextWeekBills: nextWeek,
+      thisWeekTotal: thisTotal,
+      nextWeekTotal: nextTotal,
+    };
+  }, [bills]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -33,44 +157,37 @@ export default function HomeScreen() {
 
         <ScrollView style={styles.content}>
           {/* Today Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Today</Text>
-            <View style={styles.card}>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Expected Income</Text>
-                <Text style={styles.cardValue}>$0.00</Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Expected Expenses</Text>
-                <Text style={styles.cardValue}>$0.00</Text>
-              </View>
-              <View style={[styles.cardRow, styles.cardRowTotal]}>
-                <Text style={styles.cardLabelBold}>Net Income/Loss</Text>
-                <Text style={styles.cardValueBold}>$0.00</Text>
-              </View>
-            </View>
-          </View>
+          <WeekSummary
+            title="Today"
+            income={todayIncome}
+            bills={todayBills}
+            total={todayTotal}
+            incomeBreakdown={todayIncomeData}
+            isExpanded={expandedPeriod === 'today'}
+            onToggleExpand={() => togglePeriod('today')}
+          />
 
           {/* This Week Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>This Week</Text>
-            <View style={styles.card}>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Projected Income</Text>
-                <Text style={styles.cardValue}>$0.00</Text>
-              </View>
-              <View style={styles.cardRow}>
-                <Text style={styles.cardLabel}>Required Expenses</Text>
-                <Text style={styles.cardValue}>$0.00</Text>
-              </View>
-              <View style={[styles.cardRow, styles.cardRowTotal]}>
-                <View style={styles.statusContainer}>
-                  <Ionicons name="checkmark-circle" size={20} color="#2ecc71" />
-                  <Text style={styles.statusText}>On Track</Text>
-                </View>
-              </View>
-            </View>
-          </View>
+          <WeekSummary
+            title="This Week"
+            income={thisWeekIncome}
+            bills={thisWeekBills}
+            total={thisWeekTotal}
+            incomeBreakdown={thisWeekIncomeData}
+            isExpanded={expandedPeriod === 'thisWeek'}
+            onToggleExpand={() => togglePeriod('thisWeek')}
+          />
+
+          {/* Next Week Section */}
+          <WeekSummary
+            title="Next Week"
+            income={nextWeekIncome}
+            bills={nextWeekBills}
+            total={nextWeekTotal}
+            incomeBreakdown={nextWeekIncomeData}
+            isExpanded={expandedPeriod === 'nextWeek'}
+            onToggleExpand={() => togglePeriod('nextWeek')}
+          />
 
           {/* Next Big Bills Section */}
           <View style={styles.section}>
@@ -162,16 +279,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2c3e50',
   },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  statusText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2ecc71',
-  },
   billItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -183,7 +290,7 @@ const styles = StyleSheet.create({
   },
   billName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#2c3e50',
     marginBottom: 4,
   },
@@ -193,12 +300,12 @@ const styles = StyleSheet.create({
   },
   billAmount: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+    fontWeight: '600',
+    color: '#e74c3c',
   },
   divider: {
     height: 1,
     backgroundColor: '#ecf0f1',
-    marginVertical: 4,
+    marginVertical: 8,
   },
 });
