@@ -1,18 +1,22 @@
-import React from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import DateInput from '@/components/DateInput';
+import AmountInput from '@/components/AmountInput';
+import MonthYearInput from '@/components/MonthYearInput';
 import { BillModel } from '@/models/BillModel';
+import { format } from 'date-fns';
 
 interface PaymentFormProps {
   paymentAmount: string;
   paymentDate: string;
-  appliedDate: string;
+  appliedMonthYear: string;
   scheduledPaymentId: string | null;
   loading: boolean;
   buttonState: { text: string; color: string };
+  nextDueDate?: Date;
   onPaymentAmountChange: (amount: string) => void;
   onPaymentDateChange: (date: string) => void;
-  onAppliedDateChange: (date: string) => void;
+  onAppliedMonthYearChange: (monthYear: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
 }
@@ -20,74 +24,78 @@ interface PaymentFormProps {
 export default function PaymentForm({
   paymentAmount,
   paymentDate,
-  appliedDate,
+  appliedMonthYear,
   scheduledPaymentId,
   loading,
   buttonState,
+  nextDueDate,
   onPaymentAmountChange,
   onPaymentDateChange,
-  onAppliedDateChange,
+  onAppliedMonthYearChange,
   onSubmit,
   onCancel,
 }: PaymentFormProps) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>
-        {scheduledPaymentId ? 'Edit/Make Payment' : 'Make/Schedule Payment'}
-      </Text>
+    <>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>
+          {scheduledPaymentId ? 'Edit/Make Payment' : 'Make/Schedule Payment'}
+        </Text>
 
-      <View style={styles.inputGroup}>
-        <DateInput
-          label="Payment Date"
-          value={paymentDate}
-          onChangeDate={onPaymentDateChange}
+        <View style={styles.inputRow}>
+          <View style={styles.halfInputGroup}>
+            <Text style={styles.label}>Payment Amount</Text>
+            <AmountInput
+              value={paymentAmount}
+              onChangeText={onPaymentAmountChange}
+              placeholder="0.00"
+            />
+          </View>
+
+          <View style={styles.halfInputGroup}>
+            <DateInput
+              label="Payment Date"
+              value={paymentDate}
+              onChangeDate={onPaymentDateChange}
+            />
+          </View>
+        </View>
+
+        <MonthYearInput
+          label="Applied Month"
+          value={appliedMonthYear}
+          onChangeValue={onAppliedMonthYearChange}
+          preselectedDate={nextDueDate}
         />
       </View>
 
-      <View style={styles.inputGroup}>
-        <DateInput
-          label="Applied Date (Optional)"
-          value={appliedDate}
-          onChangeDate={onAppliedDateChange}
-        />
+      <View style={styles.fixedFooter}>
+        <View style={styles.formButtons}>
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={onCancel}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.submitButton, { backgroundColor: buttonState.color }, loading && styles.disabledButton]}
+            onPress={onSubmit}
+            disabled={loading}
+          >
+            <Text style={styles.submitButtonText}>
+              {loading ? 'Saving...' : buttonState.text}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Payment Amount</Text>
-        <TextInput
-          style={styles.input}
-          value={paymentAmount}
-          onChangeText={onPaymentAmountChange}
-          placeholder="0.00"
-          keyboardType="decimal-pad"
-        />
-      </View>
-
-      <View style={styles.formButtons}>
-        <TouchableOpacity
-          style={styles.cancelButton}
-          onPress={onCancel}
-        >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.submitButton, { backgroundColor: buttonState.color }, loading && styles.disabledButton]}
-          onPress={onSubmit}
-          disabled={loading}
-        >
-          <Text style={styles.submitButtonText}>
-            {loading ? 'Saving...' : buttonState.text}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   section: {
-    marginBottom: 24,
+    flex: 1,
   },
   sectionTitle: {
     fontSize: 18,
@@ -100,8 +108,18 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 16,
   },
-  inputGroup: {
+  halfInputGroup: {
     flex: 1,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  fixedFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+    paddingTop: 16,
+    paddingBottom: 8,
+    backgroundColor: '#fff',
   },
   label: {
     fontSize: 14,
@@ -120,7 +138,6 @@ const styles = StyleSheet.create({
   formButtons: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
   },
   cancelButton: {
     flex: 1,

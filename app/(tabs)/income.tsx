@@ -67,19 +67,19 @@ export default function IncomeScreen() {
         </View>
         <View style={styles.sourceEarnings}>
           <Text style={styles.earningsLabel}>Pending</Text>
-          <Text style={styles.earningsAmount}>${item.pending_earnings.toFixed(2)}</Text>
+          <Text style={styles.earningsAmount}>${(item.pending_earnings || 0).toFixed(2)}</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 
   const totalPendingEarnings = incomeSources.reduce(
-    (sum, source) => sum + source.pending_earnings,
+    (sum, source) => sum + (source.pending_earnings || 0),
     0
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <TabScreenHeader title="Income Sources" />
 
       {totalPendingEarnings > 0 && (

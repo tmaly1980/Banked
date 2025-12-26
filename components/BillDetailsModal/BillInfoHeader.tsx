@@ -1,10 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { BillModel } from '@/models/BillModel';
 import { BillPayment } from '@/types';
-import { getPriorityColor, getPriorityIcon, formatAmount, getDaysLateBadge } from '@/utils/paymentHelpers';
+import { formatAmount, getDaysLateBadge } from '@/utils/paymentHelpers';
 
 interface BillInfoHeaderProps {
   bill: BillModel;
@@ -12,7 +11,25 @@ interface BillInfoHeaderProps {
 }
 
 export default function BillInfoHeader({ bill, lastPayment }: BillInfoHeaderProps) {
-  const dueDate = bill.next_date;
+  // Parse next_due_date manually to avoid timezone issues
+  const nextDueDate = bill.next_due_date ? (() => {
+    const [year, month, day] = bill.next_due_date.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  })() : null;
+  
+  const isOverdue = bill.is_overdue;
+  
+  // Calculate days until due locally to avoid timezone issues
+  const daysUntilDue = nextDueDate ? (() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(nextDueDate);
+    due.setHours(0, 0, 0, 0);
+    const diffTime = today.getTime() - due.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  })() : null;
+  
   const lastPaymentDate = lastPayment ? lastPayment.payment_date : null;
   const daysLateBadge = lastPayment ? getDaysLateBadge(lastPayment, bill.due_day) : null;
 
@@ -23,45 +40,30 @@ export default function BillInfoHeader({ bill, lastPayment }: BillInfoHeaderProp
           <Text style={styles.billName}>{bill.name}</Text>
           <Text style={styles.billAmount}>{formatAmount(bill.amount)}</Text>
         </View>
-        <View style={styles.headerTags}>
-          <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(bill.priority) }]}>
-            <MaterialCommunityIcons 
-              name={getPriorityIcon(bill.priority)} 
-              size={14} 
-              color="white" 
-              style={styles.priorityIcon}
-            />
-            <Text style={styles.priorityText}>{bill.priority.toUpperCase()}</Text>
+        {bill.category_name && (
+          <View style={styles.categoryBadge}>
+            <Text style={styles.categoryText}>{bill.category_name}</Text>
           </View>
-          {bill.loss_risk_flag && (
-            <View style={styles.lossRiskBadge}>
-              <Text style={styles.lossRiskText}>⚠️ Loss Risk</Text>
-            </View>
-          )}
-        </View>
+        )}
       </View>
 
       <View style={styles.infoGrid}>
         <View style={styles.infoItem}>
-          <Text style={styles.infoLabel}>Due Date</Text>
-          <Text style={styles.infoValue}>
-            {dueDate ? format(dueDate, 'MMM d, yyyy') : 'No due date'}
+          <Text style={styles.infoLabel}>Next Due Date</Text>
+          <Text style={[styles.infoValue, isOverdue && styles.overdueText]}>
+            {nextDueDate ? format(nextDueDate, 'MMM d, yyyy') : 'No due date'}
           </Text>
-        </View>
-        
-        {lastPaymentDate && (
-          <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Last Payment</Text>
-            <Text style={styles.infoValue}>
-              {format(new Date(lastPaymentDate), 'MMM d, yyyy')}
+          {isOverdue && daysUntilDue !== null && (
+            <View style={styles.overdueBadge}>
+              <Text style={styles.overdueBadgeText}>{daysUntilDue} days overdue</Text>
+            </View>
+          )}
+          {!isOverdue && daysUntilDue !== null && daysUntilDue >= 0 && (
+            <Text style={styles.daysUntilText}>
+              {daysUntilDue === 0 ? 'Due today' : `Due in ${daysUntilDue} days`}
             </Text>
-            {daysLateBadge && (
-              <View style={[styles.daysLateBadge, { backgroundColor: daysLateBadge.color }]}>
-                <Text style={styles.daysLateBadgeText}>{daysLateBadge.days} days late</Text>
-              </View>
-            )}
-          </View>
-        )}
+          )}
+        </View>
       </View>
     </View>
   );
@@ -94,23 +96,23 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
     marginBottom: 4,
   },
-  lossRiskBadge: {
-    backgroundColor: '#fff3cd',
+  categoryBadge: {
+    backgroundColor: '#e8f4f8',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ffc107',
+    borderColor: '#3498db',
   },
-  lossRiskText: {
+  categoryText: {
     fontSize: 14,
-    color: '#856404',
+    color: '#2980b9',
     fontWeight: '600',
   },
   billAmount: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#e74c3c',
+    color: '#2c3e50',
     marginBottom: 16,
   },
   infoGrid: {
@@ -147,21 +149,26 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
   },
-  priorityBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    alignSelf: 'flex-end',
+  overdueText: {
+    color: '#e74c3c',
+    fontWeight: '600',
   },
-  priorityIcon: {
-    marginRight: 2,
+  overdueBadge: {
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: '#e74c3c',
+    alignSelf: 'flex-start',
   },
-  priorityText: {
-    fontSize: 12,
+  overdueBadgeText: {
+    fontSize: 11,
     color: 'white',
     fontWeight: '600',
+  },
+  daysUntilText: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginTop: 4,
   },
 });

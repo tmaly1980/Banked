@@ -25,11 +25,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="bills"
+        name="expenses"
         options={{
-          title: 'Bills',
+          title: 'Expenses',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="receipt" size={size} color={color} />
+            <Ionicons name="wallet" size={size} color={color} />
           ),
         }}
       />
@@ -48,15 +48,6 @@ export default function TabLayout() {
           title: 'Income',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="cash" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="expenses"
-        options={{
-          title: 'Expenses',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="wallet" size={size} color={color} />
           ),
         }}
       />

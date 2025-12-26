@@ -95,6 +95,13 @@ export default function OverdueBillsAccordion({
         >
           {overdueBills.map((bill) => (
             <View key={bill.id} style={styles.billItem}>
+              {/* Debug log */}
+              {console.log(`[OverdueBills] Bill: ${bill.name}`, {
+                partial_payment: bill.partial_payment,
+                remaining_amount: bill.remaining_amount,
+                total_amount: bill.total_amount,
+                amount: bill.amount,
+              })}
               <TouchableOpacity
                 style={styles.billInfo}
                 onPress={() => onViewBill(bill)}
@@ -102,7 +109,18 @@ export default function OverdueBillsAccordion({
               >
                 <View style={styles.billHeader}>
                   <Text style={styles.billName}>{bill.name}</Text>
-                  <Text style={styles.billAmount}>{formatAmountDisplay(bill.amount)}</Text>
+                  {bill.partial_payment && bill.partial_payment > 0 ? (
+                    <View style={styles.amountContainer}>
+                      <Text style={styles.billAmountRemaining}>
+                        ${(bill.remaining_amount || 0).toFixed(2)}
+                      </Text>
+                      <Text style={styles.billAmountTotal}>
+                        / ${bill.amount.toFixed(2)}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.billAmount}>{formatAmountDisplay(bill.amount)}</Text>
+                  )}
                 </View>
                 
                 {bill.next_date && (
@@ -223,6 +241,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#2c3e50',
     flex: 1,
+  },
+  amountContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginLeft: 12,
+  },
+  billAmountRemaining: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#e67e22',
+  },
+  billAmountTotal: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#95a5a6',
+    marginLeft: 2,
   },
   billAmount: {
     fontSize: 16,

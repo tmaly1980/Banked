@@ -117,6 +117,15 @@ export default function WeeklyBillGroup({
       {group.bills.length > 0 ? (
         <View style={styles.billsList}>
           {group.bills.map((bill) => {
+            // Debug: Log bill payment data
+            console.log(`[WeeklyBillGroup] Bill: ${bill.name}`, {
+              partial_payment: bill.partial_payment,
+              remaining_amount: bill.remaining_amount,
+              total_amount: bill.total_amount,
+              amount: bill.amount,
+              next_due_date: bill.next_due_date,
+            });
+            
             // Always use getBillDueDate with week start date for proper context
             const displayDate = getBillDueDate(bill, group.startDate);
             const priorityColor = getPriorityColor(bill.priority);
@@ -188,9 +197,20 @@ export default function WeeklyBillGroup({
                   {bill.loss_risk_flag && (
                     <Text style={styles.urgentIcon}>⚠️</Text>
                   )}
-                  <Text style={styles.billAmount}>
-                    {formatAmount(bill.amount)}
-                  </Text>
+                  {bill.partial_payment && bill.partial_payment > 0 ? (
+                    <View style={styles.amountContainer}>
+                      <Text style={styles.billAmountRemaining}>
+                        {formatAmount(bill.remaining_amount || 0)}
+                      </Text>
+                      <Text style={styles.billAmountTotal}>
+                        / {formatAmount(bill.amount)}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.billAmount}>
+                      {formatAmount(bill.amount)}
+                    </Text>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -258,6 +278,22 @@ const styles = StyleSheet.create({
   },
   urgentIcon: {
     fontSize: 14,
+  },
+  amountContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginLeft: 'auto',
+  },
+  billAmountRemaining: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#e67e22',
+  },
+  billAmountTotal: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#95a5a6',
+    marginLeft: 2,
   },
   billAmount: {
     fontSize: 14,

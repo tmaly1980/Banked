@@ -6,14 +6,14 @@ export const usePaymentOperations = (userId: string | undefined, loadBills: () =
     billId: string,
     amount: number,
     paymentDate: string,
-    appliedDate?: string,
+    appliedMonthYear?: string,
     isPaid: boolean = false
   ) => {
     console.log('[addBillPayment] Starting payment creation:', {
       billId,
       amount,
       paymentDate,
-      appliedDate,
+      appliedMonthYear,
       isPaid,
       userId,
     });
@@ -31,7 +31,7 @@ export const usePaymentOperations = (userId: string | undefined, loadBills: () =
           user_id: userId,
           amount,
           payment_date: paymentDate,
-          applied_date: appliedDate,
+          applied_month_year: appliedMonthYear,
           is_paid: isPaid,
         })
         .select()
@@ -58,14 +58,14 @@ export const usePaymentOperations = (userId: string | undefined, loadBills: () =
     paymentId: string,
     amount: number,
     paymentDate: string,
-    appliedDate?: string,
+    appliedMonthYear?: string,
     isPaid?: boolean
   ) => {
     console.log('[updateBillPayment] Starting payment update:', {
       paymentId,
       amount,
       paymentDate,
-      appliedDate,
+      appliedMonthYear,
       isPaid,
       userId,
     });
@@ -80,7 +80,7 @@ export const usePaymentOperations = (userId: string | undefined, loadBills: () =
         amount,
         payment_date: paymentDate,
       };
-      if (appliedDate !== undefined) updateData.applied_date = appliedDate;
+      if (appliedMonthYear !== undefined) updateData.applied_month_year = appliedMonthYear;
       if (isPaid !== undefined) updateData.is_paid = isPaid;
 
       const { data, error } = await supabase

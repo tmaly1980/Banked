@@ -127,9 +127,20 @@ export default function DeferredBillsAccordion({
                   {bill.loss_risk_flag && (
                     <Text style={styles.urgentIcon}>⚠️</Text>
                   )}
-                  <Text style={[styles.billAmount, { color: priorityColor }]}>
-                    {formatAmount(bill.amount)}
-                  </Text>
+                  {bill.partial_payment && bill.partial_payment > 0 ? (
+                    <View style={styles.amountContainer}>
+                      <Text style={[styles.billAmountRemaining, { color: priorityColor }]}>
+                        {formatAmount(bill.remaining_amount || 0)}
+                      </Text>
+                      <Text style={styles.billAmountTotal}>
+                        / {formatAmount(bill.amount)}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={[styles.billAmount, { color: priorityColor }]}>
+                      {formatAmount(bill.amount)}
+                    </Text>
+                  )}
                 </View>
               </TouchableOpacity>
             );
@@ -203,6 +214,20 @@ const styles = StyleSheet.create({
   urgentIcon: {
     fontSize: 14,
     marginRight: 4,
+  },
+  amountContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  billAmountRemaining: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  billAmountTotal: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#95a5a6',
+    marginLeft: 2,
   },
   billAmount: {
     fontSize: 14,

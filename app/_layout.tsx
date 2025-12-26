@@ -1,3 +1,4 @@
+import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Slot, useRouter, useSegments } from 'expo-router';
@@ -38,7 +39,7 @@ function RootLayoutNav() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#3498db' }}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
         <AuthProvider>
           <BillsProvider>
             <DepositsProvider>

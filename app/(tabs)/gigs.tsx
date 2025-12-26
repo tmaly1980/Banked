@@ -62,7 +62,7 @@ export default function GigsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         <TabScreenHeader
           title="Gigs"

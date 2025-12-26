@@ -30,8 +30,8 @@ interface BillsContextType {
   createDeposit: (deposit: Omit<Deposit, 'id' | 'user_id' | 'created_at'>) => Promise<{ data: Deposit | null; error: Error | null }>;
   updateDeposit: (id: string, updates: Partial<Deposit>) => Promise<{ error: Error | null }>;
   deleteDeposit: (id: string) => Promise<{ error: Error | null }>;
-  addBillPayment: (billId: string, amount: number, paymentDate: string, appliedDate?: string, isPaid?: boolean) => Promise<{ data: BillPayment | null; error: Error | null }>;
-  updateBillPayment: (paymentId: string, amount: number, paymentDate: string, appliedDate?: string, isPaid?: boolean) => Promise<{ data: BillPayment | null; error: Error | null }>;
+  addBillPayment: (billId: string, amount: number, paymentDate: string, appliedMonthYear?: string, isPaid?: boolean) => Promise<{ data: BillPayment | null; error: Error | null }>;
+  updateBillPayment: (paymentId: string, amount: number, paymentDate: string, appliedMonthYear?: string, isPaid?: boolean) => Promise<{ data: BillPayment | null; error: Error | null }>;
   deleteBillPayment: (paymentId: string) => Promise<{ error: Error | null }>;
   markPaymentAsPaid: (paymentId: string) => Promise<{ error: Error | null }>;
   loadExpenseTypes: () => Promise<void>;
@@ -106,9 +106,10 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     if (!user?.id) return;
     
     try {
-      const { data, error } = await supabase.rpc('get_overdue_bills', {
-        p_user_id: user.id
-      });
+      const { data, error } = await supabase
+        .from('user_bills_view')
+        .select('*')
+        .eq('is_overdue', true);
 
       if (error) {
         console.error('Error loading overdue bills:', error);
@@ -141,14 +142,17 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
     try {
       setError(null);
 
-      // Fetch bills
+      // Use user_bills_view for calculated fields
       const { data: billsData, error: billsError } = await supabase
-        .from('bills')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .from('user_bills_view')
+        .select('*');
 
       if (billsError) throw billsError;
+
+      // Debug: Log first bill to see what fields we're getting
+      if (billsData && billsData.length > 0) {
+        console.log('[BillsContext] Sample bill from view:', billsData[0]);
+      }
 
       // Fetch all payments for these bills
       const { data: paymentsData, error: paymentsError } = await supabase
@@ -167,10 +171,27 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
         paymentsByBill[payment.bill_id].push(payment);
       });
 
+      // Fetch category names
+      const billIds = billsData?.map(b => b.id) || [];
+      const { data: categoriesData } = await supabase
+        .from('bills')
+        .select('id, category_id, bill_categories(name)')
+        .in('id', billIds);
+
+      const categoriesByBillId: { [key: string]: string } = {};
+      categoriesData?.forEach((item: any) => {
+        if (item.bill_categories) {
+          categoriesByBillId[item.id] = item.bill_categories.name;
+        }
+      });
+
       // Create BillModel instances
-      const billModels = billsData?.map((bill) =>
-        BillModel.fromDatabase(bill, paymentsByBill[bill.id] || [])
-      ) || [];
+      const billModels = billsData?.map((bill) => {
+        return BillModel.fromDatabase({
+          ...bill,
+          category_name: categoriesByBillId[bill.id] || null
+        }, paymentsByBill[bill.id] || []);
+      }) || [];
 
       setBills(billModels);
     } catch (err) {

@@ -11,9 +11,23 @@ export interface Bill {
   priority: 'low' | 'medium' | 'high';
   loss_risk_flag: boolean;
   deferred_flag: boolean;
+  category_id?: string | null;
+  category_name?: string;
   notes?: string;
+  start_month_year?: string | null;
+  end_month_year?: string | null;
   created_at: string;
   updated_at: string;
+  // Fields from get_upcoming_bills function
+  next_due_date?: string;
+  days_until_due?: number;
+  is_overdue?: boolean;
+  last_payment_date?: string;
+  total_paid?: number;
+  // Current billing period payment tracking
+  total_amount?: number;
+  partial_payment?: number;
+  remaining_amount?: number;
 }
 
 export class BillModel {
@@ -26,10 +40,24 @@ export class BillModel {
   priority: 'low' | 'medium' | 'high';
   loss_risk_flag: boolean;
   deferred_flag: boolean;
+  category_id?: string | null;
+  category_name?: string;
   notes?: string;
+  start_month_year?: string | null;
+  end_month_year?: string | null;
   created_at: string;
   updated_at: string;
   payments: PaymentModel[];
+  // Fields from get_upcoming_bills function
+  next_due_date?: string;
+  days_until_due?: number;
+  is_overdue?: boolean;
+  last_payment_date?: string;
+  total_paid_from_db?: number;
+  // Current billing period payment tracking
+  total_amount?: number;
+  partial_payment?: number;
+  remaining_amount?: number;
 
   constructor(bill: Bill, payments: BillPayment[] = []) {
     this.id = bill.id;
@@ -41,10 +69,24 @@ export class BillModel {
     this.priority = bill.priority;
     this.loss_risk_flag = bill.loss_risk_flag;
     this.deferred_flag = bill.deferred_flag;
+    this.category_id = bill.category_id;
+    this.category_name = bill.category_name;
     this.notes = bill.notes;
+    this.start_month_year = bill.start_month_year;
+    this.end_month_year = bill.end_month_year;
     this.created_at = bill.created_at;
     this.updated_at = bill.updated_at;
     this.payments = PaymentModel.fromDatabaseArray(payments);
+    // SQL function fields
+    this.next_due_date = bill.next_due_date;
+    this.days_until_due = bill.days_until_due;
+    this.is_overdue = bill.is_overdue;
+    this.last_payment_date = bill.last_payment_date;
+    this.total_paid_from_db = bill.total_paid;
+    // Current billing period payment tracking
+    this.total_amount = bill.total_amount;
+    this.partial_payment = bill.partial_payment;
+    this.remaining_amount = bill.remaining_amount;
   }
 
   // Calculate total amount paid on this bill

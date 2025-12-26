@@ -12,7 +12,7 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
   const [payments, setPayments] = useState<BillPayment[]>([]);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(localDate(new Date()));
-  const [appliedDate, setAppliedDate] = useState('');
+  const [appliedMonthYear, setAppliedMonthYear] = useState('');
   const [scheduledPaymentId, setScheduledPaymentId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -49,12 +49,25 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
       setScheduledPaymentId(scheduledPayment.id);
       setPaymentAmount(scheduledPayment.amount.toString());
       setPaymentDate(timestampToDate(scheduledPayment.payment_date));
-      setAppliedDate(scheduledPayment.applied_date ? timestampToDate(scheduledPayment.applied_date) : timestampToDate(scheduledPayment.payment_date));
+      // If applied_month_year exists, use it; otherwise derive from payment_date or next_due_date
+      if (scheduledPayment.applied_month_year) {
+        setAppliedMonthYear(scheduledPayment.applied_month_year);
+      } else {
+        const date = new Date(scheduledPayment.payment_date);
+        const monthYear = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        setAppliedMonthYear(monthYear);
+      }
     } else {
       setScheduledPaymentId(null);
       setPaymentAmount(bill.amount.toString());
       setPaymentDate(localDate(new Date()));
-      setAppliedDate('');
+      // Preselect month/year from next_due_date if available
+      if (bill.next_due_date) {
+        const [year, month] = bill.next_due_date.split('-');
+        setAppliedMonthYear(`${year}-${month}`);
+      } else {
+        setAppliedMonthYear('');
+      }
     }
   };
 
@@ -88,7 +101,7 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
           scheduledPaymentId,
           amount,
           dateToTimestamp(paymentDate),
-          appliedDate ? dateToTimestamp(appliedDate) : undefined,
+          appliedMonthYear || undefined,
           isPaid
         );
         if (error) throw error;
@@ -99,7 +112,7 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
           bill.id,
           amount,
           dateToTimestamp(paymentDate),
-          appliedDate ? dateToTimestamp(appliedDate) : undefined,
+          appliedMonthYear || undefined,
           isPaid
         );
         if (error) throw error;
@@ -197,13 +210,13 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
     payments,
     paymentAmount,
     paymentDate,
-    appliedDate,
+    appliedMonthYear,
     scheduledPaymentId,
     loading,
     showPaymentForm,
     setPaymentAmount,
     setPaymentDate,
-    setAppliedDate,
+    setAppliedMonthYear,
     setShowPaymentForm,
     loadScheduledPayment,
     handleAddPayment,

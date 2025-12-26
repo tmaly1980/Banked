@@ -35,13 +35,13 @@ export default function BillDetailsModal({
     payments,
     paymentAmount,
     paymentDate,
-    appliedDate,
+    appliedMonthYear,
     scheduledPaymentId,
     loading,
     showPaymentForm,
     setPaymentAmount,
     setPaymentDate,
-    setAppliedDate,
+    setAppliedMonthYear,
     setShowPaymentForm,
     loadScheduledPayment,
     handleAddPayment,
@@ -105,6 +105,28 @@ export default function BillDetailsModal({
             </View>
           )}
 
+          {/* Current Period Progress */}
+          {bill.partial_payment !== undefined && bill.partial_payment > 0 && 
+           bill.remaining_amount !== undefined && bill.remaining_amount > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Current Period Progress</Text>
+              <View style={styles.progressContainer}>
+                <View style={styles.progressBar}>
+                  <View 
+                    style={[
+                      styles.progressFill,
+                      { width: `${Math.min(100, ((bill.partial_payment || 0) / bill.amount) * 100)}%` }
+                    ]}
+                  />
+                </View>
+                <View style={styles.progressLabels}>
+                  <Text style={styles.progressValue}>${(bill.partial_payment || 0).toFixed(2)}</Text>
+                  <Text style={styles.progressValueRemaining}>-${(bill.remaining_amount || 0).toFixed(2)}</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
           {/* Payment History */}
           {paymentHistory.length > 0 && (
             <View style={styles.section}>
@@ -126,13 +148,14 @@ export default function BillDetailsModal({
             <PaymentForm
               paymentAmount={paymentAmount}
               paymentDate={paymentDate}
-              appliedDate={appliedDate}
+              appliedMonthYear={appliedMonthYear}
               scheduledPaymentId={scheduledPaymentId}
               loading={loading}
               buttonState={buttonState}
+              nextDueDate={bill.next_due_date ? new Date(bill.next_due_date) : undefined}
               onPaymentAmountChange={setPaymentAmount}
               onPaymentDateChange={setPaymentDate}
-              onAppliedDateChange={setAppliedDate}
+              onAppliedMonthYearChange={setAppliedMonthYear}
               onSubmit={() => handleAddPayment(onSuccess)}
               onCancel={() => setShowPaymentForm(false)}
             />

@@ -10,16 +10,19 @@ import {
   Platform,
   ScrollView,
   Switch,
+  Alert,
 } from 'react-native';
 import { InlineAlert } from '@/components/InlineAlert';
 import { useInlineAlert } from '@/hooks/useInlineAlert';
-import { Chip } from 'react-native-paper';
 import { useBills } from '@/contexts/BillsContext';
 import { BillModel } from '@/models/BillModel';
-import DateInput from '@/components/DateInput';
-import DayOfMonthInput from '@/components/DayOfMonthInput';
+import BillDatePicker from '@/components/BillDatePicker';
+import MonthYearInput from '@/components/MonthYearInput';
+import CategoryDropdown from '@/components/CategoryDropdown';
+import AmountInput from '@/components/AmountInput';
 import { dateToTimestamp, timestampToDate } from '@/lib/dateUtils';
 import { globalStyles } from '@/lib/globalStyles';
+import { format } from 'date-fns';
 
 interface BillFormModalProps {
   visible: boolean;
@@ -35,37 +38,40 @@ export default function BillFormModal({
   editingBill,
 }: BillFormModalProps) {
   const { alert, showError, showSuccess, hideAlert } = useInlineAlert();
-  const { createBill, updateBill } = useBills();
+  const { createBill, updateBill, deleteBill } = useBills();
   const [name, setName] = useState(editingBill?.name || '');
   const [amount, setAmount] = useState(editingBill?.amount?.toString() || '');
   const [dueDate, setDueDate] = useState(editingBill?.due_date || '');
   const [dueDay, setDueDay] = useState(editingBill?.due_day?.toString() || '');
-  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>(
-    editingBill?.priority || 'medium'
-  );
-  const [lossRiskFlag, setLossRiskFlag] = useState(editingBill?.loss_risk_flag || false);
-  const [deferredFlag, setDeferredFlag] = useState(editingBill?.deferred_flag || false);
+  const [categoryId, setCategoryId] = useState<string | null>(editingBill?.category_id || null);
   const [notes, setNotes] = useState(editingBill?.notes || '');
   const [isRecurring, setIsRecurring] = useState(!!editingBill?.due_day);
   const [loading, setLoading] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [startMonthYear, setStartMonthYear] = useState<string | null>(editingBill?.start_month_year || null);
+  const [endMonthYear, setEndMonthYear] = useState<string | null>(editingBill?.end_month_year || null);
+  const [showStartInput, setShowStartInput] = useState(!!editingBill?.start_month_year);
+  const [showEndInput, setShowEndInput] = useState(!!editingBill?.end_month_year);
 
   // Auto-hide alert when form values change
   useEffect(() => {
     if (alert.visible) {
       hideAlert();
     }
-  }, [name, amount, dueDate, dueDay, priority, lossRiskFlag, deferredFlag, notes, isRecurring]);
+  }, [name, amount, dueDate, dueDay, categoryId, notes, isRecurring]);
 
   const resetForm = () => {
     setName('');
     setAmount('');
     setDueDate('');
     setDueDay('');
-    setPriority('medium');
-    setLossRiskFlag(false);
-    setDeferredFlag(false);
+    setCategoryId(null);
     setNotes('');
     setIsRecurring(false);
+    setStartMonthYear(null);
+    setEndMonthYear(null);
+    setShowStartInput(false);
+    setShowEndInput(false);
   };
 
   const handleClose = () => {
@@ -95,6 +101,50 @@ export default function BillFormModal({
 
     return true;
   };
+
+  const getDueDateDisplay = () => {
+    if (isRecurring && dueDay) {
+      return `Every ${dueDay}${getDaySuffix(parseInt(dueDay))}`;
+    } else if (dueDate) {
+      return format(new Date(dueDate), 'MMM d, yyyy');
+    }
+    return 'Select due date';
+  };
+
+  const getDaySuffix = (day: number) => {
+    if (day >= 11 && day <= 13) return 'th';
+    switch (day % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  };
+
+  const formatMonthYear = (monthYear: string) => {
+    const [year, month] = monthYear.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1);
+    return format(date, 'MMMM yyyy');
+  };
+
+  const handleDateSelect = (date: string) => {
+    setDueDate(date);
+    setDueDay('');
+    setShowDatePicker(false);
+  };
+
+  const handleDaySelect = (day: number) => {
+    setDueDay(day.toString());
+    setDueDate('');
+    setShowDatePicker(false);
+  };
+
+  const handleClearDate = () => {
+    setDueDate('');
+    setDueDay('');
+    setShowDatePicker(false);
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
@@ -106,12 +156,13 @@ export default function BillFormModal({
       const billData = {
         name: name.trim(),
         amount: amountNum,
-        due_date: isRecurring ? undefined : (dueDate ? dateToTimestamp(dueDate) : undefined),
-        due_day: isRecurring ? (dueDay ? parseInt(dueDay) : undefined) : undefined,
-        priority,
-        loss_risk_flag: lossRiskFlag,
-        deferred_flag: !hasDueDate ? true : deferredFlag,
+        due_date: isRecurring ? null : (dueDate ? dateToTimestamp(dueDate) : null),
+        due_day: isRecurring ? (dueDay ? parseInt(dueDay) : null) : null,
+        category_id: categoryId || null,
+        deferred_flag: !hasDueDate,
         notes: notes.trim() || undefined,
+        start_month_year: startMonthYear || null,
+        end_month_year: endMonthYear || null,
       };
 
       if (editingBill) {
@@ -134,17 +185,51 @@ export default function BillFormModal({
     }
   };
 
+  const handleDelete = async () => {
+    if (!editingBill) return;
+
+    Alert.alert(
+      'Delete Bill',
+      `Are you sure you want to delete "${editingBill.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const { error } = await deleteBill(editingBill.id);
+              if (error) throw error;
+              
+              showSuccess('Bill deleted successfully');
+              resetForm();
+              onSuccess?.();
+              onClose?.();
+            } catch (error) {
+              showError(error instanceof Error ? error.message : 'An error occurred');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   React.useEffect(() => {
     if (visible && editingBill) {
       setName(editingBill.name);
       setAmount(editingBill.amount.toString());
       setDueDate(editingBill.due_date ? timestampToDate(editingBill.due_date) : '');
       setDueDay(editingBill.due_day?.toString() || '');
-      setPriority(editingBill.priority);
-      setLossRiskFlag(editingBill.loss_risk_flag);
-      setDeferredFlag(editingBill.deferred_flag);
+      setCategoryId(editingBill.category_id || null);
       setNotes(editingBill.notes || '');
       setIsRecurring(!!editingBill.due_day);
+      setStartMonthYear(editingBill.start_month_year || null);
+      setEndMonthYear(editingBill.end_month_year || null);
+      setShowStartInput(!!editingBill.start_month_year);
+      setShowEndInput(!!editingBill.end_month_year);
     }
   }, [visible, editingBill]);
 
@@ -161,11 +246,19 @@ export default function BillFormModal({
           <Text style={globalStyles.modalTitle}>
             {editingBill ? 'Edit' : 'Add'} Bill
           </Text>
-          <TouchableOpacity onPress={handleSubmit} disabled={loading}>
-            <Text style={[globalStyles.saveButton, loading && globalStyles.disabledButton]}>
-              {loading ? 'Saving...' : 'Save'}
-            </Text>
-          </TouchableOpacity>
+          {editingBill ? (
+            <TouchableOpacity onPress={handleDelete} disabled={loading}>
+              <Text style={[styles.deleteLink, loading && globalStyles.disabledButton]}>
+                Delete
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={handleSubmit} disabled={loading}>
+              <Text style={[globalStyles.saveButton, loading && globalStyles.disabledButton]}>
+                {loading ? 'Saving...' : 'Save'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <ScrollView style={globalStyles.form}>
@@ -186,77 +279,92 @@ export default function BillFormModal({
             />
           </View>
 
-          <View style={globalStyles.inputGroup}>
-            <Text style={globalStyles.label}>Amount</Text>
-            <TextInput
-              style={globalStyles.input}
-              value={amount}
-              onChangeText={setAmount}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
-            />
-          </View>
+          <View style={styles.rowInputGroup}>
+            <View style={styles.halfInputGroup}>
+              <Text style={globalStyles.label}>Amount</Text>
+              <AmountInput
+                style={globalStyles.input}
+                value={amount}
+                onChangeText={setAmount}
+                placeholder="0.00"
+              />
+            </View>
 
-          <View style={styles.switchGroup}>
-            <Text style={globalStyles.label}>Recurring Monthly</Text>
-            <Switch value={isRecurring} onValueChange={setIsRecurring} />
-          </View>
-
-          {isRecurring ? (
-            <DayOfMonthInput
-              label="Day of Month"
-              value={dueDay}
-              onChangeDay={setDueDay}
-            />
-          ) : (
-            <DateInput
-              label="Due Date"
-              value={dueDate}
-              onChangeDate={setDueDate}
-            />
-          )}
-
-          <View style={globalStyles.inputGroup}>
-            <Text style={globalStyles.label}>Priority</Text>
-            <View style={styles.chipContainer}>
-              <Chip
-                mode={priority === 'low' ? 'flat' : 'outlined'}
-                selected={priority === 'low'}
-                onPress={() => setPriority('low')}
-                style={[styles.chip, priority === 'low' && styles.chipSelectedLow]}
-                textStyle={priority === 'low' ? styles.chipTextSelected : styles.chipText}
+            <View style={styles.halfInputGroup}>
+              <Text style={globalStyles.label}>Due Date</Text>
+              <TouchableOpacity
+                style={styles.dateInput}
+                onPress={() => setShowDatePicker(true)}
               >
-                Low
-              </Chip>
-              <Chip
-                mode={priority === 'medium' ? 'flat' : 'outlined'}
-                selected={priority === 'medium'}
-                onPress={() => setPriority('medium')}
-                style={[styles.chip, priority === 'medium' && styles.chipSelectedMedium]}
-                textStyle={priority === 'medium' ? styles.chipTextSelected : styles.chipText}
-              >
-                Medium
-              </Chip>
-              <Chip
-                mode={priority === 'high' ? 'flat' : 'outlined'}
-                selected={priority === 'high'}
-                onPress={() => setPriority('high')}
-                style={[styles.chip, priority === 'high' && styles.chipSelectedHigh]}
-                textStyle={priority === 'high' ? styles.chipTextSelected : styles.chipText}
-              >
-                High
-              </Chip>
+                <Text style={[styles.dateInputText, (!dueDate && !dueDay) && styles.dateInputPlaceholder]}>
+                  {getDueDateDisplay()}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
-          <View style={styles.switchGroup}>
-            <Text style={globalStyles.label}>Loss Risk</Text>
-            <Switch value={lossRiskFlag} onValueChange={setLossRiskFlag} />
+          {/* Start Date / End Date Row */}
+          <View style={styles.rowInputGroup}>
+            <View style={styles.halfInputGroup}>
+              {showStartInput ? (
+                <MonthYearInput
+                  label="Start Date"
+                  value={startMonthYear || ''}
+                  onChangeValue={(value) => {
+                    setStartMonthYear(value);
+                    if (!value) {
+                      setShowStartInput(false);
+                      setEndMonthYear(null);
+                      setShowEndInput(false);
+                    }
+                  }}
+                />
+              ) : (
+                <TouchableOpacity onPress={() => {
+                  setShowStartInput(true);
+                  // Auto-select current month/year if not set
+                  if (!startMonthYear) {
+                    const now = new Date();
+                    const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+                    setStartMonthYear(currentMonthYear);
+                  }
+                }}>
+                  <Text style={styles.setDateLink}>Set Start Date</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.halfInputGroup}>
+              {showStartInput && (
+                showEndInput ? (
+                  <MonthYearInput
+                    label="End Date"
+                    value={endMonthYear || ''}
+                    onChangeValue={(value) => {
+                      setEndMonthYear(value);
+                      if (!value) {
+                        setShowEndInput(false);
+                      }
+                    }}
+                  />
+                ) : (
+                  <TouchableOpacity 
+                    style={styles.setEndDateContainer}
+                    onPress={() => setShowEndInput(true)}
+                  >
+                    <Text style={styles.setDateLink}>Set End Date</Text>
+                  </TouchableOpacity>
+                )
+              )}
+            </View>
           </View>
 
-          <View style={styles.switchGroup}>
-            <Text style={globalStyles.label}>Deferred</Text>
-            <Switch value={deferredFlag} onValueChange={setDeferredFlag} />
+          <View style={globalStyles.inputGroup}>
+            <Text style={globalStyles.label}>Category</Text>
+            <CategoryDropdown
+              selectedCategoryId={categoryId}
+              onSelectCategory={setCategoryId}
+            />
           </View>
 
           <View style={globalStyles.inputGroup}>
@@ -272,44 +380,101 @@ export default function BillFormModal({
             />
           </View>
         </ScrollView>
+
+        {editingBill && (
+          <View style={styles.saveFooter}>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSubmit}
+              disabled={loading}
+            >
+              <Text style={styles.saveButtonText}>
+                {loading ? 'Saving...' : 'Save Changes'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <BillDatePicker
+          visible={showDatePicker}
+          onClose={() => setShowDatePicker(false)}
+          onSelectDate={handleDateSelect}
+          onSelectDay={handleDaySelect}
+          onClear={handleClearDate}
+          isRecurring={isRecurring}
+          onToggleRecurring={setIsRecurring}
+          selectedDate={dueDate}
+          selectedDay={dueDay ? parseInt(dueDay) : undefined}
+        />
       </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  rowInputGroup: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  halfInputGroup: {
+    flex: 1,
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: 'white',
+  },
+  dateInputText: {
+    fontSize: 16,
+    color: '#2c3e50',
+  },
+  dateInputPlaceholder: {
+    color: '#95a5a6',
+  },
   switchGroup: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
   },
-  chipContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  chip: {
-    borderColor: '#ddd',
-  },
-  chipSelectedLow: {
-    backgroundColor: '#27ae60',
-  },
-  chipSelectedMedium: {
-    backgroundColor: '#f39c12',
-  },
-  chipSelectedHigh: {
-    backgroundColor: '#e74c3c',
-  },
-  chipText: {
-    color: '#666',
-  },
-  chipTextSelected: {
-    color: '#fff',
-    fontWeight: '600',
-  },
   textArea: {
     height: 100,
     paddingTop: 12,
+  },
+  saveFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  saveButton: {
+    backgroundColor: '#3498db',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  deleteLink: {
+    fontSize: 17,
+    color: '#e74c3c',
+    fontWeight: '600',
+  },
+  setDateLink: {
+    fontSize: 16,
+    color: '#3498db',
+    paddingVertical: 8,
+  },
+  setEndDateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
   },
 });

@@ -28,7 +28,14 @@ BEGIN
     -- Get the most recent payment for each bill
     SELECT 
       bp.bill_id,
-      MAX(COALESCE(bp.applied_date, bp.payment_date)) as last_payment_date,
+      MAX(COALESCE(
+        CASE 
+          WHEN bp.applied_month_year IS NOT NULL 
+          THEN (bp.applied_month_year || '-01')::DATE 
+          ELSE bp.payment_date 
+        END,
+        bp.payment_date
+      )) as last_payment_date,
       SUM(bp.amount) as total_paid
     FROM bill_payments bp
     WHERE bp.user_id = p_user_id
