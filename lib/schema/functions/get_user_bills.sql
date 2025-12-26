@@ -37,6 +37,26 @@ current_period_payments AS (
     AND COALESCE(bp.applied_month_year, TO_CHAR(bp.payment_date, 'YYYY-MM')) = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
   GROUP BY bp.bill_id
 ),
+latest_statements AS (
+  -- Get the most recent statement for each bill
+  SELECT DISTINCT ON (bs.bill_id)
+    bs.bill_id,
+    bs.statement_date,
+    bs.balance as statement_balance,
+    bs.minimum_due as statement_minimum_due,
+    (bs.balance - COALESCE(
+      (SELECT SUM(bp.amount + COALESCE(bp.additional_fees, 0))
+       FROM bill_payments bp
+       WHERE bp.bill_id = bs.bill_id
+         AND bp.payment_date >= bs.statement_date
+         AND bp.payment_date <= CURRENT_DATE
+         AND bp.user_id = auth.uid()),
+      0
+    )) as updated_balance
+  FROM bill_statements bs
+  WHERE bs.user_id = auth.uid()
+  ORDER BY bs.bill_id, bs.statement_date DESC
+),
 bill_due_dates AS (
   -- Calculate next due date for each bill
   SELECT 
@@ -49,6 +69,7 @@ bill_due_dates AS (
     b.priority,
     b.loss_risk_flag,
     b.deferred_flag,
+    b.is_variable,
     b.category_id,
     b.notes,
     b.start_month_year,
@@ -58,6 +79,10 @@ bill_due_dates AS (
     bp.last_payment_date,
     bp.total_paid,
     cpp.current_period_paid,
+    ls.statement_date,
+    ls.statement_balance,
+    ls.statement_minimum_due,
+    ls.updated_balance,
     CASE
       -- One-time bill: use the due_date
       WHEN b.due_date IS NOT NULL THEN b.due_date::DATE
@@ -119,6 +144,7 @@ bill_due_dates AS (
   FROM bills b
   LEFT JOIN bill_payment_summary bp ON b.id = bp.bill_id
   LEFT JOIN current_period_payments cpp ON b.id = cpp.bill_id
+  LEFT JOIN latest_statements ls ON b.id = ls.bill_id
   WHERE b.user_id = auth.uid()
 )
 SELECT 
@@ -130,13 +156,18 @@ SELECT
   bdd.due_day,
   bdd.priority,
   bdd.loss_risk_flag,
-  bdd.deferred_flag,
+  bdd.is_variable,
   bdd.category_id,
   bdd.notes,
   bdd.start_month_year,
   bdd.end_month_year,
   bdd.created_at,
   bdd.updated_at,
+  -- Variable bill statement fields
+  bdd.statement_date,
+  bdd.statement_balance,
+  bdd.statement_minimum_due,
+  bdd.updated_balance,
   -- Apply end_month_year constraint: if calculated_due_date is after end_month_year, set to NULL
   CASE
     WHEN bdd.end_month_year IS NOT NULL 

@@ -11,6 +11,7 @@ import { useBills } from '@/contexts/BillsContext';
 import TabScreenHeader from '@/components/TabScreenHeader';
 import BillDetailsModal from '@/components/modals/BillDetailsModal';
 import { BillModel } from '@/models/BillModel';
+import { formatDollar } from '@/lib/utils';
 import Bills from '@/components/Expenses/Bills';
 import Budget from '@/components/Expenses/Budget';
 import Projects from '@/components/Expenses/Projects';
@@ -74,15 +75,14 @@ export default function ExpensesScreen() {
             />
             <Text style={styles.accordionTitle}>Bills</Text>
             <Text style={styles.accordionTotal}>
-              ${bills
+              {formatDollar(bills
                 .filter(bill => !bill.deferred_flag && bill.next_due_date)
                 .reduce((sum, bill) => {
                   const amount = bill.is_variable 
                     ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
                     : (bill.remaining_amount || bill.amount || 0);
                   return sum + amount;
-                }, 0)
-                .toFixed(2)}
+                }, 0))}
             </Text>
           </TouchableOpacity>
           {expandedSection === 'bills' && (

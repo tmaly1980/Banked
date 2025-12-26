@@ -11,6 +11,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { BillModel } from '@/models/BillModel';
+import { formatDollar } from '@/lib/utils';
 import { format, isAfter, isBefore, startOfDay, addDays } from 'date-fns';
 import DayOrDateInput from '@/components/DayOrDateInput';
 import BillDatePicker from '@/components/BillDatePicker';
@@ -220,7 +221,7 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
           isOverdue && styles.overdueText,
           bill.alert_flag && { fontWeight: '700' }
         ]}>
-          ${displayAmount.toFixed(2)}
+          {formatDollar(displayAmount)}
         </Text>
       </TouchableOpacity>
     );
@@ -251,14 +252,13 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
               Upcoming ({groupedBills.upcoming.length})
             </Text>
             <Text style={styles.sectionTotal}>
-              ${groupedBills.upcoming
+              {formatDollar(groupedBills.upcoming
                 .reduce((sum, bill) => {
                   const amount = bill.is_variable 
                     ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
                     : (bill.remaining_amount || bill.amount || 0);
                   return sum + amount;
-                }, 0)
-                .toFixed(2)}
+                }, 0))}
             </Text>
             {/* {onAddBill && (
               <TouchableOpacity 

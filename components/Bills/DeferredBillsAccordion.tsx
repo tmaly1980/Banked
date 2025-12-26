@@ -15,8 +15,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BillModel } from '@/models/BillModel';
 import { format } from 'date-fns';
-import { formatAmount } from '@/lib/utils';
-import { getBillDueDate } from '@/lib/utils';
+import { formatDollar, getBillDueDate } from '@/lib/utils';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -65,10 +64,6 @@ export default function DeferredBillsAccordion({
     }
   };
 
-  const formatAmount = (amount: number) => {
-    return `$${amount.toFixed(2)}`;
-  };
-
   const totalDeferred = deferredBills.reduce((sum, bill) => {
     const billAmount = bill.is_variable 
       ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
@@ -93,7 +88,7 @@ export default function DeferredBillsAccordion({
           <Text style={styles.headerTitle}>Deferred</Text>
         </View>
         <Text style={styles.headerCount}>
-          ({deferredBills.length}) {formatAmount(totalDeferred)}
+          ({deferredBills.length}) {formatDollar(totalDeferred)}
         </Text>
       </TouchableOpacity>
 
@@ -143,15 +138,15 @@ export default function DeferredBillsAccordion({
                   {bill.partial_payment && bill.partial_payment > 0 ? (
                     <View style={styles.amountContainer}>
                       <Text style={[styles.billAmountRemaining, { color: priorityColor }]}>
-                        {formatAmount(bill.remaining_amount || 0)}
+                        {formatDollar(bill.remaining_amount || 0)}
                       </Text>
                       <Text style={styles.billAmountTotal}>
-                        / {formatAmount(bill.amount)}
+                        / {formatDollar(bill.amount || 0)}
                       </Text>
                     </View>
                   ) : (
                     <Text style={[styles.billAmount, { color: priorityColor }]}>
-                      {formatAmount(bill.amount)}
+                      {formatDollar(bill.amount || 0)}
                     </Text>
                   )}
                 </View>

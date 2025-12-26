@@ -12,8 +12,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import TabScreenHeader from '@/components/TabScreenHeader';
 import AccountManagementModal from '@/components/modals/AccountManagementModal';
+import DayIncomeBreakdownModal from '@/components/modals/DayIncomeBreakdownModal';
+import AddPaycheckModal from '@/components/modals/AddPaycheckModal';
+import FloatingActionButton from '@/components/FloatingActionButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { formatDollar } from '@/lib/utils';
 import { format, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
 
 interface DailyIncome {
@@ -21,6 +25,12 @@ interface DailyIncome {
   amount: number;
   income_source_id: string;
   income_source_name: string;
+  is_actual: boolean;
+}
+
+interface DayIncomeDetail {
+  date: string;
+  sources: DailyIncome[];
 }
 
 interface WeekGroup {
@@ -33,8 +43,13 @@ export default function IncomeScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showBreakdownModal, setShowBreakdownModal] = useState(false);
+  const [showPaycheckModal, setShowPaycheckModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedDateEntries, setSelectedDateEntries] = useState<DailyIncome[]>([]);
   const [accountBalance, setAccountBalance] = useState<number>(0);
   const [weeklyGroups, setWeeklyGroups] = useState<WeekGroup[]>([]);
+  const [allDailyIncome, setAllDailyIncome] = useState<DailyIncome[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -86,6 +101,9 @@ export default function IncomeScreen() {
 
       if (error) throw error;
 
+      // Store all daily income for breakdown modal
+      setAllDailyIncome(data || []);
+
       // Group by week
       const grouped = groupByWeek(data || []);
       setWeeklyGroups(grouped);
@@ -98,9 +116,22 @@ export default function IncomeScreen() {
 
   const groupByWeek = (dailyIncome: DailyIncome[]): WeekGroup[] => {
     const weeks: { [key: string]: WeekGroup } = {};
+    const dayTotals: { [key: string]: { date: string; total: number } } = {};
 
-    dailyIncome.forEach((day) => {
-      const date = parseISO(day.income_date);
+    // First, aggregate amounts for each unique date
+    dailyIncome.forEach((entry) => {
+      if (!dayTotals[entry.income_date]) {
+        dayTotals[entry.income_date] = {
+          date: entry.income_date,
+          total: 0,
+        };
+      }
+      dayTotals[entry.income_date].total += parseFloat(entry.amount.toString());
+    });
+
+    // Then group by week
+    Object.values(dayTotals).forEach((dayTotal) => {
+      const date = parseISO(dayTotal.date);
       const weekStart = startOfWeek(date, { weekStartsOn: 0 }); // Sunday
       const weekEnd = endOfWeek(date, { weekStartsOn: 0 });
       const weekKey = format(weekStart, 'yyyy-MM-dd');
@@ -114,8 +145,15 @@ export default function IncomeScreen() {
         };
       }
 
-      weeks[weekKey].days.push(day);
-      weeks[weekKey].total += parseFloat(day.amount.toString());
+      // Create a DailyIncome object for display (just needs the aggregated amount)
+      weeks[weekKey].days.push({
+        income_date: dayTotal.date,
+        amount: dayTotal.total,
+        income_source_id: '',
+        income_source_name: '',
+        is_actual: false,
+      });
+      weeks[weekKey].total += dayTotal.total;
     });
 
     // Sort weeks chronologically by weekKey (yyyy-MM-dd format), then sort days within each week
@@ -127,11 +165,18 @@ export default function IncomeScreen() {
       }));
   };
 
-  const calculateRunningTotal = (days: DailyIncome[], upToIndex: number): string => {
+  const calculateRunningTotal = (days: DailyIncome[], upToIndex: number): number => {
     const total = days.slice(0, upToIndex + 1).reduce((sum, day) => {
       return sum + parseFloat(day.amount.toString());
     }, 0);
-    return total.toFixed(2);
+    return total;
+  };
+
+  const handleDayPress = (date: string) => {
+    const entries = allDailyIncome.filter(income => income.income_date === date);
+    setSelectedDate(date);
+    setSelectedDateEntries(entries);
+    setShowBreakdownModal(true);
   };
 
   return (
@@ -154,7 +199,7 @@ export default function IncomeScreen() {
           onPress={() => setShowAccountModal(true)}
         >
           <Text style={styles.balanceLabel}>Account Balance</Text>
-          <Text style={styles.balanceAmount}>${accountBalance.toFixed(2)}</Text>
+          <Text style={styles.balanceAmount}>{formatDollar(accountBalance)}</Text>
         </TouchableOpacity>
 
         <ScrollView
@@ -172,27 +217,31 @@ export default function IncomeScreen() {
           ) : (
             <>
               <View style={styles.grandTotalCard}>
-                <Text style={styles.grandTotalLabel}>Total</Text>
+                <Text style={styles.grandTotalLabel}>30-Day Total Income:</Text>
                 <Text style={styles.grandTotalAmount}>
-                  ${weeklyGroups.reduce((sum, week) => sum + week.total, 0).toFixed(2)}
+                  {formatDollar(weeklyGroups.reduce((sum, week) => sum + week.total, 0), true)}
                 </Text>
               </View>
               {weeklyGroups.map((week, weekIndex) => (
               <View key={weekIndex} style={styles.weekCard}>
                 <View style={styles.weekHeader}>
                   <Text style={styles.weekLabel}>{week.weekLabel}</Text>
-                  <Text style={styles.weekTotal}>${week.total.toFixed(2)}</Text>
+                  <Text style={styles.weekTotal}>{formatDollar(week.total)}</Text>
                 </View>
                 {week.days.map((day, dayIndex) => {
                   const date = parseISO(day.income_date);
                   const dayLabel = format(date, 'EEE MMM d');
                   
                   return (
-                    <View key={dayIndex} style={[styles.dayRow, dayIndex === 0 && styles.firstDayRow]}>
+                    <TouchableOpacity
+                      key={dayIndex}
+                      style={[styles.dayRow, dayIndex === 0 && styles.firstDayRow]}
+                      onPress={() => handleDayPress(day.income_date)}
+                    >
                       <Text style={styles.dayLabel}>{dayLabel}</Text>
-                      <Text style={styles.dayAmount}>${parseFloat(day.amount.toString()).toFixed(2)}</Text>
-                      <Text style={styles.dayRunningTotal}>${calculateRunningTotal(week.days, dayIndex)}</Text>
-                    </View>
+                      <Text style={styles.dayAmount}>{formatDollar(parseFloat(day.amount.toString()))}</Text>
+                      <Text style={styles.dayRunningTotal}>{formatDollar(parseFloat(calculateRunningTotal(week.days, dayIndex)))}</Text>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
@@ -201,10 +250,37 @@ export default function IncomeScreen() {
           )}
         </ScrollView>
 
+      <FloatingActionButton
+        options={[
+          {
+            label: 'Add Paycheck',
+            icon: 'cash',
+            onPress: () => setShowPaycheckModal(true),
+          },
+        ]}
+      />
+
       <AccountManagementModal
         visible={showAccountModal}
         onClose={() => setShowAccountModal(false)}
         onUpdate={loadAccountInfo}
+      />
+
+      <AddPaycheckModal
+        visible={showPaycheckModal}
+        onClose={() => setShowPaycheckModal(false)}
+        onSuccess={loadDailyIncome}
+      />
+
+      <DayIncomeBreakdownModal
+        visible={showBreakdownModal}
+        onClose={() => setShowBreakdownModal(false)}
+        date={selectedDate}
+        entries={selectedDateEntries}
+        onUpdate={() => {
+          loadDailyIncome();
+          setShowBreakdownModal(false);
+        }}
       />
       </View>
     </SafeAreaView>

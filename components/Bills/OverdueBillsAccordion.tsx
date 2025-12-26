@@ -15,7 +15,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BillModel } from '@/models/BillModel';
 import { format } from 'date-fns';
-import { formatAmount } from '@/lib/utils';
+import { formatDollar } from '@/lib/utils';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -55,10 +55,6 @@ export default function OverdueBillsAccordion({
     }
   };
 
-  const formatAmountDisplay = (amount: number) => {
-    return `$${amount.toFixed(2)}`;
-  };
-
   const totalOverdue = overdueBills.reduce((sum, bill) => {
     const billAmount = bill.is_variable 
       ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
@@ -88,7 +84,7 @@ export default function OverdueBillsAccordion({
             Overdue Bills ({overdueBills.length})
           </Text>
         </View>
-        <Text style={styles.headerAmount}>{formatAmountDisplay(totalOverdue)}</Text>
+        <Text style={styles.headerAmount}>{formatDollar(totalOverdue)}</Text>
       </TouchableOpacity>
 
       {/* Expanded Content */}
@@ -126,14 +122,14 @@ export default function OverdueBillsAccordion({
                   {bill.partial_payment && bill.partial_payment > 0 ? (
                     <View style={styles.amountContainer}>
                       <Text style={styles.billAmountRemaining}>
-                        ${(bill.remaining_amount || 0).toFixed(2)}
+                        {formatDollar(bill.remaining_amount || 0)}
                       </Text>
                       <Text style={styles.billAmountTotal}>
-                        / ${(bill.amount || 0).toFixed(2)}
+                        / {formatDollar(bill.amount || 0)}
                       </Text>
                     </View>
                   ) : (
-                    <Text style={styles.billAmount}>{formatAmountDisplay(bill.amount)}</Text>
+                    <Text style={styles.billAmount}>{formatDollar(bill.amount || 0)}</Text>
                   )}
                 </View>
                 

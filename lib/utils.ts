@@ -38,6 +38,25 @@ export const formatAmount = (amount: number): string => {
   return amount < 0 ? `-$${formattedAmount}` : `$${formattedAmount}`;
 };
 
+/**
+ * Format dollar amounts with optional sign and rounded to nearest dollar
+ * @param amount - The amount to format
+ * @param showSign - Whether to show + for positive amounts (default: false)
+ * @returns Formatted string like "$100", "+$100", or "-$100"
+ */
+export const formatDollar = (amount: number, showSign: boolean = false): string => {
+  const rounded = Math.round(amount);
+  const absAmount = Math.abs(rounded);
+  
+  if (rounded < 0) {
+    return `-$${absAmount}`;
+  } else if (showSign && rounded > 0) {
+    return `+$${absAmount}`;
+  } else {
+    return `$${absAmount}`;
+  }
+};
+
 export const groupExpensesByWeek = (
   expenseBudgets: ExpenseBudget[],
   expenseTypes: ExpenseType[]

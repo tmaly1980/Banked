@@ -1,5 +1,6 @@
 -- Function to generate daily income based on income rules
 -- Returns a series of dates with their corresponding income amounts
+-- Includes both projected income from rules and actual earnings from income_source_daily_earnings
 CREATE OR REPLACE FUNCTION generate_daily_income(
   p_user_id UUID,
   p_start_date DATE,
@@ -9,7 +10,8 @@ RETURNS TABLE (
   income_date DATE,
   amount NUMERIC,
   income_source_id UUID,
-  income_source_name TEXT
+  income_source_name TEXT,
+  is_actual BOOLEAN
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -17,8 +19,8 @@ BEGIN
     -- Generate series of dates
     SELECT generate_series(p_start_date, p_end_date, '1 day'::interval)::DATE AS date
   ),
-  applicable_rules AS (
-    -- Find rules that apply to each date
+  projected_income AS (
+    -- Calculate projected income from rules
     SELECT 
       ds.date,
       ir.id AS rule_id,
@@ -54,22 +56,48 @@ BEGIN
         )
       )
   ),
-  latest_rules AS (
-    -- For each date, pick the rule with the latest created_at (most recent rule wins)
-    SELECT DISTINCT ON (ar.date)
-      ar.date,
-      ar.rule_amount,
-      ar.income_source_id,
-      ar.income_source_name
-    FROM applicable_rules ar
-    ORDER BY ar.date, ar.created_at DESC
+  latest_projected AS (
+    -- For each date/source combo, pick the rule with the latest created_at (most recent rule wins)
+    SELECT DISTINCT ON (pi.date, pi.income_source_id)
+      pi.date,
+      pi.rule_amount,
+      pi.income_source_id,
+      pi.income_source_name
+    FROM projected_income pi
+    ORDER BY pi.date, pi.income_source_id, pi.created_at DESC
+  ),
+  actual_earnings AS (
+    -- Get actual earnings from income_source_daily_earnings
+    SELECT
+      isde.date,
+      isde.earnings_amount,
+      isde.income_source_id,
+      ins.name AS income_source_name
+    FROM income_source_daily_earnings isde
+    INNER JOIN income_sources ins ON isde.income_source_id = ins.id
+    WHERE isde.user_id = p_user_id
+      AND isde.date >= p_start_date
+      AND isde.date <= p_end_date
+  ),
+  combined_income AS (
+    -- Use actual earnings if they exist, otherwise use projected
+    SELECT
+      COALESCE(ae.date, lp.date) AS income_date,
+      COALESCE(ae.earnings_amount, lp.rule_amount) AS amount,
+      COALESCE(ae.income_source_id, lp.income_source_id) AS income_source_id,
+      COALESCE(ae.income_source_name, lp.income_source_name) AS income_source_name,
+      (ae.date IS NOT NULL) AS is_actual
+    FROM latest_projected lp
+    FULL OUTER JOIN actual_earnings ae 
+      ON lp.date = ae.date AND lp.income_source_id = ae.income_source_id
   )
   SELECT 
-    lr.date AS income_date,
-    lr.rule_amount AS amount,
-    lr.income_source_id,
-    lr.income_source_name
-  FROM latest_rules lr
-  ORDER BY lr.date;
+    ci.income_date,
+    ci.amount,
+    ci.income_source_id,
+    ci.income_source_name,
+    ci.is_actual
+  FROM combined_income ci
+  ORDER BY ci.income_date, ci.income_source_name;
 END;
 $$ LANGUAGE plpgsql STABLE;

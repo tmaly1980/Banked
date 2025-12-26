@@ -9,7 +9,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { WeeklyGroup } from '@/types';
 import { BillModel } from '@/models/BillModel';
-import { formatWeekLabel, getBillDueDate, formatAmount } from '@/lib/utils';
+import { formatWeekLabel, getBillDueDate, formatDollar } from '@/lib/utils';
 import { format, differenceInDays, startOfDay } from 'date-fns';
 import { Colors } from '@/constants/Colors';
 import WeeklyCard from '@/components/WeeklyCard';
@@ -101,7 +101,7 @@ export default function WeeklyBillGroup({
     <ProgressBar
       current={group.totalDeposits}
       total={group.totalBills}
-      formatAmount={formatAmount}
+      formatAmount={formatDollar}
       onLeftPress={onDepositTotalPress}
       leftPressable={!!onDepositTotalPress}
     />
@@ -210,17 +210,17 @@ export default function WeeklyBillGroup({
                   {bill.partial_payment && bill.partial_payment > 0 ? (
                     <View style={styles.amountContainer}>
                       <Text style={[styles.billAmountRemaining, bill.alert_flag && { fontWeight: '700' }]}>
-                        {formatAmount(bill.remaining_amount || 0)}
+                        {formatDollar(bill.remaining_amount || 0)}
                       </Text>
                       <Text style={[styles.billAmountTotal, bill.alert_flag && { fontWeight: '700' }]}>
-                        / {formatAmount(bill.amount || 0)}
+                        / {formatDollar(bill.amount || 0)}
                       </Text>
                     </View>
                   ) : (
                     <Text style={[styles.billAmount, bill.alert_flag && { fontWeight: '700' }]}>
                       {bill.is_variable 
-                        ? formatAmount(bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
-                        : formatAmount(bill.amount || 0)}
+                        ? formatDollar(bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
+                        : formatDollar(bill.amount || 0)}
                     </Text>
                   )}
                 </View>
