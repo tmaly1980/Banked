@@ -139,11 +139,12 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
     const later: BillModel[] = [];
 
     bills.forEach(bill => {
-      // Bills without next_due_date or with deferred flag go to "Later"
-      if (!bill.next_due_date || bill.deferred_flag) {
-        later.push(bill);
-      } else if (bill.is_overdue) {
+      // Check overdue first, regardless of other flags
+      if (bill.is_overdue) {
         overdue.push(bill);
+      } else if (!bill.next_due_date) {
+        // Bills without dates go to "Later"
+        later.push(bill);
       } else {
         // Check if bill is from today through end of next month
         const nextDueDate = startOfDay(new Date(bill.next_due_date));
@@ -229,7 +230,7 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
 
     return (
       <TouchableOpacity
-        key={bill.id}
+        key={`${bill.id}-${bill.next_due_date}`}
         style={styles.billRow}
         onPress={() => onBillPress(bill)}
       >

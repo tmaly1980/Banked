@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import TabScreenHeader from '@/components/TabScreenHeader';
+import SwipeableBillRow from '@/components/Plan/SwipeableBillRow';
+import BillPaymentSheet from '@/components/Plan/BillPaymentSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { formatDollar } from '@/lib/utils';
@@ -21,6 +23,9 @@ interface LedgerEntry {
   description: string;
   amount: number;
   runningTotal: number;
+  billId?: string;
+  billData?: any;
+  isDeferred?: boolean;
 }
 
 interface IncomeBreakdown {
@@ -48,6 +53,8 @@ export default function PlanScreen() {
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
   const [overdueCollapsed, setOverdueCollapsed] = useState(true);
   const [allCollapsed, setAllCollapsed] = useState(true);
+  const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
+  const [selectedBill, setSelectedBill] = useState<any>(null);
 
   useEffect(() => {
     loadLedgerData();
@@ -127,8 +134,11 @@ export default function PlanScreen() {
     const entries: { [date: string]: LedgerEntry[] } = {};
     const today = format(new Date(), 'yyyy-MM-dd');
     
-    // Calculate overdue total to adjust starting balance
+    // Calculate overdue total to adjust starting balance (exclude deferred bills)
     const overdueTotal = overdueBills.reduce((sum, bill) => {
+      // Skip deferred bills
+      if (bill.deferred_flag) return sum;
+      
       let billAmount: number;
       if (bill.is_variable) {
         if (bill.partial_payment && bill.partial_payment > 0) {
@@ -167,7 +177,7 @@ export default function PlanScreen() {
     });
 
     // Aggregate bills by due date (filter out invalid dates and use next_due_date)
-    const billsByDate: { [date: string]: { name: string; amount: number }[] } = {};
+    const billsByDate: { [date: string]: any[] } = {};
     bills.forEach((bill) => {
       const date = bill.next_due_date || bill.due_date;
       if (!date) return; // Skip bills without due dates
@@ -194,6 +204,7 @@ export default function PlanScreen() {
         billsByDate[date] = [];
       }
       billsByDate[date].push({
+        ...bill,
         name: bill.name,
         amount: parseFloat(billAmount.toString()),
       });
@@ -224,13 +235,23 @@ export default function PlanScreen() {
       // Add bill entries
       if (billsByDate[date]) {
         billsByDate[date].forEach((bill) => {
-          runningTotal -= bill.amount;
+          const isDeferred = bill.deferred_flag || false;
+          const displayAmount = -bill.amount;
+          
+          // Only subtract from running total if NOT deferred
+          if (!isDeferred) {
+            runningTotal -= bill.amount;
+          }
+          
           entries[date].push({
             date,
             type: 'bill',
             description: bill.name,
-            amount: -bill.amount,
+            amount: displayAmount,
             runningTotal,
+            billId: bill.id,
+            billData: bill,
+            isDeferred,
           });
         });
       }
@@ -382,7 +403,7 @@ export default function PlanScreen() {
     day.entries.forEach(entry => {
       if (entry.type === 'income') {
         netIncome += entry.amount;
-      } else if (entry.type === 'bill') {
+      } else if (entry.type === 'bill' && !entry.isDeferred) {
         netExpenses += Math.abs(entry.amount);
       }
     });
@@ -394,6 +415,9 @@ export default function PlanScreen() {
 
   const getOverdueSummary = () => {
     const totalOverdue = overdueBills.reduce((sum, bill) => {
+      // Skip deferred bills
+      if (bill.deferred_flag) return sum;
+      
       let billAmount: number;
       if (bill.is_variable) {
         if (bill.partial_payment && bill.partial_payment > 0) {
@@ -488,16 +512,23 @@ export default function PlanScreen() {
                         billAmount = bill.remaining_amount || bill.amount || 0;
                       }
 
-                      runningBalance -= billAmount;
+                      const isDeferred = bill.deferred_flag || false;
+                      if (!isDeferred) {
+                        runningBalance -= billAmount;
+                      }
 
                       return (
-                        <View key={index} style={styles.entryRow}>
-                          <Text style={styles.entryDescription}>{bill.name}</Text>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Text style={[styles.entryAmount, { color: '#e74c3c' }]}>{formatDollar(-billAmount, true)}</Text>
-                            <Text style={[styles.entryAmount, { color: '#3498db' }]}>{formatDollar(runningBalance)}</Text>
-                          </View>
-                        </View>
+                        <SwipeableBillRow
+                          key={index}
+                          billName={bill.name}
+                          billAmount={billAmount}
+                          runningTotal={runningBalance}
+                          isDeferred={isDeferred}
+                          onSwipeOpen={() => {
+                            setSelectedBill(bill);
+                            setPaymentSheetVisible(true);
+                          }}
+                        />
                       );
                     })}
                   </View>
@@ -554,23 +585,40 @@ export default function PlanScreen() {
                         ))
                       ) : (
                         // Show regular entries for normal days
-                        day.entries.map((entry, entryIndex) => (
-                          <View key={entryIndex} style={styles.entryRow}>
-                            <View style={styles.entryInfo}>
-                              <Text style={styles.entryDescription}>{entry.description}</Text>
-                              {entry.type !== 'balance' && (
-                                <Text style={[
-                                  styles.entryAmount,
-                                  entry.type === 'income' && styles.incomeAmount,
-                                  entry.type === 'bill' && styles.billAmount,
-                                ]}>
-                                  {formatDollar(entry.amount, true)}
-                                </Text>
-                              )}
+                        day.entries.map((entry, entryIndex) => {
+                          if (entry.type === 'bill' && entry.billId) {
+                            return (
+                              <SwipeableBillRow
+                                key={entryIndex}
+                                billName={entry.description}
+                                billAmount={Math.abs(entry.amount)}
+                                runningTotal={entry.runningTotal}
+                                isDeferred={entry.isDeferred || false}
+                                onSwipeOpen={() => {
+                                  setSelectedBill(entry.billData);
+                                  setPaymentSheetVisible(true);
+                                }}
+                              />
+                            );
+                          }
+                          return (
+                            <View key={entryIndex} style={styles.entryRow}>
+                              <View style={styles.entryInfo}>
+                                <Text style={styles.entryDescription}>{entry.description}</Text>
+                                {entry.type !== 'balance' && (
+                                  <Text style={[
+                                    styles.entryAmount,
+                                    entry.type === 'income' && styles.incomeAmount,
+                                    entry.type === 'bill' && styles.billAmount,
+                                  ]}>
+                                    {formatDollar(entry.amount, true)}
+                                  </Text>
+                                )}
+                              </View>
+                              <Text style={styles.runningTotal}>{formatDollar(entry.runningTotal)}</Text>
                             </View>
-                            <Text style={styles.runningTotal}>{formatDollar(entry.runningTotal)}</Text>
-                          </View>
-                        ))
+                          );
+                        })
                       )}
                     </View>
                   )}
@@ -579,6 +627,31 @@ export default function PlanScreen() {
             })
           )}
         </ScrollView>
+
+        {/* Payment/Defer Sheet */}
+        {selectedBill && (
+          <BillPaymentSheet
+            visible={paymentSheetVisible}
+            billId={selectedBill.id}
+            billName={selectedBill.name}
+            billAmount={
+              selectedBill.is_variable
+                ? selectedBill.statement_minimum_due || selectedBill.updated_balance || selectedBill.statement_balance || selectedBill.amount || 0
+                : selectedBill.remaining_amount || selectedBill.amount || 0
+            }
+            isVariable={selectedBill.is_variable || false}
+            isDeferred={selectedBill.deferred_flag || false}
+            deferredNote={selectedBill.deferred_note}
+            nextDueDate={selectedBill.next_due_date ? new Date(selectedBill.next_due_date) : undefined}
+            onClose={() => {
+              setPaymentSheetVisible(false);
+              setSelectedBill(null);
+            }}
+            onSuccess={() => {
+              loadLedgerData();
+            }}
+          />
+        )}
       </View>
     </SafeAreaView>
   );

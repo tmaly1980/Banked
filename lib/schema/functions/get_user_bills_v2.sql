@@ -58,6 +58,7 @@ bill_instances AS (
     b.priority,
     b.loss_risk_flag,
     b.deferred_flag,
+    b.deferred_note,
     b.is_variable,
     b.urgent_note,
     b.category_id,
@@ -95,6 +96,7 @@ bill_instances AS (
     b.priority,
     b.loss_risk_flag,
     b.deferred_flag,
+    b.deferred_note,
     b.is_variable,
     b.urgent_note,
     b.category_id,
@@ -124,13 +126,8 @@ bill_instances AS (
     AND b.due_day IS NOT NULL
     AND (b.start_month_year IS NULL OR b.start_month_year <= TO_CHAR(CURRENT_DATE, 'YYYY-MM'))
     AND (b.end_month_year IS NULL OR b.end_month_year >= TO_CHAR(CURRENT_DATE, 'YYYY-MM'))
-    -- Only show current month if not fully paid OR if due date hasn't passed yet
-    AND (COALESCE(cpp.current_period_paid, 0) < b.amount OR 
-         make_date(
-           EXTRACT(YEAR FROM CURRENT_DATE)::int,
-           EXTRACT(MONTH FROM CURRENT_DATE)::int,
-           LEAST(b.due_day, EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int)
-         ) >= CURRENT_DATE)
+    -- Show current month if not fully paid
+    AND COALESCE(cpp.current_period_paid, 0) < b.amount
 
   UNION ALL
 
@@ -145,6 +142,7 @@ bill_instances AS (
     b.priority,
     b.loss_risk_flag,
     b.deferred_flag,
+    b.deferred_note,
     b.is_variable,
     b.urgent_note,
     b.category_id,
@@ -187,6 +185,7 @@ bill_instances AS (
     b.priority,
     b.loss_risk_flag,
     b.deferred_flag,
+    b.deferred_note,
     b.is_variable,
     b.urgent_note,
     b.category_id,
@@ -221,6 +220,8 @@ SELECT
   bi.due_day,
   bi.priority,
   bi.loss_risk_flag,
+  bi.deferred_flag,
+  bi.deferred_note,
   bi.is_variable,
   bi.urgent_note,
   bi.category_id,
