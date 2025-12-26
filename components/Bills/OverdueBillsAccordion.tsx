@@ -59,7 +59,12 @@ export default function OverdueBillsAccordion({
     return `$${amount.toFixed(2)}`;
   };
 
-  const totalOverdue = overdueBills.reduce((sum, bill) => sum + bill.amount, 0);
+  const totalOverdue = overdueBills.reduce((sum, bill) => {
+    const billAmount = bill.is_variable 
+      ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
+      : (bill.amount || 0);
+    return sum + billAmount;
+  }, 0);
 
   if (overdueBills.length === 0) {
     return null;
@@ -108,14 +113,23 @@ export default function OverdueBillsAccordion({
                 activeOpacity={0.7}
               >
                 <View style={styles.billHeader}>
-                  <Text style={styles.billName}>{bill.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {bill.alert_flag && (
+                      <MaterialCommunityIcons 
+                        name="alert-outline" 
+                        size={16} 
+                        color="#e67e22" 
+                      />
+                    )}
+                    <Text style={styles.billName}>{bill.name}</Text>
+                  </View>
                   {bill.partial_payment && bill.partial_payment > 0 ? (
                     <View style={styles.amountContainer}>
                       <Text style={styles.billAmountRemaining}>
                         ${(bill.remaining_amount || 0).toFixed(2)}
                       </Text>
                       <Text style={styles.billAmountTotal}>
-                        / ${bill.amount.toFixed(2)}
+                        / ${(bill.amount || 0).toFixed(2)}
                       </Text>
                     </View>
                   ) : (

@@ -3,8 +3,6 @@ CREATE TABLE IF NOT EXISTS income_sources (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
-  frequency TEXT NOT NULL CHECK (frequency IN ('daily', 'weekly', 'bi-weekly', 'monthly')),
-  pending_earnings NUMERIC(10, 2) DEFAULT 0.00,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -32,7 +30,6 @@ CREATE POLICY "Users can delete their own income sources"
 
 -- Indexes
 CREATE INDEX idx_income_sources_user_id ON income_sources(user_id);
-CREATE INDEX idx_income_sources_frequency ON income_sources(frequency);
 
 -- Update timestamp trigger
 CREATE OR REPLACE FUNCTION update_income_sources_updated_at()

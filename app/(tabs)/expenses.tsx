@@ -3,9 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,10 +40,10 @@ export default function ExpensesScreen() {
     await refreshData();
   };
 
-  const handleAddInlineBill = async (bill: { name: string; amount: number; due_date?: string; due_day?: number }) => {
+  const handleAddInlineBill = async (bill: { name: string; amount?: number | null; due_date?: string; due_day?: number }) => {
     const { error } = await createBill({
       name: bill.name,
-      amount: bill.amount,
+      amount: bill.amount || null,
       due_date: bill.due_date || undefined,
       due_day: bill.due_day || undefined,
       priority: 'medium',
@@ -63,36 +61,45 @@ export default function ExpensesScreen() {
       <View style={styles.container}>
         <TabScreenHeader title="Expenses" />
 
-        <ScrollView
-          style={styles.content}
-          refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={handleRefresh} />
-          }
-        >
-          {/* Bills Accordion */}
-          <View style={styles.accordionSection}>
-            <TouchableOpacity
-              style={styles.accordionHeader}
-              onPress={() => toggleSection('bills')}
-            >
-              <Ionicons
-                name={expandedSection === 'bills' ? 'chevron-down' : 'chevron-forward'}
-                size={24}
-                color="#2c3e50"
+        {/* Bills Accordion */}
+        <View style={expandedSection === 'bills' ? styles.billsAccordionSection : styles.accordionSection}>
+          <TouchableOpacity
+            style={styles.accordionHeader}
+            onPress={() => toggleSection('bills')}
+          >
+            <Ionicons
+              name={expandedSection === 'bills' ? 'chevron-down' : 'chevron-forward'}
+              size={24}
+              color="#2c3e50"
+            />
+            <Text style={styles.accordionTitle}>Bills</Text>
+            <Text style={styles.accordionTotal}>
+              ${bills
+                .filter(bill => !bill.deferred_flag && bill.next_due_date)
+                .reduce((sum, bill) => {
+                  const amount = bill.is_variable 
+                    ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
+                    : (bill.remaining_amount || bill.amount || 0);
+                  return sum + amount;
+                }, 0)
+                .toFixed(2)}
+            </Text>
+          </TouchableOpacity>
+          {expandedSection === 'bills' && (
+            <View style={styles.billsScrollContainer}>
+              <Bills 
+                bills={bills} 
+                onBillPress={handleBillPress}
+                onAddBill={handleAddInlineBill}
+                onRefresh={handleRefresh}
+                loading={loading}
               />
-              <Text style={styles.accordionTitle}>Bills</Text>
-            </TouchableOpacity>
-            {expandedSection === 'bills' && (
-              <View style={styles.accordionContent}>
-                <Bills 
-                  bills={bills} 
-                  onBillPress={handleBillPress}
-                  onAddBill={handleAddInlineBill}
-                />
-              </View>
-            )}
-          </View>
+            </View>
+          )}
+        </View>
 
+        {/* Bottom Fixed Accordions */}
+        <View style={styles.bottomAccordions}>
           {/* Budget Accordion */}
           <View style={styles.accordionSection}>
             <TouchableOpacity
@@ -152,7 +159,7 @@ export default function ExpensesScreen() {
               </View>
             )}
           </View>
-        </ScrollView>
+        </View>
 
         {/* Bill Details Modal */}
         <BillDetailsModal
@@ -185,20 +192,18 @@ export default function ExpensesScreen() {
         />
 
         {/* Floating Action Button for Bills */}
-        {expandedSection === 'bills' && (
-          <FloatingActionButton
-            options={[
-              {
-                label: 'Add Bill',
-                icon: 'add',
-                onPress: () => {
-                  setSelectedBill(null);
-                  setBillFormVisible(true);
-                },
+        <FloatingActionButton
+          options={[
+            {
+              label: 'Add Bill',
+              icon: 'add',
+              onPress: () => {
+                setSelectedBill(null);
+                setBillFormVisible(true);
               },
-            ]}
-          />
-        )}
+            },
+          ]}
+        />
       </View>
     </SafeAreaView>
   );
@@ -213,11 +218,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  content: {
+  billsAccordionSection: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  billsScrollContainer: {
     flex: 1,
   },
+  bottomAccordions: {
+    backgroundColor: 'white',
+  },
   accordionSection: {
-    marginBottom: 2,
     backgroundColor: 'white',
   },
   accordionHeader: {
@@ -234,7 +245,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2c3e50',
   },
+  accordionTotal: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3498db',
+    marginLeft: 'auto',
+  },
   accordionContent: {
+    minHeight: 150,
     backgroundColor: 'white',
   },
 });

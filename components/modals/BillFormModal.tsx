@@ -21,6 +21,7 @@ import MonthYearInput from '@/components/MonthYearInput';
 import DayOrDateInput from '@/components/DayOrDateInput';
 import CategoryDropdown from '@/components/CategoryDropdown';
 import AmountInput from '@/components/AmountInput';
+import PillPicker from '@/components/PillPicker';
 import { dateToTimestamp, timestampToDate } from '@/lib/dateUtils';
 import { globalStyles } from '@/lib/globalStyles';
 import { format } from 'date-fns';
@@ -39,7 +40,7 @@ export default function BillFormModal({
   editingBill,
 }: BillFormModalProps) {
   const { alert, showError, showSuccess, hideAlert } = useInlineAlert();
-  const { createBill, updateBill, deleteBill } = useBills();
+  const { createBill, updateBill, deleteBill, createBillStatement } = useBills();
   const [name, setName] = useState(editingBill?.name || '');
   const [amount, setAmount] = useState(editingBill?.amount?.toString() || '');
   const [dueDate, setDueDate] = useState(editingBill?.due_date || '');
@@ -51,6 +52,9 @@ export default function BillFormModal({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [startMonthYear, setStartMonthYear] = useState<string | null>(editingBill?.start_month_year || null);
   const [endMonthYear, setEndMonthYear] = useState<string | null>(editingBill?.end_month_year || null);
+  const [isVariable, setIsVariable] = useState(editingBill?.is_variable || false);
+  const [balance, setBalance] = useState('');
+  const [minimumDue, setMinimumDue] = useState('');
 
   // Auto-hide alert when form values change
   useEffect(() => {
@@ -69,6 +73,9 @@ export default function BillFormModal({
     setIsRecurring(false);
     setStartMonthYear(null);
     setEndMonthYear(null);
+    setIsVariable(false);
+    setBalance('');
+    setMinimumDue('');
   };
 
   const handleClose = () => {
@@ -82,10 +89,24 @@ export default function BillFormModal({
       return false;
     }
     
-    const amountNum = parseFloat(amount);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      showError('Please enter a valid amount');
-      return false;
+    if (isVariable) {
+      // For variable bills, balance is optional (can be set later via statements)
+      if (balance.trim()) {
+        const balanceNum = parseFloat(balance);
+        if (isNaN(balanceNum) || balanceNum <= 0) {
+          showError('Please enter a valid balance');
+          return false;
+        }
+      }
+    } else {
+      // For fixed bills, amount is optional (useful for bills with changing amounts)
+      if (amount.trim()) {
+        const amountNum = parseFloat(amount);
+        if (isNaN(amountNum) || amountNum <= 0) {
+          showError('Please enter a valid amount');
+          return false;
+        }
+      }
     }
 
     if (isRecurring && dueDay) {
@@ -153,7 +174,7 @@ export default function BillFormModal({
     setLoading(true);
     
     try {
-      const amountNum = parseFloat(amount);
+      const amountNum = isVariable ? null : parseFloat(amount);
       const hasDueDate = isRecurring ? !!dueDay : !!dueDate;
       const billData = {
         name: name.trim(),
@@ -165,14 +186,27 @@ export default function BillFormModal({
         notes: notes.trim() || undefined,
         start_month_year: startMonthYear || null,
         end_month_year: endMonthYear || null,
+        is_variable: isVariable,
       };
 
+      let billId = editingBill?.id;
       if (editingBill) {
         const { error } = await updateBill(editingBill.id, billData);
         if (error) throw error;
       } else {
-        const { error } = await createBill(billData);
+        const { data, error } = await createBill(billData);
         if (error) throw error;
+        billId = data?.id;
+      }
+
+      // Create bill statement for variable bills
+      if (isVariable && billId && balance) {
+        const { error: stmtError } = await createBillStatement(
+          billId,
+          parseFloat(balance),
+          minimumDue ? parseFloat(minimumDue) : undefined
+        );
+        if (stmtError) throw stmtError;
       }
 
       showSuccess(`Bill ${editingBill ? 'updated' : 'added'} successfully`);
@@ -222,7 +256,19 @@ export default function BillFormModal({
   React.useEffect(() => {
     if (visible && editingBill) {
       setName(editingBill.name);
-      setAmount(editingBill.amount.toString());
+      setIsVariable(editingBill.is_variable || false);
+      
+      // For variable bills, load balance and minimum due from statement
+      if (editingBill.is_variable) {
+        setBalance(editingBill.statement_balance?.toString() || '');
+        setMinimumDue(editingBill.statement_minimum_due?.toString() || '');
+        setAmount(''); // Clear amount for variable bills
+      } else {
+        setAmount(editingBill.amount?.toString() || '');
+        setBalance('');
+        setMinimumDue('');
+      }
+      
       setDueDate(editingBill.due_date ? timestampToDate(editingBill.due_date) : '');
       setDueDay(editingBill.due_day?.toString() || '');
       setCategoryId(editingBill.category_id || null);
@@ -253,11 +299,7 @@ export default function BillFormModal({
               </Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={handleSubmit} disabled={loading}>
-              <Text style={[globalStyles.saveButton, loading && globalStyles.disabledButton]}>
-                {loading ? 'Saving...' : 'Save'}
-              </Text>
-            </TouchableOpacity>
+            <View style={{ width: 50 }} />
           )}
         </View>
 
@@ -279,13 +321,25 @@ export default function BillFormModal({
             />
           </View>
 
+          {/* Bill Type Toggle */}
+          <View style={globalStyles.inputGroup}>
+            <PillPicker
+              options={[
+                { label: 'Fixed', value: 'fixed' as const },
+                { label: 'Variable', value: 'variable' as const }
+              ]}
+              value={isVariable ? 'variable' : 'fixed'}
+              onChange={(value) => setIsVariable(value === 'variable')}
+            />
+          </View>
+
           <View style={styles.rowInputGroup}>
             <View style={styles.halfInputGroup}>
-              <Text style={globalStyles.label}>Amount</Text>
+              <Text style={globalStyles.label}>{isVariable ? 'Current Balance' : 'Amount'}</Text>
               <AmountInput
                 style={globalStyles.input}
-                value={amount}
-                onChangeText={setAmount}
+                value={isVariable ? balance : amount}
+                onChangeText={isVariable ? setBalance : setAmount}
                 placeholder="0.00"
               />
             </View>
@@ -301,6 +355,19 @@ export default function BillFormModal({
               />
             </View>
           </View>
+
+          {/* Minimum Due for Variable Bills */}
+          {isVariable && (
+            <View style={globalStyles.inputGroup}>
+              <Text style={globalStyles.label}>Minimum Due</Text>
+              <AmountInput
+                style={globalStyles.input}
+                value={minimumDue}
+                onChangeText={setMinimumDue}
+                placeholder="0.00"
+              />
+            </View>
+          )}
 
           <View style={globalStyles.inputGroup}>
             <Text style={globalStyles.label}>Category</Text>
@@ -324,19 +391,17 @@ export default function BillFormModal({
           </View>
         </ScrollView>
 
-        {editingBill && (
-          <View style={styles.saveFooter}>
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={handleSubmit}
-              disabled={loading}
-            >
-              <Text style={styles.saveButtonText}>
-                {loading ? 'Saving...' : 'Save Changes'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <View style={styles.saveFooter}>
+          <TouchableOpacity
+            style={styles.saveButton}
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            <Text style={styles.saveButtonText}>
+              {loading ? 'Saving...' : (editingBill ? 'Save Changes' : 'Add Bill')}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <BillDatePicker
           visible={showDatePicker}

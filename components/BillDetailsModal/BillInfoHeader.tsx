@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { format } from 'date-fns';
 import { BillModel } from '@/models/BillModel';
 import { BillPayment } from '@/types';
@@ -8,9 +9,10 @@ import { formatAmount, getDaysLateBadge } from '@/utils/paymentHelpers';
 interface BillInfoHeaderProps {
   bill: BillModel;
   lastPayment: BillPayment | null;
+  onToggleAlert?: () => void;
 }
 
-export default function BillInfoHeader({ bill, lastPayment }: BillInfoHeaderProps) {
+export default function BillInfoHeader({ bill, lastPayment, onToggleAlert }: BillInfoHeaderProps) {
   // Parse next_due_date manually to avoid timezone issues
   const nextDueDate = bill.next_due_date ? (() => {
     const [year, month, day] = bill.next_due_date.split('-').map(Number);
@@ -36,9 +38,26 @@ export default function BillInfoHeader({ bill, lastPayment }: BillInfoHeaderProp
   return (
     <View style={styles.section}>
       <View style={styles.headerRow}>
-        <View style={styles.headerTitle}>            
-          <Text style={styles.billName}>{bill.name}</Text>
-          <Text style={styles.billAmount}>{formatAmount(bill.amount)}</Text>
+        <View style={styles.headerTitle}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>         
+            {bill.alert_flag && (
+              <MaterialCommunityIcons 
+                name="alert-outline" 
+                size={24} 
+                color="#e67e22" 
+              />
+            )}
+            <Text style={styles.billName}>{bill.name}</Text>
+          </View>
+          {bill.is_variable ? (
+            <View>
+              {bill.statement_balance !== undefined && (
+                <Text style={styles.billAmount}>{formatAmount(bill.statement_balance)}</Text>
+              )}
+            </View>
+          ) : (
+            <Text style={styles.billAmount}>{formatAmount(bill.amount || 0)}</Text>
+          )}
         </View>
         {bill.category_name && (
           <View style={styles.categoryBadge}>
@@ -46,6 +65,28 @@ export default function BillInfoHeader({ bill, lastPayment }: BillInfoHeaderProp
           </View>
         )}
       </View>
+
+
+      {bill.is_variable && (
+        <View style={styles.infoGrid}>
+          {bill.statement_minimum_due !== undefined && (
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Minimum Due</Text>
+              <Text style={styles.infoValue}>
+                {formatAmount(bill.statement_minimum_due)}
+              </Text>
+            </View>
+          )}
+          {bill.updated_balance !== undefined && (
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Remaining Balance</Text>
+              <Text style={styles.infoValue}>
+                {formatAmount(bill.updated_balance)}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
 
       <View style={styles.infoGrid}>
         <View style={styles.infoItem}>
@@ -64,7 +105,33 @@ export default function BillInfoHeader({ bill, lastPayment }: BillInfoHeaderProp
             </Text>
           )}
         </View>
+        {bill.is_variable && bill.statement_date && (
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Statement Date</Text>
+            <Text style={styles.infoValue}>
+              {format(new Date(bill.statement_date), 'MMM d, yyyy')}
+            </Text>
+          </View>
+        )}
       </View>
+
+      {/* Alert Button */}
+      {onToggleAlert && (
+        <TouchableOpacity
+          style={[styles.alertButton, bill.alert_flag && styles.alertButtonActive]}
+          onPress={onToggleAlert}
+        >
+          <MaterialCommunityIcons 
+            name="alert-outline" 
+            size={20} 
+            color={bill.alert_flag ? '#fff' : '#e67e22'} 
+            style={{ marginRight: 8 }}
+          />
+          <Text style={[styles.alertButtonText, bill.alert_flag && styles.alertButtonTextActive]}>
+            {bill.alert_flag ? 'Remove Alert' : 'Add Alert'}
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -114,6 +181,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2c3e50',
     marginBottom: 16,
+  },
+  billAmountSecondary: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#7f8c8d',
+    marginTop: 4,
   },
   infoGrid: {
     flexDirection: 'row',
@@ -170,5 +243,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7f8c8d',
     marginTop: 4,
+  },
+  alertButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#e67e22',
+  },
+  alertButtonActive: {
+    backgroundColor: '#e67e22',
+  },
+  alertButtonText: {
+    color: '#e67e22',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  alertButtonTextActive: {
+    color: '#fff',
   },
 });

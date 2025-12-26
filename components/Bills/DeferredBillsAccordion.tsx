@@ -69,7 +69,12 @@ export default function DeferredBillsAccordion({
     return `$${amount.toFixed(2)}`;
   };
 
-  const totalDeferred = deferredBills.reduce((sum, bill) => sum + bill.amount, 0);
+  const totalDeferred = deferredBills.reduce((sum, bill) => {
+    const billAmount = bill.is_variable 
+      ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
+      : (bill.amount || 0);
+    return sum + billAmount;
+  }, 0);
 
   if (deferredBills.length === 0) {
     return null;
@@ -115,6 +120,14 @@ export default function DeferredBillsAccordion({
                 )}
               >
                 <View style={styles.billRow}>
+                  {bill.alert_flag && (
+                    <MaterialCommunityIcons 
+                      name="alert-outline" 
+                      size={16} 
+                      color="#e67e22" 
+                      style={{ marginRight: 4 }}
+                    />
+                  )}
                   <MaterialCommunityIcons 
                     name={getPriorityIcon(bill.priority)} 
                     size={16} 

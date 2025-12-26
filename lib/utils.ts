@@ -147,7 +147,10 @@ export const groupBillsByWeek = (bills: BillModel[]): WeeklyGroup[] => {
       
       if (weekIndex >= 0) {
         weeks[weekIndex].bills.push(bill);
-        weeks[weekIndex].totalBills += bill.amount;
+        const billAmount = bill.is_variable 
+          ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
+          : (bill.amount || 0);
+        weeks[weekIndex].totalBills += billAmount;
       }
     }
     // Handle recurring bills with due_day
@@ -171,7 +174,10 @@ export const groupBillsByWeek = (bills: BillModel[]): WeeklyGroup[] => {
             // Only add if the due date is actually within the week range (edge case for month boundaries)
             if (dueDate >= week.startDate && dueDate <= week.endDate) {
               week.bills.push(bill);
-              week.totalBills += bill.amount;
+              const billAmount = bill.is_variable 
+                ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
+                : (bill.amount || 0);
+              week.totalBills += billAmount;
             }
           }
         } else {
@@ -184,7 +190,10 @@ export const groupBillsByWeek = (bills: BillModel[]): WeeklyGroup[] => {
           if ((startMonthDueDate >= week.startDate && startMonthDueDate <= week.endDate) ||
               (endMonthDueDate >= week.startDate && endMonthDueDate <= week.endDate)) {
             week.bills.push(bill);
-            week.totalBills += bill.amount;
+            const billAmount = bill.is_variable 
+              ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
+              : (bill.amount || 0);
+            week.totalBills += billAmount;
           }
         }
       });

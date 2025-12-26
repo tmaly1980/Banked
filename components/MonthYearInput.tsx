@@ -9,6 +9,7 @@ interface MonthYearInputProps {
   onChangeValue: (monthYear: string) => void;
   placeholder?: string;
   preselectedDate?: Date;
+  showClearButton?: boolean;
 }
 
 export default function MonthYearInput({
@@ -17,6 +18,7 @@ export default function MonthYearInput({
   onChangeValue,
   placeholder = 'Select month',
   preselectedDate,
+  showClearButton = true,
 }: MonthYearInputProps) {
   const [showPicker, setShowPicker] = useState(false);
 
@@ -38,7 +40,7 @@ export default function MonthYearInput({
           <Text style={[styles.monthYearButtonText, !value && styles.placeholderText]}>
             {formatMonthYearDisplay(value)}
           </Text>
-          {value && (
+          {value && showClearButton && (
             <TouchableOpacity
               style={styles.clearIcon}
               onPress={(e) => {

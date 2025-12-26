@@ -8,7 +8,8 @@ import {
 export default function Projects() {
   return (
     <View style={styles.container}>
-      <Text style={styles.placeholder}>Projects component coming soon...</Text>
+      <Text style={styles.placeholder}>Manage your financial projects</Text>
+      <Text style={[styles.placeholder, { fontSize: 14, marginTop: 8 }]}>Save for goals and track progress</Text>
     </View>
   );
 }

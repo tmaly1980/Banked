@@ -3,13 +3,16 @@ import {
   Modal,
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BillModel } from '@/models/BillModel';
 import { useBillPayments } from '@/hooks/useBillPayments';
+import { useBills } from '@/contexts/BillsContext';
 import { separatePaymentsBySchedule } from '@/utils/paymentHelpers';
 import { styles } from '@/styles/billDetailsStyles';
 import BillInfoHeader from '@/components/BillDetailsModal/BillInfoHeader';
@@ -31,6 +34,13 @@ export default function BillDetailsModal({
   onEdit,
   bill,
 }: BillDetailsModalProps) {
+  const [showUpdateBalanceForm, setShowUpdateBalanceForm] = React.useState(false);
+  const [newBalance, setNewBalance] = React.useState('');
+  const [newMinimumDue, setNewMinimumDue] = React.useState('');
+  const [additionalFees, setAdditionalFees] = React.useState('');
+  
+  const { createBillStatement, updateBill, loadBills } = useBills();
+  
   const {
     payments,
     paymentAmount,
@@ -77,7 +87,20 @@ export default function BillDetailsModal({
 
         <ScrollView style={styles.content}>
           {/* Bill Info */}
-          <BillInfoHeader bill={bill} lastPayment={lastPayment} />
+          <BillInfoHeader 
+            bill={bill} 
+            lastPayment={lastPayment}
+            onToggleAlert={async () => {
+              if (!bill?.id) return;
+              try {
+                await updateBill(bill.id, { alert_flag: !bill.alert_flag });
+                await loadBills();
+                onSuccess();
+              } catch (error) {
+                console.error('Error toggling alert:', error);
+              }
+            }}
+          />
 
           {/* Notes */}
           {bill.notes && (
@@ -149,6 +172,7 @@ export default function BillDetailsModal({
               paymentAmount={paymentAmount}
               paymentDate={paymentDate}
               appliedMonthYear={appliedMonthYear}
+              additionalFees={additionalFees}
               scheduledPaymentId={scheduledPaymentId}
               loading={loading}
               buttonState={buttonState}
@@ -156,24 +180,109 @@ export default function BillDetailsModal({
               onPaymentAmountChange={setPaymentAmount}
               onPaymentDateChange={setPaymentDate}
               onAppliedMonthYearChange={setAppliedMonthYear}
+              onAdditionalFeesChange={setAdditionalFees}
               onSubmit={() => handleAddPayment(onSuccess)}
               onCancel={() => setShowPaymentForm(false)}
             />
           )}
+
+          {/* Update Balance Form */}
+          {showUpdateBalanceForm && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Update Statement Balance</Text>
+              
+              <View style={styles.inputRow}>
+                <View style={styles.halfInputGroup}>
+                  <Text style={styles.label}>New Balance</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={newBalance}
+                    onChangeText={setNewBalance}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                  />
+                </View>
+
+                <View style={styles.halfInputGroup}>
+                  <Text style={styles.label}>Minimum Due</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={newMinimumDue}
+                    onChangeText={setNewMinimumDue}
+                    keyboardType="decimal-pad"
+                    placeholder="0.00"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setShowUpdateBalanceForm(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  style={[styles.submitButton, { backgroundColor: '#27ae60' }]}
+                  onPress={async () => {
+                    if (!bill?.id || !newBalance) return;
+                    
+                    try {
+                      const { error } = await createBillStatement(
+                        bill.id,
+                        parseFloat(newBalance),
+                        newMinimumDue ? parseFloat(newMinimumDue) : undefined
+                      );
+                      
+                      if (error) throw error;
+                      
+                      setShowUpdateBalanceForm(false);
+                      onSuccess();
+                    } catch (error) {
+                      console.error('Error updating balance:', error);
+                    }
+                  }}
+                >
+                  <Text style={styles.submitButtonText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </ScrollView>
 
         {/* Bottom Actions */}
-        {!showPaymentForm && (
+        {!showPaymentForm && !showUpdateBalanceForm && (
           <View style={styles.bottomActions}>
-            <TouchableOpacity
-              style={styles.makePaymentButton}
-              onPress={() => {
-                loadScheduledPayment();
-                setShowPaymentForm(true);
-              }}
-            >
-              <Text style={styles.makePaymentButtonText}>Make a Payment</Text>
-            </TouchableOpacity>
+            <View style={styles.buttonRow}>
+              {bill?.is_variable && (
+                <TouchableOpacity
+                  style={[styles.makePaymentButton, styles.updateBalanceButton, styles.halfButton]}
+                  onPress={() => {
+                    setNewBalance(bill.statement_balance?.toString() || '');
+                    setNewMinimumDue(bill.statement_minimum_due?.toString() || '');
+                    setShowUpdateBalanceForm(true);
+                  }}
+                >
+                  <Text style={styles.makePaymentButtonText}>Update Balance</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.makePaymentButton, bill?.is_variable && styles.halfButton]}
+                onPress={() => {
+                  loadScheduledPayment();
+                  // Pre-fill with minimum due for variable bills
+                  if (bill?.is_variable && bill.statement_minimum_due) {
+                    setPaymentAmount(bill.statement_minimum_due.toFixed(2));
+                  } else if (bill?.is_variable && bill.updated_balance) {
+                    setPaymentAmount(bill.updated_balance.toFixed(2));
+                  }
+                  setShowPaymentForm(true);
+                }}
+              >
+                <Text style={styles.makePaymentButtonText}>Make a Payment</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </KeyboardAvoidingView>

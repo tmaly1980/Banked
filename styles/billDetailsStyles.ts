@@ -44,6 +44,9 @@ export const styles = StyleSheet.create({
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#e1e8ed',
+  },
+  buttonRow: {
+    flexDirection: 'row',
     gap: 12,
   },
   makePaymentButton: {
@@ -51,6 +54,12 @@ export const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
+  },
+  halfButton: {
+    flex: 1,
+  },
+  updateBalanceButton: {
+    backgroundColor: '#9b59b6',
   },
   makePaymentButtonText: {
     color: 'white',
@@ -100,5 +109,81 @@ export const styles = StyleSheet.create({
     fontSize: 18,
     color: '#e74c3c',
     fontWeight: '700',
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  halfInputGroup: {
+    flex: 1,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#bdc3c7',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: 'white',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 16,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#ecf0f1',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#7f8c8d',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  submitButton: {
+    flex: 1,
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  alertButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#e67e22',
+  },
+  alertButtonActive: {
+    backgroundColor: '#e67e22',
+  },
+  alertButtonText: {
+    color: '#e67e22',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  alertButtonTextActive: {
+    color: '#fff',
   },
 });

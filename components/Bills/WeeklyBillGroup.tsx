@@ -188,10 +188,20 @@ export default function WeeklyBillGroup({
                     color={priorityColor} 
                     style={styles.priorityIcon}
                   />
-                  <Text style={styles.billDate}>
+                  {bill.alert_flag ? (
+                    <MaterialCommunityIcons 
+                      name="alert-outline" 
+                      size={16} 
+                      color="#e67e22" 
+                      style={{ marginRight: 4 }}
+                    />
+                  ) : (
+                    <View style={{ width: 20, marginRight: 4 }} />
+                  )}
+                  <Text style={[styles.billDate, bill.alert_flag && { fontWeight: '700' }]}>
                     {displayDate ? format(displayDate, 'MMM d') : 'No date'}
                   </Text>
-                  <Text style={styles.billName} numberOfLines={1}>
+                  <Text style={[styles.billName, bill.alert_flag && { fontWeight: '700' }]} numberOfLines={1}>
                     {bill.name}
                   </Text>
                   {bill.loss_risk_flag && (
@@ -199,16 +209,18 @@ export default function WeeklyBillGroup({
                   )}
                   {bill.partial_payment && bill.partial_payment > 0 ? (
                     <View style={styles.amountContainer}>
-                      <Text style={styles.billAmountRemaining}>
+                      <Text style={[styles.billAmountRemaining, bill.alert_flag && { fontWeight: '700' }]}>
                         {formatAmount(bill.remaining_amount || 0)}
                       </Text>
-                      <Text style={styles.billAmountTotal}>
-                        / {formatAmount(bill.amount)}
+                      <Text style={[styles.billAmountTotal, bill.alert_flag && { fontWeight: '700' }]}>
+                        / {formatAmount(bill.amount || 0)}
                       </Text>
                     </View>
                   ) : (
-                    <Text style={styles.billAmount}>
-                      {formatAmount(bill.amount)}
+                    <Text style={[styles.billAmount, bill.alert_flag && { fontWeight: '700' }]}>
+                      {bill.is_variable 
+                        ? formatAmount(bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
+                        : formatAmount(bill.amount || 0)}
                     </Text>
                   )}
                 </View>

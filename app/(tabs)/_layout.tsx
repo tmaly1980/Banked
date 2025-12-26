@@ -34,15 +34,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="deposits"
-        options={{
-          title: 'Deposits',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="currency-usd" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="income"
         options={{
           title: 'Income',
@@ -52,12 +43,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="deposits"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="personal"
         options={{
-          title: 'Personal',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="folder" size={size} color={color} />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen

@@ -100,10 +100,84 @@ export const useBillOperations = (userId: string | undefined, loadBills: () => P
     }
   }, [userId, loadBills]);
 
+  const createBillStatement = useCallback(async (
+    billId: string,
+    balance: number,
+    minimumDue?: number,
+    statementDate?: string
+  ) => {
+    if (!userId) return { error: new Error('User not authenticated') };
+
+    try {
+      const { error } = await supabase
+        .from('bill_statements')
+        .insert({
+          bill_id: billId,
+          user_id: userId,
+          balance,
+          minimum_due: minimumDue || null,
+          statement_date: statementDate || new Date().toISOString().split('T')[0],
+        });
+
+      if (error) throw error;
+
+      // Refresh bills to update statement info
+      await loadBills();
+
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
+  }, [userId, loadBills]);
+
+  const getLatestBillStatement = useCallback(async (billId: string) => {
+    if (!userId) return null;
+
+    try {
+      // Get the latest statement
+      const { data: statement, error: statementError } = await supabase
+        .from('bill_statements')
+        .select('*')
+        .eq('bill_id', billId)
+        .eq('user_id', userId)
+        .order('statement_date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (statementError || !statement) return null;
+
+      // Calculate updated balance (statement balance - sum of payments since statement date)
+      const { data: payments, error: paymentsError } = await supabase
+        .from('bill_payments')
+        .select('amount')
+        .eq('bill_id', billId)
+        .eq('user_id', userId)
+        .gte('payment_date', statement.statement_date);
+
+      if (paymentsError) throw paymentsError;
+
+      const totalPaid = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+      const updatedBalance = statement.balance - totalPaid;
+
+      return {
+        statement_balance: statement.balance,
+        statement_minimum_due: statement.minimum_due,
+        statement_date: statement.statement_date,
+        updated_balance: Math.max(0, updatedBalance), // Don't show negative balances
+      };
+    } catch (err) {
+      console.error('Error getting latest bill statement:', err);
+      return null;
+    }
+  }, [userId]);
+
   return {
     loadBillPayments,
     createBill,
     updateBill,
     deleteBill,
+    createBillStatement,
+    getLatestBillStatement,
   };
 };

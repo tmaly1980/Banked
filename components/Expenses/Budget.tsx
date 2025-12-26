@@ -8,7 +8,8 @@ import {
 export default function Budget() {
   return (
     <View style={styles.container}>
-      <Text style={styles.placeholder}>Budget component coming soon...</Text>
+      <Text style={styles.placeholder}>Track your spending categories</Text>
+      <Text style={[styles.placeholder, { fontSize: 14, marginTop: 8 }]}>Set budgets and monitor expenses</Text>
     </View>
   );
 }

@@ -11,6 +11,7 @@ export interface Bill {
   priority: 'low' | 'medium' | 'high';
   loss_risk_flag: boolean;
   deferred_flag: boolean;
+  alert_flag?: boolean;
   is_variable?: boolean;
   category_id?: string | null;
   category_name?: string;
@@ -46,6 +47,7 @@ export class BillModel {
   priority: 'low' | 'medium' | 'high';
   loss_risk_flag: boolean;
   deferred_flag: boolean;
+  alert_flag?: boolean;
   is_variable?: boolean;
   category_id?: string | null;
   category_name?: string;
@@ -65,6 +67,11 @@ export class BillModel {
   total_amount?: number;
   partial_payment?: number;
   remaining_amount?: number;
+  // Variable bill statement fields
+  statement_balance?: number;
+  statement_minimum_due?: number;
+  statement_date?: string;
+  updated_balance?: number;
 
   constructor(bill: Bill, payments: BillPayment[] = []) {
     this.id = bill.id;
@@ -76,6 +83,8 @@ export class BillModel {
     this.priority = bill.priority;
     this.loss_risk_flag = bill.loss_risk_flag;
     this.deferred_flag = bill.deferred_flag;
+    this.alert_flag = bill.alert_flag;
+    this.is_variable = bill.is_variable;
     this.category_id = bill.category_id;
     this.category_name = bill.category_name;
     this.notes = bill.notes;
@@ -94,6 +103,11 @@ export class BillModel {
     this.total_amount = bill.total_amount;
     this.partial_payment = bill.partial_payment;
     this.remaining_amount = bill.remaining_amount;
+    // Variable bill statement fields
+    this.statement_balance = bill.statement_balance;
+    this.statement_minimum_due = bill.statement_minimum_due;
+    this.statement_date = bill.statement_date;
+    this.updated_balance = bill.updated_balance;
   }
 
   // Calculate total amount paid on this bill
@@ -103,17 +117,19 @@ export class BillModel {
 
   // Calculate remaining amount to be paid
   get amountRemaining(): number {
+    if (this.amount === null) return 0;
     return Math.max(0, this.amount - this.totalPaid);
   }
 
   // Check if bill is fully paid
   get isPaid(): boolean {
+    if (this.amount === null) return false;
     return this.totalPaid >= this.amount;
   }
 
   // Get payment progress as percentage
   get paymentProgress(): number {
-    if (this.amount === 0) return 100;
+    if (this.amount === null || this.amount === 0) return 0;
     return Math.min(100, (this.totalPaid / this.amount) * 100);
   }
 

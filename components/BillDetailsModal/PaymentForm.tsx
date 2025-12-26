@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import DateInput from '@/components/DateInput';
 import AmountInput from '@/components/AmountInput';
@@ -10,6 +10,7 @@ interface PaymentFormProps {
   paymentAmount: string;
   paymentDate: string;
   appliedMonthYear: string;
+  additionalFees: string;
   scheduledPaymentId: string | null;
   loading: boolean;
   buttonState: { text: string; color: string };
@@ -17,6 +18,7 @@ interface PaymentFormProps {
   onPaymentAmountChange: (amount: string) => void;
   onPaymentDateChange: (date: string) => void;
   onAppliedMonthYearChange: (monthYear: string) => void;
+  onAdditionalFeesChange: (fees: string) => void;
   onSubmit: () => void;
   onCancel: () => void;
 }
@@ -25,6 +27,7 @@ export default function PaymentForm({
   paymentAmount,
   paymentDate,
   appliedMonthYear,
+  additionalFees,
   scheduledPaymentId,
   loading,
   buttonState,
@@ -32,9 +35,19 @@ export default function PaymentForm({
   onPaymentAmountChange,
   onPaymentDateChange,
   onAppliedMonthYearChange,
+  onAdditionalFeesChange,
   onSubmit,
   onCancel,
 }: PaymentFormProps) {
+  // Set default Applied Month to current month/year if not set
+  React.useEffect(() => {
+    if (!appliedMonthYear) {
+      const now = new Date();
+      const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      onAppliedMonthYearChange(currentMonthYear);
+    }
+  }, [appliedMonthYear, onAppliedMonthYearChange]);
+
   return (
     <>
       <View style={styles.section}>
@@ -61,12 +74,27 @@ export default function PaymentForm({
           </View>
         </View>
 
-        <MonthYearInput
-          label="Applied Month"
-          value={appliedMonthYear}
-          onChangeValue={onAppliedMonthYearChange}
-          preselectedDate={nextDueDate}
-        />
+        <View style={styles.inputRow}>
+          <View style={styles.halfInputGroup}>
+            <Text style={styles.label}>Additional Fees</Text>
+            <AmountInput
+              value={additionalFees}
+              onChangeText={onAdditionalFeesChange}
+              placeholder="0.00"
+            />
+            <Text style={styles.helpText}>Late fees, etc.</Text>
+          </View>
+
+          <View style={styles.halfInputGroup}>
+            <MonthYearInput
+              label="Applied Month"
+              value={appliedMonthYear}
+              onChangeValue={onAppliedMonthYearChange}
+              preselectedDate={nextDueDate}
+              showClearButton={false}
+            />
+          </View>
+        </View>
       </View>
 
       <View style={styles.fixedFooter}>
@@ -126,6 +154,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 6,
     color: '#333',
+  },
+  helpText: {
+    fontSize: 12,
+    color: '#7f8c8d',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   input: {
     borderWidth: 1,

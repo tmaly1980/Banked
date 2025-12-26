@@ -59,7 +59,11 @@ export const useBillPayments = (bill: BillModel | null, visible: boolean) => {
       }
     } else {
       setScheduledPaymentId(null);
-      setPaymentAmount(bill.amount.toString());
+      // For variable bills, use statement amounts; for fixed bills, use amount
+      const defaultAmount = bill.is_variable
+        ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
+        : (bill.amount || 0);
+      setPaymentAmount(defaultAmount.toString());
       setPaymentDate(localDate(new Date()));
       // Preselect month/year from next_due_date if available
       if (bill.next_due_date) {

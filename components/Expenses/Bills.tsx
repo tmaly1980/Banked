@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
+  RefreshControl,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,10 +18,12 @@ import BillDatePicker from '@/components/BillDatePicker';
 interface BillsProps {
   bills: BillModel[];
   onBillPress: (bill: BillModel) => void;
-  onAddBill?: (bill: { name: string; amount: number; due_date?: string; due_day?: number }) => Promise<void>;
+  onAddBill?: (bill: { name: string; amount?: number | null; due_date?: string; due_day?: number }) => Promise<void>;
+  onRefresh?: () => Promise<void>;
+  loading?: boolean;
 }
 
-export default function Bills({ bills, onBillPress, onAddBill }: BillsProps) {
+export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loading }: BillsProps) {
   const [laterExpanded, setLaterExpanded] = useState(true);
   const [showInlineForm, setShowInlineForm] = useState(false);
   const [inlineBillDate, setInlineBillDate] = useState<string>('');
@@ -64,9 +67,14 @@ export default function Bills({ bills, onBillPress, onAddBill }: BillsProps) {
     if (!onAddBill || isAdding) return;
     
     const name = inlineBillName.trim();
-    const amount = parseFloat(inlineBillAmount);
+    const amount = inlineBillAmount.trim() ? parseFloat(inlineBillAmount) : null;
     
-    if (!name || isNaN(amount) || amount <= 0) {
+    if (!name) {
+      return;
+    }
+    
+    // If amount is provided, validate it's a valid positive number
+    if (amount !== null && (isNaN(amount) || amount <= 0)) {
       return;
     }
     
@@ -178,9 +186,18 @@ export default function Bills({ bills, onBillPress, onAddBill }: BillsProps) {
   const renderBillRow = (bill: BillModel) => {
     const hasPartialPayment = bill.remaining_amount !== undefined && 
                               bill.remaining_amount > 0 &&
+                              bill.amount !== null &&
                               bill.remaining_amount < bill.amount;
     const isOverdue = bill.is_overdue;
     
+    // For variable bills, display minimum due or updated balance
+    const displayAmount = bill.is_variable 
+      ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
+      : (bill.remaining_amount || bill.amount || 0);
+    
+
+    console.log('Rendering bill:', bill.name, 'Amount:', displayAmount, 'Variable:', bill.is_variable, 'Partial Payment:', hasPartialPayment);
+
     return (
       <TouchableOpacity
         key={bill.id}
@@ -188,18 +205,22 @@ export default function Bills({ bills, onBillPress, onAddBill }: BillsProps) {
         onPress={() => onBillPress(bill)}
       >
         <View style={styles.dateContainer}>
+          <Text style={[styles.billDate, isOverdue && styles.overdueText, bill.alert_flag && { fontWeight: '700' }]}>{bill.alert_flag} {formatBillDate(bill)}</Text>
           {isOverdue && (
             <Ionicons name="time-outline" size={16} color="#e74c3c" style={styles.statusIcon} />
           )}
-          <Text style={[styles.billDate, isOverdue && styles.overdueText]}>{formatBillDate(bill)}</Text>
+          {bill.alert_flag && (
+            <Ionicons name="warning-outline" size={16} color="#e67e22" style={styles.statusIcon} />
+          )}
         </View>
-        <Text style={[styles.billName, isOverdue && styles.overdueText]} numberOfLines={1}>{bill.name}</Text>
+        <Text style={[styles.billName, isOverdue && styles.overdueText, bill.alert_flag && { fontWeight: '700' }]} numberOfLines={1}>{bill.name}</Text>
         <Text style={[
           styles.billAmount,
           hasPartialPayment && styles.billAmountPartial,
-          isOverdue && styles.overdueText
+          isOverdue && styles.overdueText,
+          bill.alert_flag && { fontWeight: '700' }
         ]}>
-          ${(bill.remaining_amount || bill.amount).toFixed(2)}
+          ${displayAmount.toFixed(2)}
         </Text>
       </TouchableOpacity>
     );
@@ -207,7 +228,14 @@ export default function Bills({ bills, onBillPress, onAddBill }: BillsProps) {
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView style={styles.container}>
+      <ScrollView 
+        style={styles.container}
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl refreshing={loading || false} onRefresh={onRefresh} />
+          ) : undefined
+        }
+      >
       {/* Overdue Bills (no header, just rows) */}
       {groupedBills.overdue.length > 0 && (
         <View style={styles.section}>
@@ -222,14 +250,24 @@ export default function Bills({ bills, onBillPress, onAddBill }: BillsProps) {
             <Text style={styles.sectionTitle}>
               Upcoming ({groupedBills.upcoming.length})
             </Text>
-            {onAddBill && (
+            <Text style={styles.sectionTotal}>
+              ${groupedBills.upcoming
+                .reduce((sum, bill) => {
+                  const amount = bill.is_variable 
+                    ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
+                    : (bill.remaining_amount || bill.amount || 0);
+                  return sum + amount;
+                }, 0)
+                .toFixed(2)}
+            </Text>
+            {/* {onAddBill && (
               <TouchableOpacity 
                 style={styles.addIcon}
                 onPress={handleShowInlineForm}
               >
                 <Ionicons name="add-circle-outline" size={24} color="#3498db" />
               </TouchableOpacity>
-            )}
+            )} */}
           </View>
           
           {showInlineForm && (
@@ -333,6 +371,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2c3e50',
   },
+  sectionTotal: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#3498db',
+    marginLeft: 'auto',
+  },
   overdueTitle: {
     color: '#e74c3c',
   },
@@ -354,10 +398,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dateContainer: {
-    flex: 1,
+    flex: 2,
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: 4,
+    paddingRight: 12,
   },
   statusIcon: {
     flexShrink: 0,
@@ -368,7 +413,7 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
   },
   billName: {
-    flex: 4,
+    flex: 6,
     fontSize: 15,
     color: '#2c3e50',
   },
