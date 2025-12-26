@@ -9,10 +9,9 @@ import { formatAmount, getDaysLateBadge } from '@/utils/paymentHelpers';
 interface BillInfoHeaderProps {
   bill: BillModel;
   lastPayment: BillPayment | null;
-  onToggleAlert?: () => void;
 }
 
-export default function BillInfoHeader({ bill, lastPayment, onToggleAlert }: BillInfoHeaderProps) {
+export default function BillInfoHeader({ bill, lastPayment }: BillInfoHeaderProps) {
   // Parse next_due_date manually to avoid timezone issues
   const nextDueDate = bill.next_due_date ? (() => {
     const [year, month, day] = bill.next_due_date.split('-').map(Number);
@@ -115,23 +114,6 @@ export default function BillInfoHeader({ bill, lastPayment, onToggleAlert }: Bil
         )}
       </View>
 
-      {/* Alert Button */}
-      {onToggleAlert && (
-        <TouchableOpacity
-          style={[styles.alertButton, bill.alert_flag && styles.alertButtonActive]}
-          onPress={onToggleAlert}
-        >
-          <MaterialCommunityIcons 
-            name="alert-outline" 
-            size={20} 
-            color={bill.alert_flag ? '#fff' : '#e67e22'} 
-            style={{ marginRight: 8 }}
-          />
-          <Text style={[styles.alertButtonText, bill.alert_flag && styles.alertButtonTextActive]}>
-            {bill.alert_flag ? 'Remove Alert' : 'Add Alert'}
-          </Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
@@ -244,27 +226,28 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     marginTop: 4,
   },
-  alertButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginTop: 16,
+  urgentNoteCard: {
+    backgroundColor: '#fff3cd',
     borderWidth: 1,
     borderColor: '#e67e22',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 16,
   },
-  alertButtonActive: {
-    backgroundColor: '#e67e22',
+  urgentNoteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  alertButtonText: {
+  urgentNoteTitle: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  urgentNoteText: {
+    flex: 1,
+    fontSize: 14,
     color: '#e67e22',
-    fontSize: 15,
     fontWeight: '600',
-  },
-  alertButtonTextActive: {
-    color: '#fff',
   },
 });

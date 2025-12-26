@@ -9,7 +9,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BillModel } from '@/models/BillModel';
 import { formatDollar } from '@/lib/utils';
 import { format, isAfter, isBefore, startOfDay, addDays } from 'date-fns';
@@ -214,7 +214,15 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
             <Ionicons name="warning-outline" size={16} color="#e67e22" style={styles.statusIcon} />
           )}
         </View>
-        <Text style={[styles.billName, isOverdue && styles.overdueText, bill.alert_flag && { fontWeight: '700' }]} numberOfLines={1}>{bill.name}</Text>
+        <View style={styles.billNameContainer}>
+          <Text style={[styles.billName, isOverdue && styles.overdueText, bill.alert_flag && { fontWeight: '700' }]} numberOfLines={1}>{bill.name}</Text>
+          {bill.urgent_note && (
+            <View style={styles.urgentNoteContainer}>
+              <MaterialCommunityIcons name="alert-outline" size={14} color="#e67e22" />
+              <Text style={styles.urgentNoteText} numberOfLines={1}>{bill.urgent_note}</Text>
+            </View>
+          )}
+        </View>
         <Text style={[
           styles.billAmount,
           hasPartialPayment && styles.billAmountPartial,
@@ -412,10 +420,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#7f8c8d',
   },
-  billName: {
+  billNameContainer: {
     flex: 6,
+  },
+  billName: {
     fontSize: 15,
     color: '#2c3e50',
+  },
+  urgentNoteContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  urgentNoteText: {
+    fontSize: 12,
+    color: '#e67e22',
+    fontWeight: '500',
+    flex: 1,
   },
   billAmount: {
     fontSize: 15,

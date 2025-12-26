@@ -70,6 +70,7 @@ bill_due_dates AS (
     b.loss_risk_flag,
     b.deferred_flag,
     b.is_variable,
+    b.urgent_note,
     b.category_id,
     b.notes,
     b.start_month_year,
@@ -93,31 +94,66 @@ bill_due_dates AS (
           -- Current period fully paid (sum >= amount) AND payment is for current or future month
           WHEN bp.last_applied_month_year >= TO_CHAR(CURRENT_DATE, 'YYYY-MM') 
                AND COALESCE(cpp.current_period_paid, 0) >= b.amount THEN
-            -- Move to next month
+            -- Move to next month (handle months with fewer days than due_day)
             make_date(
               EXTRACT(YEAR FROM CURRENT_DATE + INTERVAL '1 month')::int,
               EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 month')::int,
-              b.due_day
+              LEAST(
+                b.due_day,
+                EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE + INTERVAL '1 month') + INTERVAL '1 month - 1 day'))::int
+              )
             )
-          -- Current period partially paid OR last payment is for past month
-          ELSE
-            -- Stay on current month (or the month of last payment if in future)
+          -- Last payment is for past month - check if current month's date has passed
+          WHEN bp.last_applied_month_year < TO_CHAR(CURRENT_DATE, 'YYYY-MM') THEN
             CASE
-              WHEN bp.last_applied_month_year > TO_CHAR(CURRENT_DATE, 'YYYY-MM') THEN
-                -- Last payment is for future month, use that month
-                make_date(
-                  EXTRACT(YEAR FROM (bp.last_applied_month_year || '-01')::DATE)::int,
-                  EXTRACT(MONTH FROM (bp.last_applied_month_year || '-01')::DATE)::int,
-                  b.due_day
+              -- If current month's due date has passed, move to next month
+              WHEN make_date(
+                EXTRACT(YEAR FROM CURRENT_DATE)::int,
+                EXTRACT(MONTH FROM CURRENT_DATE)::int,
+                LEAST(
+                  b.due_day,
+                  EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int
                 )
+              ) < CURRENT_DATE THEN
+                make_date(
+                  EXTRACT(YEAR FROM CURRENT_DATE + INTERVAL '1 month')::int,
+                  EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 month')::int,
+                  LEAST(
+                    b.due_day,
+                    EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE + INTERVAL '1 month') + INTERVAL '1 month - 1 day'))::int
+                  )
+                )
+              -- Current month's due date hasn't passed yet
               ELSE
-                -- Use current month
                 make_date(
                   EXTRACT(YEAR FROM CURRENT_DATE)::int,
                   EXTRACT(MONTH FROM CURRENT_DATE)::int,
-                  b.due_day
+                  LEAST(
+                    b.due_day,
+                    EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int
+                  )
                 )
             END
+          -- Last payment is for future month
+          WHEN bp.last_applied_month_year > TO_CHAR(CURRENT_DATE, 'YYYY-MM') THEN
+            make_date(
+              EXTRACT(YEAR FROM (bp.last_applied_month_year || '-01')::DATE)::int,
+              EXTRACT(MONTH FROM (bp.last_applied_month_year || '-01')::DATE)::int,
+              LEAST(
+                b.due_day,
+                EXTRACT(DAY FROM (DATE_TRUNC('month', (bp.last_applied_month_year || '-01')::DATE) + INTERVAL '1 month - 1 day'))::int
+              )
+            )
+          -- Current period partially paid - use current month
+          ELSE
+            make_date(
+              EXTRACT(YEAR FROM CURRENT_DATE)::int,
+              EXTRACT(MONTH FROM CURRENT_DATE)::int,
+              LEAST(
+                b.due_day,
+                EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int
+              )
+            )
         END
       
       -- Recurring bill with no payments: check start_month_year
@@ -128,14 +164,38 @@ bill_due_dates AS (
             make_date(
               EXTRACT(YEAR FROM (b.start_month_year || '-01')::DATE)::int,
               EXTRACT(MONTH FROM (b.start_month_year || '-01')::DATE)::int,
-              b.due_day
+              LEAST(
+                b.due_day,
+                EXTRACT(DAY FROM (DATE_TRUNC('month', (b.start_month_year || '-01')::DATE) + INTERVAL '1 month - 1 day'))::int
+              )
+            )
+          -- Check if current month's due date has passed
+          WHEN make_date(
+            EXTRACT(YEAR FROM CURRENT_DATE)::int,
+            EXTRACT(MONTH FROM CURRENT_DATE)::int,
+            LEAST(
+              b.due_day,
+              EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int
+            )
+          ) < CURRENT_DATE THEN
+            -- Move to next month
+            make_date(
+              EXTRACT(YEAR FROM CURRENT_DATE + INTERVAL '1 month')::int,
+              EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 month')::int,
+              LEAST(
+                b.due_day,
+                EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE + INTERVAL '1 month') + INTERVAL '1 month - 1 day'))::int
+              )
             )
           -- Otherwise use current month
           ELSE
             make_date(
               EXTRACT(YEAR FROM CURRENT_DATE)::int,
               EXTRACT(MONTH FROM CURRENT_DATE)::int,
-              b.due_day
+              LEAST(
+                b.due_day,
+                EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int
+              )
             )
         END
       
@@ -157,6 +217,7 @@ SELECT
   bdd.priority,
   bdd.loss_risk_flag,
   bdd.is_variable,
+  bdd.urgent_note,
   bdd.category_id,
   bdd.notes,
   bdd.start_month_year,

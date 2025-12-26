@@ -12,6 +12,7 @@ export interface Bill {
   loss_risk_flag: boolean;
   deferred_flag: boolean;
   alert_flag?: boolean;
+  urgent_note?: string | null;
   is_variable?: boolean;
   category_id?: string | null;
   category_name?: string;
@@ -48,6 +49,7 @@ export class BillModel {
   loss_risk_flag: boolean;
   deferred_flag: boolean;
   alert_flag?: boolean;
+  urgent_note?: string | null;
   is_variable?: boolean;
   category_id?: string | null;
   category_name?: string;
@@ -84,6 +86,7 @@ export class BillModel {
     this.loss_risk_flag = bill.loss_risk_flag;
     this.deferred_flag = bill.deferred_flag;
     this.alert_flag = bill.alert_flag;
+    this.urgent_note = bill.urgent_note;
     this.is_variable = bill.is_variable;
     this.category_id = bill.category_id;
     this.category_name = bill.category_name;

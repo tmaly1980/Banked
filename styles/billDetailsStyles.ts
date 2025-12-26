@@ -53,13 +53,32 @@ export const styles = StyleSheet.create({
     backgroundColor: '#3498db',
     borderRadius: 8,
     padding: 16,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   halfButton: {
     flex: 1,
   },
+  thirdButton: {
+    flex: 1,
+  },
   updateBalanceButton: {
     backgroundColor: '#9b59b6',
+  },
+  urgentNoteButton: {
+    backgroundColor: '#e67e22',
+  },
+  urgentNoteInput: {
+    borderWidth: 1,
+    borderColor: '#e67e22',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: '#2c3e50',
+    backgroundColor: '#fff3cd',
+    minHeight: 60,
+    textAlignVertical: 'top',
   },
   makePaymentButtonText: {
     color: 'white',
@@ -185,5 +204,29 @@ export const styles = StyleSheet.create({
   },
   alertButtonTextActive: {
     color: '#fff',
+  },
+  urgentNoteCard: {
+    backgroundColor: '#fff3cd',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#e67e22',
+  },
+  urgentNoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  urgentNoteTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  urgentNoteDisplayText: {
+    fontSize: 14,
+    color: '#856404',
+    fontWeight: '500',
+    flex: 1,
   },
 });

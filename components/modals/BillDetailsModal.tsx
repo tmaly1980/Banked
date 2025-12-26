@@ -38,8 +38,30 @@ export default function BillDetailsModal({
   const [newBalance, setNewBalance] = React.useState('');
   const [newMinimumDue, setNewMinimumDue] = React.useState('');
   const [additionalFees, setAdditionalFees] = React.useState('');
+  const [showUrgentNoteInput, setShowUrgentNoteInput] = React.useState(false);
+  const [urgentNote, setUrgentNote] = React.useState('');
+  const [localUrgentNote, setLocalUrgentNote] = React.useState<string | null>(null);
+  
+  // Sync local urgent note with bill prop
+  React.useEffect(() => {
+    setLocalUrgentNote(bill?.urgent_note || null);
+  }, [bill?.urgent_note, bill?.id]);
   
   const { createBillStatement, updateBill, loadBills } = useBills();
+
+  const handleClearUrgentNote = async () => {
+    if (!bill?.id) return;
+    try {
+      await updateBill(bill.id, { urgent_note: null });
+      setLocalUrgentNote(null);
+      setShowUrgentNoteInput(false);
+      setUrgentNote('');
+      await loadBills();
+      onSuccess();
+    } catch (error) {
+      console.error('Error clearing urgent note:', error);
+    }
+  };
   
   const {
     payments,
@@ -90,24 +112,116 @@ export default function BillDetailsModal({
           <BillInfoHeader 
             bill={bill} 
             lastPayment={lastPayment}
-            onToggleAlert={async () => {
-              if (!bill?.id) return;
-              try {
-                await updateBill(bill.id, { alert_flag: !bill.alert_flag });
-                await loadBills();
-                onSuccess();
-              } catch (error) {
-                console.error('Error toggling alert:', error);
-              }
-            }}
           />
 
           {/* Notes */}
           {bill.notes && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Notes</Text>
+              <Text style={styles.sectionTitle}>Info</Text>
               <View style={styles.notesContainer}>
                 <Text style={styles.notesText}>{bill.notes}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Urgent Note Card */}
+          {localUrgentNote && (
+            <View style={styles.section}>
+              <View style={styles.urgentNoteCard}>
+                <View style={styles.urgentNoteHeader}>
+                  <View style={styles.urgentNoteTitle}>
+                    <MaterialCommunityIcons 
+                      name="alert-outline" 
+                      size={20} 
+                      color="#e67e22" 
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text style={styles.urgentNoteDisplayText}>{localUrgentNote}</Text>
+                  </View>
+                  <TouchableOpacity onPress={handleClearUrgentNote}>
+                    <MaterialCommunityIcons 
+                      name="trash-can-outline" 
+                      size={20} 
+                      color="#e67e22" 
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Add Urgent Note Button */}
+          {!localUrgentNote && !showUrgentNoteInput && (
+            <View style={styles.section}>
+              <TouchableOpacity
+                style={[styles.makePaymentButton, styles.urgentNoteButton]}
+                onPress={() => setShowUrgentNoteInput(true)}
+              >
+                <MaterialCommunityIcons name="alert-outline" size={18} color="#fff" style={{ marginRight: 6 }} />
+                <Text style={styles.makePaymentButtonText}>Add Urgent Note</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Urgent Note Input */}
+          {showUrgentNoteInput && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Add Urgent Note</Text>
+              <TextInput
+                style={styles.urgentNoteInput}
+                value={urgentNote}
+                onChangeText={setUrgentNote}
+                placeholder="Enter urgent note..."
+                placeholderTextColor="#95a5a6"
+                autoFocus
+                multiline
+                numberOfLines={2}
+                onSubmitEditing={async () => {
+                  if (!bill?.id || !urgentNote.trim()) return;
+                  try {
+                    const noteText = urgentNote.trim();
+                    await updateBill(bill.id, { urgent_note: noteText });
+                    setLocalUrgentNote(noteText);
+                    setShowUrgentNoteInput(false);
+                    setUrgentNote('');
+                    await loadBills();
+                    onSuccess();
+                  } catch (error) {
+                    console.error('Error adding urgent note:', error);
+                  }
+                }}
+                blurOnSubmit={false}
+                returnKeyType="done"
+              />
+              <View style={styles.actionButtons}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => {
+                    setShowUrgentNoteInput(false);
+                    setUrgentNote('');
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.submitButton, { backgroundColor: '#e67e22' }]}
+                  onPress={async () => {
+                    if (!bill?.id || !urgentNote.trim()) return;
+                    try {
+                      const noteText = urgentNote.trim();
+                      await updateBill(bill.id, { urgent_note: noteText });
+                      setLocalUrgentNote(noteText);
+                      setShowUrgentNoteInput(false);
+                      setUrgentNote('');
+                      await loadBills();
+                      onSuccess();
+                    } catch (error) {
+                      console.error('Error adding urgent note:', error);
+                    }
+                  }}
+                >
+                  <Text style={styles.submitButtonText}>Save</Text>
+                </TouchableOpacity>
               </View>
             </View>
           )}
@@ -138,7 +252,7 @@ export default function BillDetailsModal({
                   <View 
                     style={[
                       styles.progressFill,
-                      { width: `${Math.min(100, ((bill.partial_payment || 0) / bill.amount) * 100)}%` }
+                      { width: `${Math.min(100, ((bill.partial_payment || 0) / (bill.amount || 1)) * 100)}%` }
                     ]}
                   />
                 </View>
@@ -252,7 +366,7 @@ export default function BillDetailsModal({
         </ScrollView>
 
         {/* Bottom Actions */}
-        {!showPaymentForm && !showUpdateBalanceForm && (
+        {!showPaymentForm && !showUpdateBalanceForm && !showUrgentNoteInput && (
           <View style={styles.bottomActions}>
             <View style={styles.buttonRow}>
               {bill?.is_variable && (

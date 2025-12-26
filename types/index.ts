@@ -15,6 +15,7 @@ export interface Bill {
   loss_risk_flag: boolean;
   deferred_flag: boolean;
   notes?: string;
+  urgent_note?: string | null;
   created_at: string;
   updated_at: string;
 }
