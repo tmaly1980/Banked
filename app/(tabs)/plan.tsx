@@ -33,8 +33,10 @@ export default function PlanScreen() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [dayGroups, setDayGroups] = useState<DayGroup[]>([]);
+  const [overdueBills, setOverdueBills] = useState<any[]>([]);
   const [accountBalance, setAccountBalance] = useState<number>(0);
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
+  const [overdueCollapsed, setOverdueCollapsed] = useState(true);
   const [allCollapsed, setAllCollapsed] = useState(true);
 
   useEffect(() => {
@@ -85,6 +87,16 @@ export default function PlanScreen() {
 
       if (billsError) throw billsError;
 
+      // Load overdue bills separately
+      const { data: overdueData, error: overdueError } = await supabase
+        .from('user_bills_view')
+        .select('*')
+        .eq('is_overdue', true);
+
+      if (overdueError) throw overdueError;
+
+      setOverdueBills(overdueData || []);
+
       // Process and combine data
       const ledger = buildLedger(totalBalance, incomeData || [], billsData || []);
       setDayGroups(ledger);
@@ -93,6 +105,7 @@ export default function PlanScreen() {
       const allDates = new Set(ledger.map(day => day.date));
       setCollapsedDays(allDates);
       setAllCollapsed(true);
+      setOverdueCollapsed(true);
     } catch (error) {
       console.error('Error loading ledger data:', error);
     } finally {
@@ -103,19 +116,38 @@ export default function PlanScreen() {
   const buildLedger = (startingBalance: number, income: any[], bills: any[]): DayGroup[] => {
     const entries: { [date: string]: LedgerEntry[] } = {};
     const today = format(new Date(), 'yyyy-MM-dd');
-    let runningTotal = startingBalance;
+    
+    // Calculate overdue total to adjust starting balance
+    const overdueTotal = overdueBills.reduce((sum, bill) => {
+      let billAmount: number;
+      if (bill.is_variable) {
+        if (bill.partial_payment && bill.partial_payment > 0) {
+          billAmount = bill.partial_payment;
+        } else {
+          billAmount = bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || bill.amount || 0;
+        }
+      } else {
+        billAmount = bill.remaining_amount || bill.amount || 0;
+      }
+      return sum + billAmount;
+    }, 0);
+    
+    let runningTotal = startingBalance - overdueTotal;
 
-    // Add starting balance as first entry for today
+    // Add starting balance as first entry for today (after overdue adjustment)
+    // BUT only if there are no overdue bills (overdue card already shows balance)
     if (!entries[today]) {
       entries[today] = [];
     }
-    entries[today].push({
-      date: today,
-      type: 'balance',
-      description: 'Account Balance',
-      amount: 0,
-      runningTotal: startingBalance,
-    });
+    if (overdueTotal === 0) {
+      entries[today].push({
+        date: today,
+        type: 'balance',
+        description: 'Account Balance',
+        amount: 0,
+        runningTotal: runningTotal,
+      });
+    }
 
     // Aggregate income by date
     const incomeByDate: { [date: string]: number } = {};
@@ -209,11 +241,13 @@ export default function PlanScreen() {
     if (allCollapsed) {
       // Expand all
       setCollapsedDays(new Set());
+      setOverdueCollapsed(false);
       setAllCollapsed(false);
     } else {
       // Collapse all
       const allDates = new Set(dayGroups.map(day => day.date));
       setCollapsedDays(allDates);
+      setOverdueCollapsed(true);
       setAllCollapsed(true);
     }
   };
@@ -227,8 +261,10 @@ export default function PlanScreen() {
     }
     setCollapsedDays(newCollapsed);
     
-    // Update allCollapsed state
-    setAllCollapsed(newCollapsed.size === dayGroups.length);
+    // Update allCollapsed state: true only if ALL cards are collapsed (daily + overdue)
+    const allDaysCollapsed = newCollapsed.size === dayGroups.length;
+    const hasOverdue = overdueBills.length > 0;
+    setAllCollapsed(allDaysCollapsed && (!hasOverdue || overdueCollapsed));
   };
 
   const getDaySummary = (day: DayGroup) => {
@@ -246,6 +282,28 @@ export default function PlanScreen() {
     const finalBalance = day.entries[day.entries.length - 1]?.runningTotal || 0;
     
     return { netIncome, netExpenses, finalBalance };
+  };
+
+  const getOverdueSummary = () => {
+    const totalOverdue = overdueBills.reduce((sum, bill) => {
+      let billAmount: number;
+      if (bill.is_variable) {
+        if (bill.partial_payment && bill.partial_payment > 0) {
+          billAmount = bill.partial_payment;
+        } else {
+          billAmount = bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || bill.amount || 0;
+        }
+      } else {
+        billAmount = bill.remaining_amount || bill.amount || 0;
+      }
+      return sum + billAmount;
+    }, 0);
+
+    return {
+      netIncome: 0,
+      netExpenses: totalOverdue,
+      finalBalance: accountBalance - totalOverdue,
+    };
   };
 
   return (
@@ -270,6 +328,76 @@ export default function PlanScreen() {
             <RefreshControl refreshing={loading} onRefresh={loadLedgerData} />
           }
         >
+          {/* Overdue Bills Section */}
+          {overdueBills.length > 0 && (
+            <View style={styles.dayCard}>
+              <TouchableOpacity 
+                onPress={() => {
+                  const newOverdueCollapsed = !overdueCollapsed;
+                  setOverdueCollapsed(newOverdueCollapsed);
+                  // Update allCollapsed: true only if overdue AND all daily cards are collapsed
+                  const allDaysCollapsed = collapsedDays.size === dayGroups.length;
+                  setAllCollapsed(allDaysCollapsed && newOverdueCollapsed);
+                }}
+                style={styles.dayHeader}
+              >
+                <View style={styles.dayHeaderContent}>
+                  <Text style={[styles.dayLabel, styles.overdueLabel]}>Overdue</Text>
+                  {overdueCollapsed && (() => {
+                    const summary = getOverdueSummary();
+                    return (
+                      <View style={styles.summaryRow}>
+                        <Text style={styles.summaryBalance}>{formatDollar(accountBalance)}</Text>
+                        <Text style={styles.summaryExpense}>{formatDollar(-summary.netExpenses, true)}</Text>
+                        <Text style={styles.summaryBalance}>{formatDollar(summary.finalBalance)}</Text>
+                      </View>
+                    );
+                  })()}
+                </View>
+              </TouchableOpacity>
+
+              {!overdueCollapsed && (() => {
+                let runningBalance = accountBalance;
+
+                return (
+                  <View style={styles.dayContent}>
+                    {/* Account Balance */}
+                    <View style={styles.entryRow}>
+                      <Text style={styles.entryDescription}>Account Balance</Text>
+                      <Text style={[styles.entryAmount, { color: '#3498db' }]}>{formatDollar(accountBalance)}</Text>
+                    </View>
+
+                    {/* Overdue Bills with running subtotal */}
+                    {overdueBills.map((bill, index) => {
+                      let billAmount: number;
+                      if (bill.is_variable) {
+                        if (bill.partial_payment && bill.partial_payment > 0) {
+                          billAmount = bill.partial_payment;
+                        } else {
+                          billAmount = bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || bill.amount || 0;
+                        }
+                      } else {
+                        billAmount = bill.remaining_amount || bill.amount || 0;
+                      }
+
+                      runningBalance -= billAmount;
+
+                      return (
+                        <View key={index} style={styles.entryRow}>
+                          <Text style={styles.entryDescription}>{bill.name}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Text style={[styles.entryAmount, { color: '#e74c3c' }]}>{formatDollar(-billAmount, true)}</Text>
+                            <Text style={[styles.entryAmount, { color: '#3498db' }]}>{formatDollar(runningBalance)}</Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                );
+              })()}
+            </View>
+          )}
+
           {/* Ledger Entries */}
           {dayGroups.length === 0 ? (
             <View style={styles.emptyState}>
@@ -356,13 +484,21 @@ const styles = StyleSheet.create({
     elevation: 3,
     overflow: 'hidden',
   },
+  overdueLabel: {
+    color: '#e74c3c',
+  },
   dayHeader: {
     padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   dayHeaderContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
   },
   dayLabel: {
     fontSize: 18,
@@ -390,6 +526,12 @@ const styles = StyleSheet.create({
     color: '#3498db',
   },
   entriesContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderTopWidth: 2,
+    borderTopColor: '#ecf0f1',
+  },
+  dayContent: {
     paddingHorizontal: 16,
     paddingBottom: 16,
     borderTopWidth: 2,

@@ -106,7 +106,26 @@ bill_due_dates AS (
           -- Last payment is for past month - check if current month's date has passed
           WHEN bp.last_applied_month_year < TO_CHAR(CURRENT_DATE, 'YYYY-MM') THEN
             CASE
-              -- If current month's due date has passed, move to next month
+              -- If current month's due date has passed BUT not paid, show current month (overdue)
+              WHEN make_date(
+                EXTRACT(YEAR FROM CURRENT_DATE)::int,
+                EXTRACT(MONTH FROM CURRENT_DATE)::int,
+                LEAST(
+                  b.due_day,
+                  EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int
+                )
+              ) < CURRENT_DATE 
+              AND COALESCE(cpp.current_period_paid, 0) < b.amount THEN
+                -- Show current month as overdue
+                make_date(
+                  EXTRACT(YEAR FROM CURRENT_DATE)::int,
+                  EXTRACT(MONTH FROM CURRENT_DATE)::int,
+                  LEAST(
+                    b.due_day,
+                    EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int
+                  )
+                )
+              -- If current month's due date has passed AND paid, move to next month
               WHEN make_date(
                 EXTRACT(YEAR FROM CURRENT_DATE)::int,
                 EXTRACT(MONTH FROM CURRENT_DATE)::int,
@@ -178,13 +197,13 @@ bill_due_dates AS (
               EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int
             )
           ) < CURRENT_DATE THEN
-            -- Move to next month
+            -- Show current month (will be marked as overdue since unpaid)
             make_date(
-              EXTRACT(YEAR FROM CURRENT_DATE + INTERVAL '1 month')::int,
-              EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 month')::int,
+              EXTRACT(YEAR FROM CURRENT_DATE)::int,
+              EXTRACT(MONTH FROM CURRENT_DATE)::int,
               LEAST(
                 b.due_day,
-                EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE + INTERVAL '1 month') + INTERVAL '1 month - 1 day'))::int
+                EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int
               )
             )
           -- Otherwise use current month
