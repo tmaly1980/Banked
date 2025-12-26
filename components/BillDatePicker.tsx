@@ -14,7 +14,7 @@ interface BillDatePickerProps {
   visible: boolean;
   onClose: () => void;
   onSelectDate: (date: string) => void;
-  onSelectDay: (day: number) => void;
+  onSelectDay: (day: number, selectedMonth?: Date) => void;
   onClear: () => void;
   isRecurring: boolean;
   onToggleRecurring: (value: boolean) => void;
@@ -74,7 +74,7 @@ export default function BillDatePicker({
 
   const handleSave = () => {
     if (tempRecurring && tempDay) {
-      onSelectDay(tempDay);
+      onSelectDay(tempDay, currentMonth);
     } else if (!tempRecurring && tempDate) {
       onSelectDate(tempDate);
     }
@@ -179,24 +179,16 @@ export default function BillDatePicker({
             </TouchableOpacity>
           </View>
 
-          {/* Month Navigation */}
-          {!tempRecurring && (
-            <View style={styles.monthNav}>
-              <TouchableOpacity onPress={handlePrevMonth} style={styles.navButton}>
-                <Ionicons name="chevron-back" size={24} color="#2c3e50" />
-              </TouchableOpacity>
-              <Text style={styles.monthYear}>{monthYear}</Text>
-              <TouchableOpacity onPress={handleNextMonth} style={styles.navButton}>
-                <Ionicons name="chevron-forward" size={24} color="#2c3e50" />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {tempRecurring && (
-            <View style={styles.recurringHeader}>
-              <Text style={styles.recurringText}>Select day of month (1-31)</Text>
-            </View>
-          )}
+          {/* Month Navigation - shown for both recurring and one-time */}
+          <View style={styles.monthNav}>
+            <TouchableOpacity onPress={handlePrevMonth} style={styles.navButton}>
+              <Ionicons name="chevron-back" size={24} color="#2c3e50" />
+            </TouchableOpacity>
+            <Text style={styles.monthYear}>{monthYear}</Text>
+            <TouchableOpacity onPress={handleNextMonth} style={styles.navButton}>
+              <Ionicons name="chevron-forward" size={24} color="#2c3e50" />
+            </TouchableOpacity>
+          </View>
 
           {/* Calendar Grid */}
           <ScrollView style={styles.calendar}>

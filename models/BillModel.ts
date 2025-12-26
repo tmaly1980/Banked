@@ -5,12 +5,13 @@ export interface Bill {
   id: string;
   user_id: string;
   name: string;
-  amount: number;
+  amount: number | null;
   due_date?: string;
   due_day?: number;
   priority: 'low' | 'medium' | 'high';
   loss_risk_flag: boolean;
   deferred_flag: boolean;
+  is_variable?: boolean;
   category_id?: string | null;
   category_name?: string;
   notes?: string;
@@ -28,18 +29,24 @@ export interface Bill {
   total_amount?: number;
   partial_payment?: number;
   remaining_amount?: number;
+  // Variable bill statement fields
+  statement_balance?: number;
+  statement_minimum_due?: number;
+  statement_date?: string;
+  updated_balance?: number;
 }
 
 export class BillModel {
   id: string;
   user_id: string;
   name: string;
-  amount: number;
+  amount: number | null;
   due_date?: string;
   due_day?: number;
   priority: 'low' | 'medium' | 'high';
   loss_risk_flag: boolean;
   deferred_flag: boolean;
+  is_variable?: boolean;
   category_id?: string | null;
   category_name?: string;
   notes?: string;

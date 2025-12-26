@@ -18,6 +18,7 @@ import { useBills } from '@/contexts/BillsContext';
 import { BillModel } from '@/models/BillModel';
 import BillDatePicker from '@/components/BillDatePicker';
 import MonthYearInput from '@/components/MonthYearInput';
+import DayOrDateInput from '@/components/DayOrDateInput';
 import CategoryDropdown from '@/components/CategoryDropdown';
 import AmountInput from '@/components/AmountInput';
 import { dateToTimestamp, timestampToDate } from '@/lib/dateUtils';
@@ -50,8 +51,6 @@ export default function BillFormModal({
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [startMonthYear, setStartMonthYear] = useState<string | null>(editingBill?.start_month_year || null);
   const [endMonthYear, setEndMonthYear] = useState<string | null>(editingBill?.end_month_year || null);
-  const [showStartInput, setShowStartInput] = useState(!!editingBill?.start_month_year);
-  const [showEndInput, setShowEndInput] = useState(!!editingBill?.end_month_year);
 
   // Auto-hide alert when form values change
   useEffect(() => {
@@ -70,8 +69,6 @@ export default function BillFormModal({
     setIsRecurring(false);
     setStartMonthYear(null);
     setEndMonthYear(null);
-    setShowStartInput(false);
-    setShowEndInput(false);
   };
 
   const handleClose = () => {
@@ -133,9 +130,14 @@ export default function BillFormModal({
     setShowDatePicker(false);
   };
 
-  const handleDaySelect = (day: number) => {
+  const handleDaySelect = (day: number, selectedMonth?: Date) => {
     setDueDay(day.toString());
     setDueDate('');
+    // Auto-set start_month_year to the month being viewed when selecting recurring day
+    if (selectedMonth) {
+      const monthYear = format(selectedMonth, 'yyyy-MM');
+      setStartMonthYear(monthYear);
+    }
     setShowDatePicker(false);
   };
 
@@ -228,8 +230,6 @@ export default function BillFormModal({
       setIsRecurring(!!editingBill.due_day);
       setStartMonthYear(editingBill.start_month_year || null);
       setEndMonthYear(editingBill.end_month_year || null);
-      setShowStartInput(!!editingBill.start_month_year);
-      setShowEndInput(!!editingBill.end_month_year);
     }
   }, [visible, editingBill]);
 
@@ -292,70 +292,13 @@ export default function BillFormModal({
 
             <View style={styles.halfInputGroup}>
               <Text style={globalStyles.label}>Due Date</Text>
-              <TouchableOpacity
-                style={styles.dateInput}
+              <DayOrDateInput
+                value={isRecurring && dueDay ? parseInt(dueDay) : dueDate}
+                isRecurring={isRecurring}
                 onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={[styles.dateInputText, (!dueDate && !dueDay) && styles.dateInputPlaceholder]}>
-                  {getDueDateDisplay()}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Start Date / End Date Row */}
-          <View style={styles.rowInputGroup}>
-            <View style={styles.halfInputGroup}>
-              {showStartInput ? (
-                <MonthYearInput
-                  label="Start Date"
-                  value={startMonthYear || ''}
-                  onChangeValue={(value) => {
-                    setStartMonthYear(value);
-                    if (!value) {
-                      setShowStartInput(false);
-                      setEndMonthYear(null);
-                      setShowEndInput(false);
-                    }
-                  }}
-                />
-              ) : (
-                <TouchableOpacity onPress={() => {
-                  setShowStartInput(true);
-                  // Auto-select current month/year if not set
-                  if (!startMonthYear) {
-                    const now = new Date();
-                    const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-                    setStartMonthYear(currentMonthYear);
-                  }
-                }}>
-                  <Text style={styles.setDateLink}>Set Start Date</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <View style={styles.halfInputGroup}>
-              {showStartInput && (
-                showEndInput ? (
-                  <MonthYearInput
-                    label="End Date"
-                    value={endMonthYear || ''}
-                    onChangeValue={(value) => {
-                      setEndMonthYear(value);
-                      if (!value) {
-                        setShowEndInput(false);
-                      }
-                    }}
-                  />
-                ) : (
-                  <TouchableOpacity 
-                    style={styles.setEndDateContainer}
-                    onPress={() => setShowEndInput(true)}
-                  >
-                    <Text style={styles.setDateLink}>Set End Date</Text>
-                  </TouchableOpacity>
-                )
-              )}
+                placeholder="Select due date"
+                startMonthYear={startMonthYear}
+              />
             </View>
           </View>
 

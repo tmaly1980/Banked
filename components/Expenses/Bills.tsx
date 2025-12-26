@@ -1,23 +1,38 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { BillModel } from '@/models/BillModel';
 import { format, isAfter, isBefore, startOfDay, addDays } from 'date-fns';
+import DayOrDateInput from '@/components/DayOrDateInput';
+import BillDatePicker from '@/components/BillDatePicker';
 
 interface BillsProps {
   bills: BillModel[];
   onBillPress: (bill: BillModel) => void;
+  onAddBill?: (bill: { name: string; amount: number; due_date?: string; due_day?: number }) => Promise<void>;
 }
 
-export default function Bills({ bills, onBillPress }: BillsProps) {
+export default function Bills({ bills, onBillPress, onAddBill }: BillsProps) {
   const [laterExpanded, setLaterExpanded] = useState(true);
+  const [showInlineForm, setShowInlineForm] = useState(false);
+  const [inlineBillDate, setInlineBillDate] = useState<string>('');
+  const [inlineBillDay, setInlineBillDay] = useState<number | undefined>(undefined);
+  const [inlineBillName, setInlineBillName] = useState('');
+  const [inlineBillAmount, setInlineBillAmount] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  
+  const nameInputRef = useRef<TextInput>(null);
+  const amountInputRef = useRef<TextInput>(null);
 
   // Load saved accordion state on mount
   useEffect(() => {
@@ -42,6 +57,68 @@ export default function Bills({ bills, onBillPress }: BillsProps) {
       await AsyncStorage.setItem('bills_later_expanded', JSON.stringify(newState));
     } catch (error) {
       console.error('Failed to save accordion state:', error);
+    }
+  };
+
+  const handleAddInlineBill = async () => {
+    if (!onAddBill || isAdding) return;
+    
+    const name = inlineBillName.trim();
+    const amount = parseFloat(inlineBillAmount);
+    
+    if (!name || isNaN(amount) || amount <= 0) {
+      return;
+    }
+    
+    if (!inlineBillDate && inlineBillDay === undefined) {
+      return;
+    }
+    
+    try {
+      setIsAdding(true);
+      await onAddBill({
+        name,
+        amount,
+        due_date: !isRecurring && inlineBillDate ? inlineBillDate : undefined,
+        due_day: isRecurring && inlineBillDay ? inlineBillDay : undefined,
+      });
+      
+      // Clear form
+      setInlineBillDate('');
+      setInlineBillDay(undefined);
+      setInlineBillName('');
+      setInlineBillAmount('');
+      setShowInlineForm(false);
+      setIsRecurring(false);
+    } catch (error) {
+      console.error('Failed to add bill:', error);
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const handleDateSelect = (date: string) => {
+    setInlineBillDate(date);
+    setInlineBillDay(undefined);
+  };
+
+  const handleDaySelect = (day: number) => {
+    setInlineBillDay(day);
+    setInlineBillDate('');
+  };
+
+  const handleClearDate = () => {
+    setInlineBillDate('');
+    setInlineBillDay(undefined);
+  };
+
+  const handleShowInlineForm = () => {
+    if (showInlineForm) {
+      // Hide form if already shown
+      setShowInlineForm(false);
+    } else {
+      // Show form
+      setShowInlineForm(true);
     }
   };
 
@@ -83,7 +160,7 @@ export default function Bills({ bills, onBillPress }: BillsProps) {
       const date = new Date(year, month - 1, day);
       return format(date, 'MM/dd');
     }
-    return '--/--';
+    return '';
   };
 
   const getBillStatus = (bill: BillModel): string => {
@@ -102,6 +179,7 @@ export default function Bills({ bills, onBillPress }: BillsProps) {
     const hasPartialPayment = bill.remaining_amount !== undefined && 
                               bill.remaining_amount > 0 &&
                               bill.remaining_amount < bill.amount;
+    const isOverdue = bill.is_overdue;
     
     return (
       <TouchableOpacity
@@ -109,15 +187,20 @@ export default function Bills({ bills, onBillPress }: BillsProps) {
         style={styles.billRow}
         onPress={() => onBillPress(bill)}
       >
-        <Text style={styles.billDate}>{formatBillDate(bill)}</Text>
-        <Text style={styles.billName} numberOfLines={1}>{bill.name}</Text>
+        <View style={styles.dateContainer}>
+          {isOverdue && (
+            <Ionicons name="time-outline" size={16} color="#e74c3c" style={styles.statusIcon} />
+          )}
+          <Text style={[styles.billDate, isOverdue && styles.overdueText]}>{formatBillDate(bill)}</Text>
+        </View>
+        <Text style={[styles.billName, isOverdue && styles.overdueText]} numberOfLines={1}>{bill.name}</Text>
         <Text style={[
           styles.billAmount,
-          hasPartialPayment && styles.billAmountPartial
+          hasPartialPayment && styles.billAmountPartial,
+          isOverdue && styles.overdueText
         ]}>
           ${(bill.remaining_amount || bill.amount).toFixed(2)}
         </Text>
-        <Text style={styles.billStatus}></Text>
       </TouchableOpacity>
     );
   };
@@ -125,15 +208,9 @@ export default function Bills({ bills, onBillPress }: BillsProps) {
   return (
     <View style={{ flex: 1 }}>
       <ScrollView style={styles.container}>
-      {/* Overdue Bills */}
+      {/* Overdue Bills (no header, just rows) */}
       {groupedBills.overdue.length > 0 && (
         <View style={styles.section}>
-          <View style={[styles.sectionHeader, styles.overdueHeader]}>
-            <Ionicons name="warning" size={20} color="#e74c3c" />
-            <Text style={[styles.sectionTitle, styles.overdueTitle]}>
-              Overdue ({groupedBills.overdue.length})
-            </Text>
-          </View>
           {groupedBills.overdue.map(renderBillRow)}
         </View>
       )}
@@ -145,7 +222,49 @@ export default function Bills({ bills, onBillPress }: BillsProps) {
             <Text style={styles.sectionTitle}>
               Upcoming ({groupedBills.upcoming.length})
             </Text>
+            {onAddBill && (
+              <TouchableOpacity 
+                style={styles.addIcon}
+                onPress={handleShowInlineForm}
+              >
+                <Ionicons name="add-circle-outline" size={24} color="#3498db" />
+              </TouchableOpacity>
+            )}
           </View>
+          
+          {showInlineForm && (
+            <View style={styles.inlineFormRow}>
+              <View style={styles.inlineDateInput}>
+                <DayOrDateInput
+                  value={isRecurring && inlineBillDay ? inlineBillDay : inlineBillDate}
+                  isRecurring={isRecurring}
+                  onPress={() => setShowDatePicker(true)}
+                  placeholder="MM/DD"
+                  style={styles.compactInput}
+                />
+              </View>
+              <TextInput
+                ref={nameInputRef}
+                style={[styles.inlineTextInput, styles.inlineNameInput]}
+                placeholder="Bill name"
+                value={inlineBillName}
+                onChangeText={setInlineBillName}
+                returnKeyType="next"
+                onSubmitEditing={() => amountInputRef.current?.focus()}
+              />
+              <TextInput
+                ref={amountInputRef}
+                style={[styles.inlineTextInput, styles.inlineAmountInput]}
+                placeholder="Amount"
+                value={inlineBillAmount}
+                onChangeText={setInlineBillAmount}
+                keyboardType="decimal-pad"
+                returnKeyType="done"
+                onSubmitEditing={handleAddInlineBill}
+              />
+            </View>
+          )}
+          
           {groupedBills.upcoming.map(renderBillRow)}
         </View>
       )}
@@ -170,6 +289,18 @@ export default function Bills({ bills, onBillPress }: BillsProps) {
         </View>
       )}
       </ScrollView>
+      
+      <BillDatePicker
+        visible={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        onSelectDate={handleDateSelect}
+        onSelectDay={handleDaySelect}
+        onClear={handleClearDate}
+        isRecurring={isRecurring}
+        onToggleRecurring={setIsRecurring}
+        selectedDate={inlineBillDate}
+        selectedDay={inlineBillDay}
+      />
     </View>
   );
 }
@@ -184,12 +315,17 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 16,
     backgroundColor: '#ecf0f1',
     gap: 8,
   },
+  addIcon: {
+    marginLeft: 'auto',
+  },
   overdueHeader: {
+    justifyContent: 'flex-start',
     backgroundColor: '#fadbd8',
   },
   sectionTitle: {
@@ -215,16 +351,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#ecf0f1',
-    gap: 12,
+    gap: 8,
+  },
+  dateContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  statusIcon: {
+    flexShrink: 0,
   },
   billDate: {
     fontSize: 14,
     fontWeight: '600',
     color: '#7f8c8d',
-    width: 50,
   },
   billName: {
-    flex: 1,
+    flex: 4,
     fontSize: 15,
     color: '#2c3e50',
   },
@@ -232,16 +376,46 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#2c3e50',
-    width: 80,
+    flex: 2,
     textAlign: 'right',
   },
   billAmountPartial: {
     color: '#e67e22',
   },
-  billStatus: {
-    fontSize: 13,
-    fontWeight: '600',
-    width: 60,
+  overdueText: {
+    color: '#e74c3c',
+  },
+  inlineFormRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    backgroundColor: '#f8f9fa',
+    borderBottomWidth: 2,
+    borderBottomColor: '#3498db',
+    gap: 4,
+  },
+  inlineDateInput: {
+    flex: 2,
+  },
+  compactInput: {
+    padding: 8,
+    minHeight: 36,
+  },
+  inlineTextInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 8,
+    backgroundColor: 'white',
+    fontSize: 14,
+    minHeight: 36,
+  },
+  inlineNameInput: {
+    flex: 5,
+  },
+  inlineAmountInput: {
+    flex: 2,
     textAlign: 'right',
   },
 });

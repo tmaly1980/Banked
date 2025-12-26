@@ -23,7 +23,7 @@ import FloatingActionButton from '@/components/FloatingActionButton';
 type AccordionSection = 'bills' | 'budget' | 'projects' | 'purchases';
 
 export default function ExpensesScreen() {
-  const { bills, loading, refreshData } = useBills();
+  const { bills, loading, refreshData, createBill } = useBills();
   const [expandedSection, setExpandedSection] = useState<AccordionSection | null>('bills');
   const [selectedBill, setSelectedBill] = useState<BillModel | null>(null);
   const [billDetailsVisible, setBillDetailsVisible] = useState(false);
@@ -40,6 +40,22 @@ export default function ExpensesScreen() {
 
   const handleRefresh = async () => {
     await refreshData();
+  };
+
+  const handleAddInlineBill = async (bill: { name: string; amount: number; due_date?: string; due_day?: number }) => {
+    const { error } = await createBill({
+      name: bill.name,
+      amount: bill.amount,
+      due_date: bill.due_date || undefined,
+      due_day: bill.due_day || undefined,
+      priority: 'medium',
+      loss_risk_flag: false,
+      deferred_flag: false,
+    });
+    
+    if (!error) {
+      await refreshData();
+    }
   };
 
   return (
@@ -71,6 +87,7 @@ export default function ExpensesScreen() {
                 <Bills 
                   bills={bills} 
                   onBillPress={handleBillPress}
+                  onAddBill={handleAddInlineBill}
                 />
               </View>
             )}
