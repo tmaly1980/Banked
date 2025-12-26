@@ -23,10 +23,20 @@ interface LedgerEntry {
   runningTotal: number;
 }
 
-interface DayGroup {
+interface IncomeBreakdown {
   date: string;
   dayLabel: string;
+  amount: number;
+  runningTotal: number;
+}
+
+interface DayGroup {
+  date: string;
+  endDate?: string; // For combined income-only days
+  dayLabel: string;
   entries: LedgerEntry[];
+  isIncomeOnly?: boolean;
+  incomeBreakdown?: IncomeBreakdown[]; // For combined days
 }
 
 export default function PlanScreen() {
@@ -226,15 +236,106 @@ export default function PlanScreen() {
       }
     });
 
-    // Group by day
-    return sortedDates.map((date) => {
-      const parsedDate = parseISO(date);
-      return {
-        date,
-        dayLabel: format(parsedDate, 'EEE MMM d'),
-        entries: entries[date],
-      };
+    // Group by day, combining consecutive income-only days
+    const dayGroups: DayGroup[] = [];
+    let currentIncomeGroup: { startDate: string; dates: string[]; entries: { [date: string]: LedgerEntry[] } } | null = null;
+
+    sortedDates.forEach((date, index) => {
+      const dayEntries = entries[date];
+      const hasOnlyIncome = dayEntries.every(e => e.type === 'income' || e.type === 'balance');
+      const hasIncome = dayEntries.some(e => e.type === 'income');
+      const hasBills = dayEntries.some(e => e.type === 'bill');
+
+      // If this day has only income (no bills), add to current group or start new one
+      if (hasIncome && !hasBills) {
+        if (!currentIncomeGroup) {
+          currentIncomeGroup = { startDate: date, dates: [date], entries: { [date]: dayEntries } };
+        } else {
+          currentIncomeGroup.dates.push(date);
+          currentIncomeGroup.entries[date] = dayEntries;
+        }
+
+        // If this is the last date, finalize the group
+        if (index === sortedDates.length - 1 && currentIncomeGroup) {
+          if (currentIncomeGroup.dates.length > 1) {
+            // Multiple consecutive income-only days - create combined card
+            const startDate = currentIncomeGroup.startDate;
+            const endDate = currentIncomeGroup.dates[currentIncomeGroup.dates.length - 1];
+            const incomeBreakdown: IncomeBreakdown[] = currentIncomeGroup.dates.map(d => {
+              const entry = currentIncomeGroup!.entries[d].find(e => e.type === 'income')!;
+              return {
+                date: d,
+                dayLabel: format(parseISO(d), 'EEE MMM d'),
+                amount: entry.amount,
+                runningTotal: entry.runningTotal,
+              };
+            });
+            const lastEntry = currentIncomeGroup.entries[endDate].find(e => e.type === 'income')!;
+            dayGroups.push({
+              date: startDate,
+              endDate: endDate,
+              dayLabel: `${format(parseISO(startDate), 'MMM d')} - ${format(parseISO(endDate), 'MMM d')}`,
+              entries: [lastEntry], // Use last entry for summary
+              isIncomeOnly: true,
+              incomeBreakdown,
+            });
+          } else {
+            // Single income-only day - add as regular card
+            const d = currentIncomeGroup.dates[0];
+            dayGroups.push({
+              date: d,
+              dayLabel: format(parseISO(d), 'EEE MMM d'),
+              entries: currentIncomeGroup.entries[d],
+            });
+          }
+        }
+      } else {
+        // Day has bills or no income - finalize any current income group
+        if (currentIncomeGroup) {
+          if (currentIncomeGroup.dates.length > 1) {
+            // Multiple consecutive income-only days - create combined card
+            const startDate = currentIncomeGroup.startDate;
+            const endDate = currentIncomeGroup.dates[currentIncomeGroup.dates.length - 1];
+            const incomeBreakdown: IncomeBreakdown[] = currentIncomeGroup.dates.map(d => {
+              const entry = currentIncomeGroup!.entries[d].find(e => e.type === 'income')!;
+              return {
+                date: d,
+                dayLabel: format(parseISO(d), 'EEE MMM d'),
+                amount: entry.amount,
+                runningTotal: entry.runningTotal,
+              };
+            });
+            const lastEntry = currentIncomeGroup.entries[endDate].find(e => e.type === 'income')!;
+            dayGroups.push({
+              date: startDate,
+              endDate: endDate,
+              dayLabel: `${format(parseISO(startDate), 'MMM d')} - ${format(parseISO(endDate), 'MMM d')}`,
+              entries: [lastEntry], // Use last entry for summary
+              isIncomeOnly: true,
+              incomeBreakdown,
+            });
+          } else {
+            // Single income-only day - add as regular card
+            const d = currentIncomeGroup.dates[0];
+            dayGroups.push({
+              date: d,
+              dayLabel: format(parseISO(d), 'EEE MMM d'),
+              entries: currentIncomeGroup.entries[d],
+            });
+          }
+          currentIncomeGroup = null;
+        }
+
+        // Add current day as regular card
+        dayGroups.push({
+          date,
+          dayLabel: format(parseISO(date), 'EEE MMM d'),
+          entries: dayEntries,
+        });
+      }
     });
+
+    return dayGroups;
   };
 
   const toggleAllDays = () => {
@@ -270,6 +371,13 @@ export default function PlanScreen() {
   const getDaySummary = (day: DayGroup) => {
     let netIncome = 0;
     let netExpenses = 0;
+    
+    if (day.isIncomeOnly && day.incomeBreakdown) {
+      // For combined income cards, sum all income from breakdown
+      netIncome = day.incomeBreakdown.reduce((sum, breakdown) => sum + breakdown.amount, 0);
+      const finalBalance = day.incomeBreakdown[day.incomeBreakdown.length - 1]?.runningTotal || 0;
+      return { netIncome, netExpenses: 0, finalBalance };
+    }
     
     day.entries.forEach(entry => {
       if (entry.type === 'income') {
@@ -431,23 +539,39 @@ export default function PlanScreen() {
                   </TouchableOpacity>
                   {!isCollapsed && (
                     <View style={styles.entriesContainer}>
-                      {day.entries.map((entry, entryIndex) => (
-                        <View key={entryIndex} style={styles.entryRow}>
-                          <View style={styles.entryInfo}>
-                            <Text style={styles.entryDescription}>{entry.description}</Text>
-                            {entry.type !== 'balance' && (
-                              <Text style={[
-                                styles.entryAmount,
-                                entry.type === 'income' && styles.incomeAmount,
-                                entry.type === 'bill' && styles.billAmount,
-                              ]}>
-                                {formatDollar(entry.amount, true)}
+                      {day.isIncomeOnly && day.incomeBreakdown ? (
+                        // Show breakdown for combined income days
+                        day.incomeBreakdown.map((breakdown, idx) => (
+                          <View key={idx} style={styles.entryRow}>
+                            <View style={styles.entryInfo}>
+                              <Text style={styles.entryDescription}>{breakdown.dayLabel}</Text>
+                              <Text style={[styles.entryAmount, styles.incomeAmount]}>
+                                {formatDollar(breakdown.amount, true)}
                               </Text>
-                            )}
+                            </View>
+                            <Text style={styles.runningTotal}>{formatDollar(breakdown.runningTotal)}</Text>
                           </View>
-                          <Text style={styles.runningTotal}>{formatDollar(entry.runningTotal)}</Text>
-                        </View>
-                      ))}
+                        ))
+                      ) : (
+                        // Show regular entries for normal days
+                        day.entries.map((entry, entryIndex) => (
+                          <View key={entryIndex} style={styles.entryRow}>
+                            <View style={styles.entryInfo}>
+                              <Text style={styles.entryDescription}>{entry.description}</Text>
+                              {entry.type !== 'balance' && (
+                                <Text style={[
+                                  styles.entryAmount,
+                                  entry.type === 'income' && styles.incomeAmount,
+                                  entry.type === 'bill' && styles.billAmount,
+                                ]}>
+                                  {formatDollar(entry.amount, true)}
+                                </Text>
+                              )}
+                            </View>
+                            <Text style={styles.runningTotal}>{formatDollar(entry.runningTotal)}</Text>
+                          </View>
+                        ))
+                      )}
                     </View>
                   )}
                 </View>
