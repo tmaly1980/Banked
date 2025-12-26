@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,18 +20,14 @@ import Purchases from '@/components/Expenses/Purchases';
 import BillFormModal from '@/components/modals/BillFormModal';
 import FloatingActionButton from '@/components/FloatingActionButton';
 
-type AccordionSection = 'bills' | 'budget' | 'projects' | 'purchases';
+type TabSection = 'bills' | 'budget' | 'projects' | 'purchases';
 
 export default function ExpensesScreen() {
   const { bills, loading, refreshData, createBill } = useBills();
-  const [expandedSection, setExpandedSection] = useState<AccordionSection | null>('bills');
+  const [activeTab, setActiveTab] = useState<TabSection>('bills');
   const [selectedBill, setSelectedBill] = useState<BillModel | null>(null);
   const [billDetailsVisible, setBillDetailsVisible] = useState(false);
   const [billFormVisible, setBillFormVisible] = useState(false);
-
-  const toggleSection = (section: AccordionSection) => {
-    setExpandedSection(expandedSection === section ? null : section);
-  };
 
   const handleBillPress = (bill: BillModel) => {
     setSelectedBill(bill);
@@ -62,103 +59,71 @@ export default function ExpensesScreen() {
       <View style={styles.container}>
         <TabScreenHeader title="Expenses" />
 
-        {/* Bills Accordion */}
-        <View style={expandedSection === 'bills' ? styles.billsAccordionSection : styles.accordionSection}>
+        {/* Top Navigation Bar */}
+        <View style={styles.tabBar}>
           <TouchableOpacity
-            style={styles.accordionHeader}
-            onPress={() => toggleSection('bills')}
+            style={[styles.tab, activeTab === 'bills' && styles.activeTab]}
+            onPress={() => setActiveTab('bills')}
           >
-            <Ionicons
-              name={expandedSection === 'bills' ? 'chevron-down' : 'chevron-forward'}
-              size={24}
-              color="#2c3e50"
-            />
-            <Text style={styles.accordionTitle}>Bills</Text>
-            <Text style={styles.accordionTotal}>
-              {formatDollar(bills
-                .filter(bill => !bill.deferred_flag && bill.next_due_date)
-                .reduce((sum, bill) => {
-                  const amount = bill.is_variable 
-                    ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
-                    : (bill.remaining_amount || bill.amount || 0);
-                  return sum + amount;
-                }, 0))}
+            <Text style={[styles.tabText, activeTab === 'bills' && styles.activeTabText]}>
+              Bills
             </Text>
           </TouchableOpacity>
-          {expandedSection === 'bills' && (
-            <View style={styles.billsScrollContainer}>
-              <Bills 
-                bills={bills} 
-                onBillPress={handleBillPress}
-                onAddBill={handleAddInlineBill}
-                onRefresh={handleRefresh}
-                loading={loading}
-              />
-            </View>
-          )}
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'budget' && styles.activeTab]}
+            onPress={() => setActiveTab('budget')}
+          >
+            <Text style={[styles.tabText, activeTab === 'budget' && styles.activeTabText]}>
+              Budget
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'projects' && styles.activeTab]}
+            onPress={() => setActiveTab('projects')}
+          >
+            <Text style={[styles.tabText, activeTab === 'projects' && styles.activeTabText]}>
+              Projects
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'purchases' && styles.activeTab]}
+            onPress={() => setActiveTab('purchases')}
+          >
+            <Text style={[styles.tabText, activeTab === 'purchases' && styles.activeTabText]}>
+              Purchases
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Bottom Fixed Accordions */}
-        <View style={styles.bottomAccordions}>
-          {/* Budget Accordion */}
-          <View style={styles.accordionSection}>
-            <TouchableOpacity
-              style={styles.accordionHeader}
-              onPress={() => toggleSection('budget')}
-            >
-              <Ionicons
-                name={expandedSection === 'budget' ? 'chevron-down' : 'chevron-forward'}
-                size={24}
-                color="#2c3e50"
-              />
-              <Text style={styles.accordionTitle}>Budget</Text>
-            </TouchableOpacity>
-            {expandedSection === 'budget' && (
-              <View style={styles.accordionContent}>
-                <Budget />
-              </View>
-            )}
-          </View>
-
-          {/* Projects Accordion */}
-          <View style={styles.accordionSection}>
-            <TouchableOpacity
-              style={styles.accordionHeader}
-              onPress={() => toggleSection('projects')}
-            >
-              <Ionicons
-                name={expandedSection === 'projects' ? 'chevron-down' : 'chevron-forward'}
-                size={24}
-                color="#2c3e50"
-              />
-              <Text style={styles.accordionTitle}>Projects</Text>
-            </TouchableOpacity>
-            {expandedSection === 'projects' && (
-              <View style={styles.accordionContent}>
-                <Projects />
-              </View>
-            )}
-          </View>
-
-          {/* Purchases Accordion */}
-          <View style={styles.accordionSection}>
-            <TouchableOpacity
-              style={styles.accordionHeader}
-              onPress={() => toggleSection('purchases')}
-            >
-              <Ionicons
-                name={expandedSection === 'purchases' ? 'chevron-down' : 'chevron-forward'}
-                size={24}
-                color="#2c3e50"
-              />
-              <Text style={styles.accordionTitle}>Purchases</Text>
-            </TouchableOpacity>
-            {expandedSection === 'purchases' && (
-              <View style={styles.accordionContent}>
-                <Purchases />
-              </View>
-            )}
-          </View>
+        {/* Content Area */}
+        <View style={styles.content}>
+          {activeTab === 'bills' && (
+            <Bills 
+              bills={bills} 
+              onBillPress={handleBillPress}
+              onAddBill={handleAddInlineBill}
+              onRefresh={handleRefresh}
+              loading={loading}
+            />
+          )}
+          {activeTab === 'budget' && (
+            <View style={styles.placeholderContainer}>
+              <Ionicons name="calculator-outline" size={64} color="#bdc3c7" />
+              <Text style={styles.placeholderText}>Budget tracking coming soon</Text>
+            </View>
+          )}
+          {activeTab === 'projects' && (
+            <View style={styles.placeholderContainer}>
+              <Ionicons name="construct-outline" size={64} color="#bdc3c7" />
+              <Text style={styles.placeholderText}>Projects coming soon</Text>
+            </View>
+          )}
+          {activeTab === 'purchases' && (
+            <View style={styles.placeholderContainer}>
+              <Ionicons name="cart-outline" size={64} color="#bdc3c7" />
+              <Text style={styles.placeholderText}>Purchases coming soon</Text>
+            </View>
+          )}
         </View>
 
         {/* Bill Details Modal */}
@@ -218,41 +183,46 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  billsAccordionSection: {
-    flex: 1,
-    backgroundColor: 'white',
-  },
-  billsScrollContainer: {
-    flex: 1,
-  },
-  bottomAccordions: {
-    backgroundColor: 'white',
-  },
-  accordionSection: {
-    backgroundColor: 'white',
-  },
-  accordionHeader: {
+  tabBar: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#ecf0f1',
-    gap: 12,
   },
-  accordionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  accordionTotal: {
+  activeTab: {
+    borderBottomColor: '#3498db',
+  },
+  tabText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#3498db',
-    marginLeft: 'auto',
+    color: '#7f8c8d',
   },
-  accordionContent: {
-    minHeight: 150,
+  activeTabText: {
+    color: '#3498db',
+  },
+  content: {
+    flex: 1,
     backgroundColor: 'white',
+  },
+  placeholderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: '#7f8c8d',
+    marginTop: 16,
+    textAlign: 'center',
   },
 });

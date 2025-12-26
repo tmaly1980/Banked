@@ -173,6 +173,44 @@ bill_instances AS (
     AND b.due_day IS NOT NULL
     AND (b.start_month_year IS NULL OR b.start_month_year <= TO_CHAR(CURRENT_DATE + INTERVAL '1 month', 'YYYY-MM'))
     AND (b.end_month_year IS NULL OR b.end_month_year >= TO_CHAR(CURRENT_DATE + INTERVAL '1 month', 'YYYY-MM'))
+
+  UNION ALL
+
+  -- Undated bills (no due_date and no due_day) - pawn items, etc.
+  SELECT 
+    b.id,
+    b.user_id,
+    b.name,
+    b.amount,
+    b.due_date,
+    b.due_day,
+    b.priority,
+    b.loss_risk_flag,
+    b.deferred_flag,
+    b.is_variable,
+    b.urgent_note,
+    b.category_id,
+    b.notes,
+    b.start_month_year,
+    b.end_month_year,
+    b.created_at,
+    b.updated_at,
+    bp.last_payment_date,
+    bp.total_paid,
+    cpp.current_period_paid,
+    ls.statement_date,
+    ls.statement_balance,
+    ls.statement_minimum_due,
+    ls.updated_balance,
+    NULL::DATE as instance_due_date,
+    'undated' as instance_type
+  FROM bills b
+  LEFT JOIN bill_payment_summary bp ON b.id = bp.bill_id
+  LEFT JOIN current_period_payments cpp ON b.id = cpp.bill_id
+  LEFT JOIN latest_statements ls ON b.id = ls.bill_id
+  WHERE b.user_id = auth.uid()
+    AND b.due_date IS NULL
+    AND b.due_day IS NULL
 )
 SELECT 
   bi.id,
