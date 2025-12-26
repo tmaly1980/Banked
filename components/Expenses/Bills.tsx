@@ -133,21 +133,21 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
 
   const groupedBills = useMemo(() => {
     const today = startOfDay(new Date());
-    const thirtyDaysFromNow = addDays(today, 30);
+    const endOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 2, 0); // Last day of next month
     const overdue: BillModel[] = [];
     const upcoming: BillModel[] = [];
     const later: BillModel[] = [];
 
     bills.forEach(bill => {
-      // Bills with deferred flag or no due date go to "Later"
-      if (bill.deferred_flag || !bill.next_due_date) {
+      // Bills without next_due_date or with deferred flag go to "Later"
+      if (!bill.next_due_date || bill.deferred_flag) {
         later.push(bill);
       } else if (bill.is_overdue) {
         overdue.push(bill);
       } else {
-        // Check if bill is within next 30 days using next_due_date from SQL
+        // Check if bill is from today through end of next month
         const nextDueDate = startOfDay(new Date(bill.next_due_date));
-        if (nextDueDate <= thirtyDaysFromNow) {
+        if (nextDueDate <= endOfNextMonth) {
           upcoming.push(bill);
         } else {
           later.push(bill);
@@ -155,11 +155,18 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
       }
     });
 
-    // Overdue bills are already sorted by the SQL function
-    // Upcoming bills are already sorted by the SQL function
-    // No need to re-sort
+    // Group upcoming bills by month
+    const upcomingByMonth: { [key: string]: BillModel[] } = {};
+    upcoming.forEach(bill => {
+      const [year, month] = bill.next_due_date!.split('-');
+      const monthKey = `${year}-${month}`;
+      if (!upcomingByMonth[monthKey]) {
+        upcomingByMonth[monthKey] = [];
+      }
+      upcomingByMonth[monthKey].push(bill);
+    });
 
-    return { overdue, upcoming, later };
+    return { overdue, upcoming, upcomingByMonth, later };
   }, [bills]);
 
   const formatBillDate = (bill: BillModel): string => {
@@ -191,10 +198,31 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
                               bill.remaining_amount < bill.amount;
     const isOverdue = bill.is_overdue;
     
-    // For variable bills, display minimum due or updated balance
-    const displayAmount = bill.is_variable 
-      ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
-      : (bill.remaining_amount || bill.amount || 0);
+    // For variable bills:
+    // - First instance (current/overdue): use minimum due
+    // - Second instance (next month): use balance - minimum (estimate)
+    let displayAmount: number;
+    if (bill.is_variable) {
+      if (bill.next_due_date) {
+        const nextDueDate = new Date(bill.next_due_date);
+        const today = new Date();
+        const isCurrentMonth = nextDueDate.getMonth() === today.getMonth() && 
+                               nextDueDate.getFullYear() === today.getFullYear();
+        const isNextMonth = !isCurrentMonth && !bill.is_overdue;
+        
+        if (isNextMonth && bill.statement_balance && bill.statement_minimum_due) {
+          // Second instance - estimate as balance - minimum
+          displayAmount = Math.max(0, bill.statement_balance - bill.statement_minimum_due);
+        } else {
+          // First instance (current/overdue) - use minimum due
+          displayAmount = bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0;
+        }
+      } else {
+        displayAmount = bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0;
+      }
+    } else {
+      displayAmount = bill.remaining_amount || bill.amount || 0;
+    }
     
 
     console.log('Rendering bill:', bill.name, 'Amount:', displayAmount, 'Variable:', bill.is_variable, 'Partial Payment:', hasPartialPayment);
@@ -252,66 +280,54 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
         </View>
       )}
 
-      {/* Upcoming Bills */}
-      {groupedBills.upcoming.length > 0 && (
+      {/* Upcoming Bills - Grouped by Month */}
+      {Object.keys(groupedBills.upcomingByMonth).length > 0 && (
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              Upcoming ({groupedBills.upcoming.length})
-            </Text>
-            <Text style={styles.sectionTotal}>
-              {formatDollar(groupedBills.upcoming
-                .reduce((sum, bill) => {
-                  const amount = bill.is_variable 
-                    ? (bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0)
-                    : (bill.remaining_amount || bill.amount || 0);
-                  return sum + amount;
-                }, 0))}
-            </Text>
-            {/* {onAddBill && (
-              <TouchableOpacity 
-                style={styles.addIcon}
-                onPress={handleShowInlineForm}
-              >
-                <Ionicons name="add-circle-outline" size={24} color="#3498db" />
-              </TouchableOpacity>
-            )} */}
-          </View>
-          
-          {showInlineForm && (
-            <View style={styles.inlineFormRow}>
-              <View style={styles.inlineDateInput}>
-                <DayOrDateInput
-                  value={isRecurring && inlineBillDay ? inlineBillDay : inlineBillDate}
-                  isRecurring={isRecurring}
-                  onPress={() => setShowDatePicker(true)}
-                  placeholder="MM/DD"
-                  style={styles.compactInput}
-                />
-              </View>
-              <TextInput
-                ref={nameInputRef}
-                style={[styles.inlineTextInput, styles.inlineNameInput]}
-                placeholder="Bill name"
-                value={inlineBillName}
-                onChangeText={setInlineBillName}
-                returnKeyType="next"
-                onSubmitEditing={() => amountInputRef.current?.focus()}
-              />
-              <TextInput
-                ref={amountInputRef}
-                style={[styles.inlineTextInput, styles.inlineAmountInput]}
-                placeholder="Amount"
-                value={inlineBillAmount}
-                onChangeText={setInlineBillAmount}
-                keyboardType="decimal-pad"
-                returnKeyType="done"
-                onSubmitEditing={handleAddInlineBill}
-              />
-            </View>
-          )}
-          
-          {groupedBills.upcoming.map(renderBillRow)}
+          {Object.entries(groupedBills.upcomingByMonth)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([monthKey, monthBills]) => {
+              const [year, month] = monthKey.split('-');
+              const monthDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+              const monthLabel = format(monthDate, 'MMM yyyy');
+              
+              const monthTotal = monthBills.reduce((sum, bill) => {
+                let amount: number;
+                if (bill.is_variable) {
+                  if (bill.next_due_date) {
+                    const nextDueDate = new Date(bill.next_due_date);
+                    const today = new Date();
+                    const isCurrentMonth = nextDueDate.getMonth() === today.getMonth() && 
+                                           nextDueDate.getFullYear() === today.getFullYear();
+                    const isNextMonth = !isCurrentMonth && !bill.is_overdue;
+                    
+                    if (isNextMonth && bill.statement_balance && bill.statement_minimum_due) {
+                      amount = Math.max(0, bill.statement_balance - bill.statement_minimum_due);
+                    } else {
+                      amount = bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0;
+                    }
+                  } else {
+                    amount = bill.statement_minimum_due || bill.updated_balance || bill.statement_balance || 0;
+                  }
+                } else {
+                  amount = bill.remaining_amount || bill.amount || 0;
+                }
+                return sum + amount;
+              }, 0);
+              
+              return (
+                <View key={monthKey}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>
+                      {monthLabel} ({monthBills.length})
+                    </Text>
+                    <Text style={styles.sectionTotal}>
+                      {formatDollar(monthTotal)}
+                    </Text>
+                  </View>
+                  {monthBills.map(renderBillRow)}
+                </View>
+              );
+            })}
         </View>
       )}
 
