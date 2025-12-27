@@ -552,6 +552,7 @@ export default function PlanScreen() {
             dayGroups.map((day, dayIndex) => {
               const isCollapsed = collapsedDays.has(day.date);
               const summary = isCollapsed ? getDaySummary(day) : null;
+              const hasDeferredBill = day.entries.some(entry => entry.isDeferred);
               
               return (
                 <View key={dayIndex} style={styles.dayCard}>
@@ -560,7 +561,12 @@ export default function PlanScreen() {
                     style={styles.dayHeader}
                   >
                     <View style={styles.dayHeaderContent}>
-                      <Text style={styles.dayLabel}>{day.dayLabel}</Text>
+                      <View style={styles.dayLabelContainer}>
+                        <Text style={styles.dayLabel}>{day.dayLabel}</Text>
+                        {hasDeferredBill && (
+                          <Ionicons name="pause-circle-outline" size={18} color="#95a5a6" style={styles.deferredDayIcon} />
+                        )}
+                      </View>
                       {isCollapsed && summary && (
                         <View style={styles.summaryRow}>
                           {summary.netIncome > 0 && (
@@ -701,6 +707,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     marginRight: 8,
+  },
+  dayLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deferredDayIcon: {
+    marginLeft: 4,
   },
   dayLabel: {
     fontSize: 18,

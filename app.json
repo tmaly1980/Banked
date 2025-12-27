@@ -2,10 +2,12 @@
   "expo": {
     "name": "Banked",
     "slug": "banked",
+    "owner": "tmaly1980",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "banked",
+    "runtimeVersion": "1.0.0",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -16,6 +18,14 @@
     },
     "android": {
       "package": "com.banked.app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5695e05c-c188-4ddf-8644-cfe958590f30"
+      }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/5695e05c-c188-4ddf-8644-cfe958590f30"
     }
   }
 }
