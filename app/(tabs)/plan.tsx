@@ -790,7 +790,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginRight: 16,
   },
   entryDescription: {
     fontSize: 16,
@@ -800,7 +799,7 @@ const styles = StyleSheet.create({
   entryAmount: {
     fontSize: 16,
     fontWeight: '600',
-    marginRight: 12,
+    marginLeft: 12,
   },
   incomeAmount: {
     color: '#2ecc71',
@@ -812,6 +811,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#3498db',
+    marginLeft: 12,
     minWidth: 80,
     textAlign: 'right',
   },

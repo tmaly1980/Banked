@@ -14,11 +14,12 @@ import TabScreenHeader from '@/components/TabScreenHeader';
 import AccountManagementModal from '@/components/modals/AccountManagementModal';
 import DayIncomeBreakdownModal from '@/components/modals/DayIncomeBreakdownModal';
 import AddPaycheckModal from '@/components/modals/AddPaycheckModal';
+import TimeOffFormModal from '@/components/modals/TimeOffFormModal';
 import FloatingActionButton from '@/components/FloatingActionButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { formatDollar } from '@/lib/utils';
-import { format, startOfWeek, endOfWeek, addDays, parseISO } from 'date-fns';
+import { format, startOfWeek, endOfWeek, addDays, parseISO, isFuture, isPast } from 'date-fns';
 
 interface DailyIncome {
   income_date: string;
@@ -33,9 +34,18 @@ interface DayIncomeDetail {
   sources: DailyIncome[];
 }
 
+interface DayEntry {
+  date: string;
+  type: 'income' | 'time_off';
+  amount?: number;
+  timeOffName?: string;
+  timeOffCapacity?: number;
+  timeOffId?: string;
+}
+
 interface WeekGroup {
   weekLabel: string;
-  days: DailyIncome[];
+  days: DayEntry[];
   total: number;
 }
 
@@ -45,17 +55,29 @@ export default function IncomeScreen() {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showBreakdownModal, setShowBreakdownModal] = useState(false);
   const [showPaycheckModal, setShowPaycheckModal] = useState(false);
+  const [showTimeOffModal, setShowTimeOffModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedDateEntries, setSelectedDateEntries] = useState<DailyIncome[]>([]);
+  const [selectedTimeOff, setSelectedTimeOff] = useState<any>(null);
   const [accountBalance, setAccountBalance] = useState<number>(0);
   const [weeklyGroups, setWeeklyGroups] = useState<WeekGroup[]>([]);
   const [allDailyIncome, setAllDailyIncome] = useState<DailyIncome[]>([]);
+  const [timeOffList, setTimeOffList] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadAccountInfo();
+    loadTimeOff();
     loadDailyIncome();
   }, [user]);
+
+  useEffect(() => {
+    // Regroup when time off list changes
+    if (allDailyIncome.length > 0) {
+      const grouped = groupByWeek(allDailyIncome, timeOffList);
+      setWeeklyGroups(grouped);
+    }
+  }, [timeOffList]);
 
   const loadAccountInfo = async () => {
     if (!user) return;
@@ -104,8 +126,8 @@ export default function IncomeScreen() {
       // Store all daily income for breakdown modal
       setAllDailyIncome(data || []);
 
-      // Group by week
-      const grouped = groupByWeek(data || []);
+      // Group by week with time off
+      const grouped = groupByWeek(data || [], timeOffList);
       setWeeklyGroups(grouped);
     } catch (error) {
       console.error('Error loading daily income:', error);
@@ -114,12 +136,45 @@ export default function IncomeScreen() {
     }
   };
 
-  const groupByWeek = (dailyIncome: DailyIncome[]): WeekGroup[] => {
+  const loadTimeOff = async () => {
+    if (!user) return;
+
+    try {
+      const today = new Date();
+      
+      const { data, error } = await supabase
+        .from('time_off')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('end_date', format(today, 'yyyy-MM-dd'))
+        .order('start_date', { ascending: true });
+
+      if (error) throw error;
+
+      setTimeOffList(data || []);
+    } catch (error) {
+      console.error('Error loading time off:', error);
+    }
+  };
+
+  const handleTimeOffPress = (timeOff: any) => {
+    setSelectedTimeOff(timeOff);
+    setShowTimeOffModal(true);
+  };
+
+  const handleTimeOffModalClose = () => {
+    setShowTimeOffModal(false);
+    setSelectedTimeOff(null);
+  };
+
+  const groupByWeek = (dailyIncome: DailyIncome[], timeOffEntries: any[]): WeekGroup[] => {
     const weeks: { [key: string]: WeekGroup } = {};
     const dayTotals: { [key: string]: { date: string; total: number } } = {};
+    const allDates = new Set<string>();
 
     // First, aggregate amounts for each unique date
     dailyIncome.forEach((entry) => {
+      allDates.add(entry.income_date);
       if (!dayTotals[entry.income_date]) {
         dayTotals[entry.income_date] = {
           date: entry.income_date,
@@ -129,10 +184,34 @@ export default function IncomeScreen() {
       dayTotals[entry.income_date].total += parseFloat(entry.amount.toString());
     });
 
-    // Then group by week
-    Object.values(dayTotals).forEach((dayTotal) => {
-      const date = parseISO(dayTotal.date);
-      const weekStart = startOfWeek(date, { weekStartsOn: 0 }); // Sunday
+    // Collect time off dates within the income date range
+    const today = new Date();
+    const endDate = addDays(today, 30);
+    const timeOffDates: { [date: string]: any } = {};
+    
+    timeOffEntries.forEach((timeOff) => {
+      const startDate = parseISO(timeOff.start_date);
+      const endDateEntry = parseISO(timeOff.end_date);
+      
+      // Only include time off within the 30-day window
+      let currentDate = startDate < today ? today : startDate;
+      const finalDate = endDateEntry < endDate ? endDateEntry : endDate;
+      
+      while (currentDate <= finalDate) {
+        const dateStr = format(currentDate, 'yyyy-MM-dd');
+        allDates.add(dateStr);
+        if (!timeOffDates[dateStr]) {
+          timeOffDates[dateStr] = [];
+        }
+        timeOffDates[dateStr].push(timeOff);
+        currentDate = addDays(currentDate, 1);
+      }
+    });
+
+    // Create week groups with both income and time off entries
+    allDates.forEach((dateStr) => {
+      const date = parseISO(dateStr);
+      const weekStart = startOfWeek(date, { weekStartsOn: 0 });
       const weekEnd = endOfWeek(date, { weekStartsOn: 0 });
       const weekKey = format(weekStart, 'yyyy-MM-dd');
       const weekLabel = `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')}`;
@@ -145,29 +224,45 @@ export default function IncomeScreen() {
         };
       }
 
-      // Create a DailyIncome object for display (just needs the aggregated amount)
-      weeks[weekKey].days.push({
-        income_date: dayTotal.date,
-        amount: dayTotal.total,
-        income_source_id: '',
-        income_source_name: '',
-        is_actual: false,
-      });
-      weeks[weekKey].total += dayTotal.total;
+      // Add income entry if exists
+      if (dayTotals[dateStr]) {
+        weeks[weekKey].days.push({
+          date: dateStr,
+          type: 'income',
+          amount: dayTotals[dateStr].total,
+        });
+        weeks[weekKey].total += dayTotals[dateStr].total;
+      }
+
+      // Add time off entries if exist
+      if (timeOffDates[dateStr]) {
+        timeOffDates[dateStr].forEach((timeOff: any) => {
+          weeks[weekKey].days.push({
+            date: dateStr,
+            type: 'time_off',
+            timeOffName: timeOff.name,
+            timeOffCapacity: timeOff.capacity,
+            timeOffId: timeOff.id,
+          });
+        });
+      }
     });
 
-    // Sort weeks chronologically by weekKey (yyyy-MM-dd format), then sort days within each week
+    // Sort weeks chronologically, then sort days within each week
     return Object.entries(weeks)
       .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
       .map(([, week]) => ({
         ...week,
-        days: week.days.sort((a, b) => a.income_date.localeCompare(b.income_date))
+        days: week.days.sort((a, b) => a.date.localeCompare(b.date))
       }));
   };
 
-  const calculateRunningTotal = (days: DailyIncome[], upToIndex: number): number => {
+  const calculateRunningTotal = (days: DayEntry[], upToIndex: number): number => {
     const total = days.slice(0, upToIndex + 1).reduce((sum, day) => {
-      return sum + parseFloat(day.amount.toString());
+      if (day.type === 'income' && day.amount) {
+        return sum + parseFloat(day.amount.toString());
+      }
+      return sum;
     }, 0);
     return total;
   };
@@ -189,7 +284,7 @@ export default function IncomeScreen() {
               style={styles.planButton}
               onPress={() => router.push('/income/planner')}
             >
-              <Text style={styles.planButtonText}>Plan</Text>
+              <Text style={styles.planButtonText}>Schedule</Text>
             </TouchableOpacity>
           }
         />
@@ -205,7 +300,10 @@ export default function IncomeScreen() {
         <ScrollView
           style={styles.content}
           refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={loadDailyIncome} />
+            <RefreshControl refreshing={loading} onRefresh={() => {
+              loadDailyIncome();
+              loadTimeOff();
+            }} />
           }
         >
           {weeklyGroups.length === 0 ? (
@@ -229,18 +327,40 @@ export default function IncomeScreen() {
                   <Text style={styles.weekTotal}>{formatDollar(week.total)}</Text>
                 </View>
                 {week.days.map((day, dayIndex) => {
-                  const date = parseISO(day.income_date);
+                  const date = parseISO(day.date);
                   const dayLabel = format(date, 'EEE MMM d');
+                  
+                  if (day.type === 'time_off') {
+                    return (
+                      <TouchableOpacity
+                        key={`${dayIndex}-${day.timeOffId}`}
+                        style={[styles.timeOffRow, dayIndex === 0 && styles.firstDayRow]}
+                        onPress={() => {
+                          const timeOff = timeOffList.find(t => t.id === day.timeOffId);
+                          if (timeOff) handleTimeOffPress(timeOff);
+                        }}
+                      >
+                        <View style={styles.timeOffRowContent}>
+                          <Text style={styles.timeOffRowLabel}>{dayLabel}</Text>
+                          <View style={styles.timeOffRowBadge}>
+                            <Ionicons name="calendar-outline" size={14} color="#f39c12" />
+                            <Text style={styles.timeOffRowName}>{day.timeOffName}</Text>
+                            <Text style={styles.timeOffRowCapacity}>{day.timeOffCapacity}%</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }
                   
                   return (
                     <TouchableOpacity
                       key={dayIndex}
                       style={[styles.dayRow, dayIndex === 0 && styles.firstDayRow]}
-                      onPress={() => handleDayPress(day.income_date)}
+                      onPress={() => handleDayPress(day.date)}
                     >
                       <Text style={styles.dayLabel}>{dayLabel}</Text>
-                      <Text style={styles.dayAmount}>{formatDollar(parseFloat(day.amount.toString()))}</Text>
-                      <Text style={styles.dayRunningTotal}>{formatDollar(parseFloat(calculateRunningTotal(week.days, dayIndex)))}</Text>
+                      <Text style={styles.dayAmount}>{formatDollar(parseFloat(day.amount!.toString()))}</Text>
+                      <Text style={styles.dayRunningTotal}>{formatDollar(parseFloat(calculateRunningTotal(week.days, dayIndex).toString()))}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -248,10 +368,48 @@ export default function IncomeScreen() {
             ))}
             </>
           )}
+
+          {/* Upcoming Time Off Section */}
+          {timeOffList.length > 0 && (
+            <View style={styles.timeOffSection}>
+              <Text style={styles.sectionTitle}>Upcoming Time Off</Text>
+              {timeOffList.map((timeOff) => (
+                <TouchableOpacity
+                  key={timeOff.id}
+                  style={styles.timeOffCard}
+                  onPress={() => handleTimeOffPress(timeOff)}
+                >
+                  <View style={styles.timeOffHeader}>
+                    <View style={styles.timeOffInfo}>
+                      <Text style={styles.timeOffName}>{timeOff.name}</Text>
+                      <Text style={styles.timeOffDates}>
+                        {format(parseISO(timeOff.start_date), 'MMM d, yyyy')} - {format(parseISO(timeOff.end_date), 'MMM d, yyyy')}
+                      </Text>
+                      {timeOff.description && (
+                        <Text style={styles.timeOffDescription}>{timeOff.description}</Text>
+                      )}
+                    </View>
+                    <View style={styles.timeOffCapacity}>
+                      <Text style={styles.capacityLabel}>{timeOff.capacity}%</Text>
+                      <Text style={styles.capacitySubtext}>reduced</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </ScrollView>
 
       <FloatingActionButton
         options={[
+          {
+            label: 'Add Time Off',
+            icon: 'calendar-outline',
+            onPress: () => {
+              setSelectedTimeOff(null);
+              setShowTimeOffModal(true);
+            },
+          },
           {
             label: 'Add Paycheck',
             icon: 'cash',
@@ -281,6 +439,16 @@ export default function IncomeScreen() {
           loadDailyIncome();
           setShowBreakdownModal(false);
         }}
+      />
+
+      <TimeOffFormModal
+        visible={showTimeOffModal}
+        onClose={handleTimeOffModalClose}
+        onSuccess={() => {
+          loadTimeOff();
+          handleTimeOffModalClose();
+        }}
+        editingTimeOff={selectedTimeOff}
       />
       </View>
     </SafeAreaView>
@@ -405,6 +573,45 @@ const styles = StyleSheet.create({
     width: 80,
     textAlign: 'right',
   },
+  timeOffRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#ecf0f1',
+    backgroundColor: '#fff9f0',
+  },
+  timeOffRowContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timeOffRowLabel: {
+    fontSize: 14,
+    color: '#2c3e50',
+    flex: 2,
+  },
+  timeOffRowBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3e0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    gap: 6,
+    flex: 3,
+  },
+  timeOffRowName: {
+    fontSize: 13,
+    color: '#e67e22',
+    fontWeight: '600',
+    flex: 1,
+  },
+  timeOffRowCapacity: {
+    fontSize: 12,
+    color: '#f39c12',
+    fontWeight: 'bold',
+  },
   totalCard: {
     backgroundColor: '#2ecc71',
     padding: 16,
@@ -508,5 +715,66 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: 'white',
+  },
+  timeOffSection: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 12,
+  },
+  timeOffCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  timeOffHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  timeOffInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  timeOffName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 4,
+  },
+  timeOffDates: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    marginBottom: 4,
+  },
+  timeOffDescription: {
+    fontSize: 14,
+    color: '#95a5a6',
+    fontStyle: 'italic',
+  },
+  timeOffCapacity: {
+    alignItems: 'center',
+    backgroundColor: '#fff3e0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  capacityLabel: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#f39c12',
+  },
+  capacitySubtext: {
+    fontSize: 11,
+    color: '#e67e22',
   },
 });

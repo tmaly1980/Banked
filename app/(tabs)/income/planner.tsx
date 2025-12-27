@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import FloatingActionButton from '@/components/FloatingActionButton';
 import IncomeRuleFormModal from '@/components/modals/IncomeRuleFormModal';
+import TimeOffFormModal from '@/components/modals/TimeOffFormModal';
 import { format, parseISO } from 'date-fns';
 
 interface IncomeSource {
@@ -41,11 +42,15 @@ export default function IncomePlannerScreen() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showFormModal, setShowFormModal] = useState(false);
+  const [showTimeOffModal, setShowTimeOffModal] = useState(false);
   const [selectedRule, setSelectedRule] = useState<IncomeRule | null>(null);
+  const [selectedTimeOff, setSelectedTimeOff] = useState<any>(null);
   const [groupedRules, setGroupedRules] = useState<GroupedRules[]>([]);
+  const [timeOffList, setTimeOffList] = useState<any[]>([]);
 
   useEffect(() => {
     loadIncomeRules();
+    loadTimeOff();
   }, [user]);
 
   const loadIncomeRules = async () => {
@@ -95,6 +100,37 @@ export default function IncomePlannerScreen() {
     }
   };
 
+  const loadTimeOff = async () => {
+    if (!user) return;
+
+    try {
+      const today = new Date();
+      
+      const { data, error } = await supabase
+        .from('time_off')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('end_date', format(today, 'yyyy-MM-dd'))
+        .order('start_date', { ascending: true });
+
+      if (error) throw error;
+
+      setTimeOffList(data || []);
+    } catch (error) {
+      console.error('Error loading time off:', error);
+    }
+  };
+
+  const handleTimeOffPress = (timeOff: any) => {
+    setSelectedTimeOff(timeOff);
+    setShowTimeOffModal(true);
+  };
+
+  const handleTimeOffModalClose = () => {
+    setShowTimeOffModal(false);
+    setSelectedTimeOff(null);
+  };
+
   const formatDaysOfWeek = (days: number[] | null) => {
     if (!days || days.length === 0) return '';
     const dayNames = ['Su', 'M', 'Tu', 'W', 'Th', 'F', 'Sa'];
@@ -135,7 +171,7 @@ export default function IncomePlannerScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#2c3e50" />
           </TouchableOpacity>
-          <Text style={styles.title}>Income Planner</Text>
+          <Text style={styles.title}>Income Scheduler</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -143,7 +179,13 @@ export default function IncomePlannerScreen() {
         <ScrollView
           style={styles.content}
           refreshControl={
-            <RefreshControl refreshing={loading} onRefresh={loadIncomeRules} />
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={() => {
+                loadIncomeRules();
+                loadTimeOff();
+              }}
+            />
           }
         >
           {groupedRules.length === 0 ? (
@@ -170,11 +212,49 @@ export default function IncomePlannerScreen() {
               </View>
             ))
           )}
+
+          {/* Time Off Section */}
+          {timeOffList.length > 0 && (
+            <View style={styles.timeOffSection}>
+              <Text style={styles.sectionTitle}>Upcoming Time Off</Text>
+              {timeOffList.map((timeOff) => (
+                <TouchableOpacity
+                  key={timeOff.id}
+                  style={styles.timeOffCard}
+                  onPress={() => handleTimeOffPress(timeOff)}
+                >
+                  <View style={styles.timeOffHeader}>
+                    <View style={styles.timeOffInfo}>
+                      <Text style={styles.timeOffName}>{timeOff.name}</Text>
+                      <Text style={styles.timeOffDates}>
+                        {format(parseISO(timeOff.start_date), 'MMM d, yyyy')} - {format(parseISO(timeOff.end_date), 'MMM d, yyyy')}
+                      </Text>
+                      {timeOff.description && (
+                        <Text style={styles.timeOffDescription}>{timeOff.description}</Text>
+                      )}
+                    </View>
+                    <View style={styles.timeOffCapacity}>
+                      <Text style={styles.capacityLabel}>{timeOff.capacity}%</Text>
+                      <Text style={styles.capacitySubtext}>reduced</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </ScrollView>
 
         {/* FAB */}
         <FloatingActionButton
           options={[
+            {
+              label: 'Add Time Off',
+              icon: 'calendar-outline',
+              onPress: () => {
+                setSelectedTimeOff(null);
+                setShowTimeOffModal(true);
+              },
+            },
             {
               label: 'Add Income Rule',
               icon: 'add',
@@ -196,6 +276,17 @@ export default function IncomePlannerScreen() {
             setSelectedRule(null);
           }}
           incomeRule={selectedRule}
+        />
+
+        {/* Time Off Modal */}
+        <TimeOffFormModal
+          visible={showTimeOffModal}
+          onClose={() => setShowTimeOffModal(false)}
+          onSuccess={() => {
+            loadTimeOff();
+            handleTimeOffModalClose();
+          }}
+          editingTimeOff={selectedTimeOff}
         />
       </View>
     </SafeAreaView>
@@ -293,5 +384,66 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     flex: 2,
     textAlign: 'right',
+  },
+  timeOffSection: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    marginBottom: 12,
+  },
+  timeOffCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  timeOffHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  timeOffInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  timeOffName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 4,
+  },
+  timeOffDates: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    marginBottom: 4,
+  },
+  timeOffDescription: {
+    fontSize: 14,
+    color: '#95a5a6',
+    fontStyle: 'italic',
+  },
+  timeOffCapacity: {
+    alignItems: 'center',
+    backgroundColor: '#fff3e0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  capacityLabel: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#f39c12',
+  },
+  capacitySubtext: {
+    fontSize: 11,
+    color: '#e67e22',
   },
 });
