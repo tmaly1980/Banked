@@ -134,7 +134,7 @@ export default function BillPaymentSheet({
           bill_id: billId,
           user_id: user.id,
           month_year: deferMonthYear,
-          decide_by_date: decideByDate,
+          decide_by_date: decideByDate || null,
           loss_date: lossDate || null,
           reason: deferReason || null,
           is_active: true,
@@ -164,7 +164,7 @@ export default function BillPaymentSheet({
           bill_id: billId,
           user_id: user.id,
           month_year: deferMonthYear,
-          decide_by_date: decideByDate,
+          decide_by_date: decideByDate || null,
           loss_date: lossDate || null,
           reason: deferReason || null,
           is_active: true,
@@ -220,9 +220,9 @@ export default function BillPaymentSheet({
     if (paymentMode === 'pay') {
       return paymentAmount && paymentDate && appliedMonthYear;
     } else if (paymentMode === 'partial') {
-      return paymentAmount && paymentDate && appliedMonthYear && deferMonthYear && decideByDate;
+      return paymentAmount && paymentDate && appliedMonthYear && deferMonthYear;
     } else {
-      return deferMonthYear && decideByDate;
+      return deferMonthYear;
     }
   };
 
@@ -270,7 +270,7 @@ export default function BillPaymentSheet({
                 onPress={() => setPaymentMode('partial')}
               >
                 <Text style={[styles.tabText, paymentMode === 'partial' && styles.tabTextActive]}>
-                  Partial Pay+Defer
+                  Pay+Defer
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -333,7 +333,7 @@ export default function BillPaymentSheet({
                   </View>
                 </View>
               ) : (
-                // Payment Mode (Pay or Partial Pay+Defer)
+                // Payment Mode (Pay or Pay+Defer)
                 <View style={styles.paymentForm}>
                   <View style={styles.inputRow}>
                     <View style={styles.halfInputGroup}>

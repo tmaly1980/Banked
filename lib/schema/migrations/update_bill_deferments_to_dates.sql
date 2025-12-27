@@ -2,6 +2,9 @@
 -- Keeps month_year to track when deferment period started
 -- decide_by_date is when user needs to make a decision (reminder date)
 
+-- Drop old column if it exists (from previous migration attempt)
+ALTER TABLE bill_deferments DROP COLUMN IF EXISTS deferred_until_date;
+
 -- Add month_year column if it doesn't exist (for new setups)
 ALTER TABLE bill_deferments 
   ADD COLUMN IF NOT EXISTS month_year TEXT;

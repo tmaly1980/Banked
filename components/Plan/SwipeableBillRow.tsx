@@ -23,6 +23,18 @@ export default function SwipeableBillRow({
   const translateX = useRef(new Animated.Value(0)).current;
   const SWIPE_THRESHOLD = -60;
 
+  const closeRow = () => {
+    Animated.spring(translateX, {
+      toValue: 0,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleDollarPress = () => {
+    closeRow();
+    onDollarPress();
+  };
+
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
@@ -41,10 +53,7 @@ export default function SwipeableBillRow({
           }).start();
           if (onSwipeOpen) onSwipeOpen();
         } else {
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
+          closeRow();
         }
       },
     })
@@ -54,7 +63,7 @@ export default function SwipeableBillRow({
     <View style={styles.container}>
       <TouchableOpacity 
         style={styles.hiddenContent}
-        onPress={onDollarPress}
+        onPress={handleDollarPress}
         activeOpacity={0.7}
       >
         <Ionicons name="logo-usd" size={24} color="white" />

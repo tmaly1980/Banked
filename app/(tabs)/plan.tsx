@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import TabScreenHeader from '@/components/TabScreenHeader';
 import SwipeableBillRow from '@/components/Plan/SwipeableBillRow';
 import BillPaymentSheet from '@/components/Plan/BillPaymentSheet';
+import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlannedExpenses } from '@/contexts/PlannedExpensesContext';
 import { supabase } from '@/lib/supabase';
@@ -62,6 +63,7 @@ export default function PlanScreen() {
   const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
   const [selectedBill, setSelectedBill] = useState<any>(null);
   const [timeOffList, setTimeOffList] = useState<any[]>([]);
+  const [deferredBills, setDeferredBills] = useState<any[]>([]);
 
   useEffect(() => {
     loadPlannedExpenses();
@@ -121,6 +123,15 @@ export default function PlanScreen() {
       if (overdueError) throw overdueError;
 
       setOverdueBills(overdueData || []);
+
+      // Load deferred bills from dedicated view
+      const { data: deferredData, error: deferredError } = await supabase
+        .from('deferred_bills_view')
+        .select('*');
+
+      if (deferredError) throw deferredError;
+
+      setDeferredBills(deferredData || []);
 
       // Load time off
       const { data: timeOffData, error: timeOffError } = await supabase
@@ -821,6 +832,25 @@ export default function PlanScreen() {
           )}
         </ScrollView>
 
+        {/* Footer Accordions */}
+        <View style={styles.footerAccordions}>
+          <DeferredBillsAccordion
+            deferredBills={deferredBills}
+            onViewBill={(bill) => {
+              setSelectedBill(bill);
+              setPaymentSheetVisible(true);
+            }}
+            onEditBill={(bill) => {
+              setSelectedBill(bill);
+              setPaymentSheetVisible(true);
+            }}
+            onDeleteBill={(billId) => {
+              // Optional: implement delete functionality
+              loadLedgerData();
+            }}
+          />
+        </View>
+
         {/* Payment/Defer Sheet */}
         {selectedBill && (
           <BillPaymentSheet
@@ -861,6 +891,13 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+  },
+  footerAccordions: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
   },
   dayCard: {
     backgroundColor: 'white',

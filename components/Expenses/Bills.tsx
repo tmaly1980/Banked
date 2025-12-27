@@ -16,6 +16,7 @@ import { format, isAfter, isBefore, startOfDay, addDays } from 'date-fns';
 import DayOrDateInput from '@/components/DayOrDateInput';
 import BillDatePicker from '@/components/BillDatePicker';
 import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
+import UndatedBillsAccordion from '@/components/Bills/UndatedBillsAccordion';
 
 interface BillsProps {
   bills: BillModel[];
@@ -359,35 +360,30 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
             })}
         </View>
       )}
-
-      {/* Undated Bills (Accordion) */}
-      {groupedBills.later.length > 0 && (
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.accordionHeader}
-            onPress={toggleUndatedExpanded}
-          >
-            <Text style={styles.sectionTitle}>
-              Undated ({groupedBills.later.length})
-            </Text>
-            <Ionicons
-              name={undatedExpanded ? 'chevron-down' : 'chevron-forward'}
-              size={24}
-              color="#2c3e50"
-            />
-          </TouchableOpacity>
-          {undatedExpanded && groupedBills.later.map(renderBillRow)}
-        </View>
-      )}
       </ScrollView>
 
-      {/* Deferred Bills Accordion - Fixed to bottom */}
-      <DeferredBillsAccordion
-        deferredBills={groupedBills.deferred}
-        onViewBill={onBillPress}
-        onEditBill={onBillPress}
-        onDeleteBill={onBillPress}
-      />
+      {/* Fixed Footer Accordions */}
+      <View style={styles.footerAccordions}>
+        {/* Undated Bills Accordion - Above Deferred */}
+        {groupedBills.later.length > 0 && (
+          <UndatedBillsAccordion
+            undatedBills={groupedBills.later}
+            onViewBill={onBillPress}
+            onEditBill={onBillPress}
+            onDeleteBill={onBillPress}
+          />
+        )}
+
+        {/* Deferred Bills Accordion */}
+        {groupedBills.deferred.length > 0 && (
+          <DeferredBillsAccordion
+            deferredBills={groupedBills.deferred}
+            onViewBill={onBillPress}
+            onEditBill={onBillPress}
+            onDeleteBill={onBillPress}
+          />
+        )}
+      </View>
       
       <BillDatePicker
         visible={showDatePicker}
@@ -537,5 +533,11 @@ const styles = StyleSheet.create({
   inlineAmountInput: {
     flex: 2,
     textAlign: 'right',
+  },
+  footerAccordions: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
 });

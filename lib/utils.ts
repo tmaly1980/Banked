@@ -143,8 +143,31 @@ export const groupGigsByWeek = (gigs: GigWithDeposits[]): WeeklyGigGroup[] => {
 };
 
 export const getBillDueDate = (bill: BillModel, startingDate?: Date): Date | null => {
-  // Use the bill's method with the provided reference date
-  return bill.getNextDueDate(startingDate || new Date());
+  // Handle plain objects from database (not class instances)
+  const fromDate = startingDate || new Date();
+  
+  if (bill.due_date) {
+    // One-time bill
+    return new Date(bill.due_date);
+  } else if (bill.due_day) {
+    // Recurring bill - calculate next occurrence from reference date
+    const refDate = new Date(fromDate);
+    refDate.setHours(0, 0, 0, 0);
+    const year = refDate.getFullYear();
+    const month = refDate.getMonth();
+    
+    // Try current month first
+    let dueDate = new Date(year, month, bill.due_day);
+    
+    // If the due date has passed the reference date, use next month
+    if (dueDate < refDate) {
+      dueDate = new Date(year, month + 1, bill.due_day);
+    }
+    
+    return dueDate;
+  }
+  
+  return null;
 };
 
 export const groupBillsByWeek = (bills: BillModel[]): WeeklyGroup[] => {
