@@ -112,7 +112,7 @@ export default function DeferredBillsAccordion({
             size={20} 
             color="#6c757d" 
           />
-          <Text style={styles.headerTitle}>Deferred</Text>
+          <Text style={styles.headerTitle}>Deferred ({deferredBills.length})</Text>
           
           {/* Status Indicators */}
           {statusInfo.decisionOverdueCount > 0 && (
@@ -131,7 +131,7 @@ export default function DeferredBillsAccordion({
           )}
         </View>
         <Text style={styles.headerCount}>
-          ({deferredBills.length}) {formatDollar(totalDeferred)}
+          {formatDollar(totalDeferred)}
         </Text>
       </TouchableOpacity>
 
@@ -139,7 +139,30 @@ export default function DeferredBillsAccordion({
       {isExpanded && (
         <ScrollView style={styles.content}>
           {deferredBills.map((bill) => {
-            const priorityColor = getPriorityColor(bill.priority);
+            const today = startOfDay(new Date());
+            
+            // Calculate urgency color based on decide_by_date and loss_date
+            let urgencyColor = getPriorityColor(bill.priority); // Default to priority color
+            
+            if (bill.loss_date) {
+              const lossDate = startOfDay(new Date(bill.loss_date));
+              const daysUntilLoss = differenceInDays(lossDate, today);
+              
+              if (daysUntilLoss < 7) {
+                urgencyColor = '#e74c3c'; // Red if < 7 days to loss
+              } else if (daysUntilLoss < 15) {
+                urgencyColor = '#e67e22'; // Orange if < 15 days to loss
+              }
+            }
+            
+            if (bill.decide_by_date && !bill.loss_date) {
+              const decideBy = startOfDay(new Date(bill.decide_by_date));
+              const daysUntilDecision = differenceInDays(decideBy, today);
+              
+              if (daysUntilDecision < 7 && daysUntilDecision >= 0) {
+                urgencyColor = '#3498db'; // Blue if < 7 days to decide_by
+              }
+            }
             
             // Determine display date: decide_by_date or next_due_date after deferred month
             let displayDate: string = '';
@@ -186,7 +209,7 @@ export default function DeferredBillsAccordion({
               >
                 <View style={styles.billRow}>
                   {/* Date column */}
-                  <Text style={styles.billDate}>{displayDate}</Text>
+                  <Text style={[styles.billDate, { color: urgencyColor }]}>{displayDate}</Text>
                   
                   {bill.alert_flag && (
                     <MaterialCommunityIcons 
@@ -198,7 +221,7 @@ export default function DeferredBillsAccordion({
                   )}
                   
                   {/* Bill name */}
-                  <Text style={[styles.billName, { color: priorityColor }]} numberOfLines={1}>
+                  <Text style={[styles.billName, { color: urgencyColor }]} numberOfLines={1}>
                     {bill.name}
                   </Text>
                   
@@ -209,7 +232,7 @@ export default function DeferredBillsAccordion({
                   {/* Amount with partial payment if applicable */}
                   {hasCurrentPeriodPayment ? (
                     <View style={styles.amountContainer}>
-                      <Text style={[styles.billAmountRemaining, { color: priorityColor }]}>
+                      <Text style={[styles.billAmountRemaining, { color: urgencyColor }]}>
                         {formatDollar(remainingAmount)}
                       </Text>
                       <Text style={styles.billAmountTotal}>
@@ -217,7 +240,7 @@ export default function DeferredBillsAccordion({
                       </Text>
                     </View>
                   ) : (
-                    <Text style={[styles.billAmount, { color: priorityColor }]}>
+                    <Text style={[styles.billAmount, { color: urgencyColor }]}>
                       {formatDollar(billAmount)}
                     </Text>
                   )}

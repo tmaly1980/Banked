@@ -11,7 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { useBills } from '@/contexts/BillsContext';
-import { useRecurringDeposits } from '@/hooks/useRecurringDeposits';
+// import { useRecurringDeposits } from '@/hooks/useRecurringDeposits';
 import { Deposit } from '@/types';
 import { dateToTimestamp } from '@/lib/dateUtils';
 import { InlineAlert } from '@/components/InlineAlert';
@@ -44,7 +44,11 @@ export default function DepositFormModal({
 }: DepositFormModalProps) {
   const { alert, showError, showSuccess, hideAlert } = useInlineAlert();
   const { createDeposit, updateDeposit, deleteDeposit } = useBills();
-  const { createRecurringDeposit, updateRecurringDeposit, recurringDeposits, deleteRecurringDeposit } = useRecurringDeposits();
+  // const { createRecurringDeposit, updateRecurringDeposit, recurringDeposits, deleteRecurringDeposit } = useRecurringDeposits();
+  const createRecurringDeposit = async () => {};
+  const updateRecurringDeposit = async () => {};
+  const recurringDeposits: any[] = [];
+  const deleteRecurringDeposit = async () => {};
   const [mode, setMode] = useState<DepositMode>('once');
   const [loading, setLoading] = useState(false);
   

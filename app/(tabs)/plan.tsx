@@ -13,6 +13,7 @@ import TabScreenHeader from '@/components/TabScreenHeader';
 import SwipeableBillRow from '@/components/Plan/SwipeableBillRow';
 import BillPaymentSheet from '@/components/Plan/BillPaymentSheet';
 import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
+import { useDeferredBills } from '@/hooks/useDeferredBills';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlannedExpenses } from '@/contexts/PlannedExpensesContext';
 import { supabase } from '@/lib/supabase';
@@ -63,7 +64,7 @@ export default function PlanScreen() {
   const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
   const [selectedBill, setSelectedBill] = useState<any>(null);
   const [timeOffList, setTimeOffList] = useState<any[]>([]);
-  const [deferredBills, setDeferredBills] = useState<any[]>([]);
+  const { deferredBills, refreshDeferredBills } = useDeferredBills();
 
   useEffect(() => {
     loadPlannedExpenses();
@@ -124,14 +125,8 @@ export default function PlanScreen() {
 
       setOverdueBills(overdueData || []);
 
-      // Load deferred bills from dedicated view
-      const { data: deferredData, error: deferredError } = await supabase
-        .from('deferred_bills_view')
-        .select('*');
-
-      if (deferredError) throw deferredError;
-
-      setDeferredBills(deferredData || []);
+      // Refresh deferred bills using hook
+      await refreshDeferredBills();
 
       // Load time off
       const { data: timeOffData, error: timeOffError } = await supabase

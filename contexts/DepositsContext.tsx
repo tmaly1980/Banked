@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react';
 import { useBills } from '@/contexts/BillsContext';
-import { useRecurringDeposits } from '@/hooks/useRecurringDeposits';
+// import { useRecurringDeposits } from '@/hooks/useRecurringDeposits';
 import { Deposit } from '@/types';
 import { generateRecurringDepositInstances, formatDateForDB } from '@/utils/depositHelpers';
 import { addWeeks } from 'date-fns';
@@ -23,7 +23,10 @@ const DepositsContext = createContext<DepositsContextType | undefined>(undefined
 
 export function DepositsProvider({ children }: { children: ReactNode }) {
   const { deposits, loading: depositsLoading, refreshData } = useBills();
-  const { recurringDeposits, loadRecurringDeposits, loading: recurringLoading } = useRecurringDeposits();
+  // const { recurringDeposits, loadRecurringDeposits, loading: recurringLoading } = useRecurringDeposits();
+  const recurringDeposits: any[] = [];
+  const loadRecurringDeposits = async () => {};
+  const recurringLoading = false;
 
   useEffect(() => {
     const init = async () => {

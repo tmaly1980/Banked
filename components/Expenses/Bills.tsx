@@ -15,7 +15,6 @@ import { formatDollar } from '@/lib/utils';
 import { format, isAfter, isBefore, startOfDay, addDays } from 'date-fns';
 import DayOrDateInput from '@/components/DayOrDateInput';
 import BillDatePicker from '@/components/BillDatePicker';
-import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
 import UndatedBillsAccordion from '@/components/Bills/UndatedBillsAccordion';
 
 interface BillsProps {
@@ -139,20 +138,8 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
     const overdue: BillModel[] = [];
     const upcoming: BillModel[] = [];
     const later: BillModel[] = [];
-    const deferred: BillModel[] = [];
 
     bills.forEach(bill => {
-      // Always add actively deferred bills to deferred section
-      if (bill.is_deferred_active) {
-        deferred.push(bill);
-        // If bill has a current period payment, also show in normal sections
-        const hasPayment = bill.partial_payment && bill.partial_payment > 0;
-        if (!hasPayment) {
-          return; // Only in deferred section
-        }
-        // Fall through to also add to normal sections if has payment
-      }
-
       // Check overdue first, regardless of other flags
       if (bill.is_overdue) {
         overdue.push(bill);
@@ -181,7 +168,7 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
       upcomingByMonth[monthKey].push(bill);
     });
 
-    return { overdue, upcoming, upcomingByMonth, later, deferred };
+    return { overdue, upcoming, upcomingByMonth, later };
   }, [bills]);
 
   const formatBillDate = (bill: BillModel): string => {
@@ -204,6 +191,34 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
     return bill.deferred_months.includes(billMonthYear);
   };
 
+  const getUrgencyColor = (bill: BillModel): string | null => {
+    if (!bill.is_deferred_active) return null;
+    
+    const today = startOfDay(new Date());
+    
+    if (bill.loss_date) {
+      const lossDate = startOfDay(new Date(bill.loss_date));
+      const daysUntilLoss = Math.ceil((lossDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntilLoss < 7) {
+        return '#e74c3c'; // Red if < 7 days to loss
+      } else if (daysUntilLoss < 15) {
+        return '#e67e22'; // Orange if < 15 days to loss
+      }
+    }
+    
+    if (bill.decide_by_date && !bill.loss_date) {
+      const decideBy = startOfDay(new Date(bill.decide_by_date));
+      const daysUntilDecision = Math.ceil((decideBy.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntilDecision < 7 && daysUntilDecision >= 0) {
+        return '#3498db'; // Blue if < 7 days to decide_by
+      }
+    }
+    
+    return null;
+  };
+
   const getBillStatus = (bill: BillModel): string => {
     if (bill.isOverdue) return 'Overdue';
     if (bill.isPaid) return 'Paid';
@@ -223,6 +238,48 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
                               bill.remaining_amount < bill.amount;
     const isOverdue = bill.is_overdue;
     const isDeferred = isBillDeferredForMonth(bill);
+    
+    // Check if this bill's month is in the active_deferred_months list
+    const isActiveDeferral = bill.active_deferred_months && bill.next_due_date && (() => {
+      const [billYear, billMonth] = bill.next_due_date.split('-');
+      const billMonthYear = `${billYear}-${billMonth}`;
+      const result = bill.active_deferred_months.includes(billMonthYear);
+      console.log(`[Deferral Debug] ${bill.name}: active_deferred_months=${JSON.stringify(bill.active_deferred_months)}, next_due_date=${bill.next_due_date}, billMonthYear=${billMonthYear}, result=${result}`);
+      return result;
+    })();
+    
+    // Calculate urgency color for deferred bills
+    let urgencyColor: string | null = null;
+    if (isActiveDeferral && bill.active_deferred_months && bill.next_due_date) {
+      const today = startOfDay(new Date());
+      const [billYear, billMonth] = bill.next_due_date.split('-');
+      const billMonthYear = `${billYear}-${billMonth}`;
+      const monthIndex = bill.active_deferred_months.indexOf(billMonthYear);
+      
+      if (monthIndex >= 0) {
+        // Get the corresponding decide_by_date and loss_date for this month
+        const lossDate = bill.loss_dates?.[monthIndex];
+        const decideByDate = bill.decide_by_dates?.[monthIndex];
+        
+        if (lossDate) {
+          const lossDateObj = startOfDay(new Date(lossDate));
+          const daysUntilLoss = Math.ceil((lossDateObj.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysUntilLoss < 7) {
+            urgencyColor = '#e74c3c'; // Red if < 7 days to loss
+          } else if (daysUntilLoss < 15) {
+            urgencyColor = '#e67e22'; // Orange if < 15 days to loss
+          }
+        } else if (decideByDate) {
+          const decideBy = startOfDay(new Date(decideByDate));
+          const daysUntilDecision = Math.ceil((decideBy.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysUntilDecision < 7 && daysUntilDecision >= 0) {
+            urgencyColor = '#3498db'; // Blue if < 7 days to decide_by
+          }
+        }
+      }
+    }
     
     // For variable bills:
     // - First instance (current/overdue): use minimum due
@@ -256,15 +313,23 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
     return (
       <TouchableOpacity
         key={`${bill.id}-${bill.next_due_date}`}
-        style={styles.billRow}
+        style={[
+          styles.billRow,
+          isActiveDeferral && styles.deferredBillRow
+        ]}
         onPress={() => onBillPress(bill)}
       >
         <View style={styles.dateContainer}>
-          <Text style={[styles.billDate, isOverdue && styles.overdueText, bill.alert_flag && { fontWeight: '700' }]}>{bill.alert_flag} {formatBillDate(bill)}</Text>
-          {isDeferred && (
-            <Ionicons name="pause-circle-outline" size={16} color="#95a5a6" style={styles.statusIcon} />
+          <Text style={[
+            styles.billDate, 
+            isOverdue && styles.overdueText, 
+            bill.alert_flag && { fontWeight: '700' },
+            urgencyColor && { color: urgencyColor }
+          ]}>{bill.alert_flag} {formatBillDate(bill)}</Text>
+          {isActiveDeferral && (
+            <Ionicons name="pause-outline" size={16} color={urgencyColor || "#95a5a6"} style={styles.statusIcon} />
           )}
-          {isOverdue && (
+          {isOverdue && !isActiveDeferral && (
             <Ionicons name="time-outline" size={16} color="#e74c3c" style={styles.statusIcon} />
           )}
           {bill.alert_flag && (
@@ -272,7 +337,13 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
           )}
         </View>
         <View style={styles.billNameContainer}>
-          <Text style={[styles.billName, isDeferred && { color: '#95a5a6' }, isOverdue && styles.overdueText, bill.alert_flag && { fontWeight: '700' }]} numberOfLines={1}>{bill.name}</Text>
+          <Text style={[
+            styles.billName, 
+            isDeferred && { color: '#95a5a6' }, 
+            isOverdue && !isActiveDeferral && styles.overdueText, 
+            bill.alert_flag && { fontWeight: '700' },
+            urgencyColor && { color: urgencyColor }
+          ]} numberOfLines={1}>{bill.name}</Text>
           {bill.urgent_note && (
             <View style={styles.urgentNoteContainer}>
               <MaterialCommunityIcons name="alert-outline" size={14} color="#e67e22" />
@@ -284,8 +355,9 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
           styles.billAmount,
           isDeferred && { color: '#95a5a6' },
           hasPartialPayment && styles.billAmountPartial,
-          isOverdue && styles.overdueText,
-          bill.alert_flag && { fontWeight: '700' }
+          isOverdue && !isActiveDeferral && styles.overdueText,
+          bill.alert_flag && { fontWeight: '700' },
+          urgencyColor && { color: urgencyColor }
         ]}>
           {formatDollar(displayAmount)}
         </Text>
@@ -364,20 +436,10 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
 
       {/* Fixed Footer Accordions */}
       <View style={styles.footerAccordions}>
-        {/* Undated Bills Accordion - Above Deferred */}
+        {/* Undated Bills Accordion */}
         {groupedBills.later.length > 0 && (
           <UndatedBillsAccordion
             undatedBills={groupedBills.later}
-            onViewBill={onBillPress}
-            onEditBill={onBillPress}
-            onDeleteBill={onBillPress}
-          />
-        )}
-
-        {/* Deferred Bills Accordion */}
-        {groupedBills.deferred.length > 0 && (
-          <DeferredBillsAccordion
-            deferredBills={groupedBills.deferred}
             onViewBill={onBillPress}
             onEditBill={onBillPress}
             onDeleteBill={onBillPress}
@@ -453,6 +515,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#ecf0f1',
     gap: 8,
+  },
+  deferredBillRow: {
+    backgroundColor: '#f8f9fa',
   },
   dateContainer: {
     flex: 2,

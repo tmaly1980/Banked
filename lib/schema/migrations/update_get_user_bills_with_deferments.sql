@@ -53,16 +53,15 @@ bill_deferments_agg AS (
   GROUP BY bd.bill_id
 ),
 active_deferments AS (
-  SELECT DISTINCT ON (bd.bill_id)
+  SELECT 
     bd.bill_id,
-    bd.month_year as deferred_month_year,
-    bd.decide_by_date,
-    bd.loss_date,
-    bd.reason as deferment_reason
+    ARRAY_AGG(bd.month_year ORDER BY bd.month_year) as active_deferred_months,
+    ARRAY_AGG(bd.decide_by_date ORDER BY bd.month_year) as decide_by_dates,
+    ARRAY_AGG(bd.loss_date ORDER BY bd.month_year) as loss_dates
   FROM bill_deferments bd
   WHERE bd.user_id = auth.uid()
     AND bd.is_active = true
-  ORDER BY bd.bill_id, bd.created_at DESC
+  GROUP BY bd.bill_id
 ),
 bill_instances AS (
   -- One-time bills - single instance
@@ -91,11 +90,9 @@ bill_instances AS (
     ls.statement_minimum_due,
     ls.updated_balance,
     bd.deferred_months,
-    ad.deferred_month_year,
-    ad.decide_by_date,
-    ad.loss_date,
-    ad.deferment_reason,
-    CASE WHEN ad.bill_id IS NOT NULL THEN true ELSE false END as is_deferred_active,
+    ad.active_deferred_months,
+    ad.decide_by_dates,
+    ad.loss_dates,
     b.due_date::DATE as instance_due_date,
     'one_time' as instance_type
   FROM bills b
@@ -109,59 +106,7 @@ bill_instances AS (
 
   UNION ALL
 
-  -- Recurring bills - current/overdue instance (if unpaid)
-  SELECT 
-    b.id,
-    b.user_id,
-    b.name,
-    b.amount,
-    b.due_date,
-    b.due_day,
-    b.priority,
-    b.loss_risk_flag,
-    b.is_variable,
-    b.urgent_note,
-    b.category_id,
-    b.notes,
-    b.start_month_year,
-    b.end_month_year,
-    b.created_at,
-    b.updated_at,
-    bp.last_payment_date,
-    bp.total_paid,
-    cpp.current_period_paid,
-    ls.statement_date,
-    ls.statement_balance,
-    ls.statement_minimum_due,
-    ls.updated_balance,
-    bd.deferred_months,
-    ad.deferred_month_year,
-    ad.decide_by_date,
-    ad.loss_date,
-    ad.deferment_reason,
-    CASE WHEN ad.bill_id IS NOT NULL THEN true ELSE false END as is_deferred_active,
-    make_date(
-      EXTRACT(YEAR FROM CURRENT_DATE)::int,
-      EXTRACT(MONTH FROM CURRENT_DATE)::int,
-      LEAST(b.due_day, EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int)
-    ) as instance_due_date,
-    'current' as instance_type
-  FROM bills b
-  LEFT JOIN bill_payment_summary bp ON b.id = bp.bill_id
-  LEFT JOIN current_period_payments cpp ON b.id = cpp.bill_id
-  LEFT JOIN latest_statements ls ON b.id = ls.bill_id
-  LEFT JOIN bill_deferments_agg bd ON b.id = bd.bill_id
-  LEFT JOIN active_deferments ad ON b.id = ad.bill_id
-  WHERE b.user_id = auth.uid()
-    AND b.due_day IS NOT NULL
-    AND (b.start_month_year IS NULL OR b.start_month_year <= TO_CHAR(CURRENT_DATE, 'YYYY-MM'))
-    AND (b.end_month_year IS NULL OR b.end_month_year >= TO_CHAR(CURRENT_DATE, 'YYYY-MM'))
-    -- Show current month if not fully paid (handle NULL amounts as unpaid)
-    AND (b.amount IS NULL OR COALESCE(cpp.current_period_paid, 0) < b.amount)
-
-  UNION ALL
-
-  -- Recurring bills - next month instance (upcoming)
+  -- Recurring bills - upcoming instance (next month)
   SELECT 
     b.id,
     b.user_id,
@@ -187,11 +132,9 @@ bill_instances AS (
     ls.statement_minimum_due,
     ls.updated_balance,
     bd.deferred_months,
-    ad.deferred_month_year,
-    ad.decide_by_date,
-    ad.loss_date,
-    ad.deferment_reason,
-    CASE WHEN ad.bill_id IS NOT NULL THEN true ELSE false END as is_deferred_active,
+    ad.active_deferred_months,
+    ad.decide_by_dates,
+    ad.loss_dates,
     make_date(
       EXTRACT(YEAR FROM CURRENT_DATE + INTERVAL '1 month')::int,
       EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 month')::int,
@@ -236,11 +179,9 @@ bill_instances AS (
     ls.statement_minimum_due,
     ls.updated_balance,
     bd.deferred_months,
-    ad.deferred_month_year,
-    ad.decide_by_date,
-    ad.loss_date,
-    ad.deferment_reason,
-    CASE WHEN ad.bill_id IS NOT NULL THEN true ELSE false END as is_deferred_active,
+    ad.active_deferred_months,
+    ad.decide_by_dates,
+    ad.loss_dates,
     NULL as instance_due_date,
     'undated' as instance_type
   FROM bills b
@@ -276,11 +217,9 @@ SELECT
   bi.statement_minimum_due,
   bi.updated_balance,
   bi.deferred_months,
-  bi.deferred_month_year,
-  bi.decide_by_date,
-  bi.loss_date,
-  bi.deferment_reason,
-  bi.is_deferred_active,
+  bi.active_deferred_months,
+  bi.decide_by_dates,
+  bi.loss_dates,
   bi.instance_due_date as next_due_date,
   CASE 
     WHEN bi.instance_due_date IS NULL THEN NULL
@@ -303,10 +242,7 @@ SELECT
       GREATEST(0, bi.amount - COALESCE(bi.current_period_paid, 0))
     ELSE NULL
   END as remaining_amount
-FROM bill_instances bi
--- Exclude bills with active deferrals from overdue/upcoming views
-WHERE (bi.is_deferred_active = false OR bi.is_deferred_active IS NULL)
-   OR (bi.current_period_paid IS NOT NULL AND bi.current_period_paid > 0);
+FROM bill_instances bi;
 
 -- Create function to get user bills (wrapper around view)
 CREATE OR REPLACE FUNCTION get_user_bills_v2()

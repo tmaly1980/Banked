@@ -97,15 +97,26 @@ SELECT
   ad.deferment_reason,
   ad.deferment_created_at,
   true as is_deferred_active,
-  -- Calculate next due date for display purposes
+  -- Calculate next due date for display purposes (skip deferred month)
   CASE 
     WHEN b.due_date IS NOT NULL THEN b.due_date::DATE
     WHEN b.due_day IS NOT NULL THEN 
-      make_date(
-        EXTRACT(YEAR FROM CURRENT_DATE)::int,
-        EXTRACT(MONTH FROM CURRENT_DATE)::int,
-        LEAST(b.due_day, EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int)
-      )
+      CASE 
+        -- If deferred_month_year matches current month, calculate for next month
+        WHEN ad.deferred_month_year = TO_CHAR(CURRENT_DATE, 'YYYY-MM') THEN
+          make_date(
+            EXTRACT(YEAR FROM CURRENT_DATE + INTERVAL '1 month')::int,
+            EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 month')::int,
+            LEAST(b.due_day, EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE + INTERVAL '1 month') + INTERVAL '1 month - 1 day'))::int)
+          )
+        -- Otherwise use current month
+        ELSE
+          make_date(
+            EXTRACT(YEAR FROM CURRENT_DATE)::int,
+            EXTRACT(MONTH FROM CURRENT_DATE)::int,
+            LEAST(b.due_day, EXTRACT(DAY FROM (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month - 1 day'))::int)
+          )
+      END
     ELSE NULL
   END as next_due_date,
   -- Calculate if overdue (for informational purposes)

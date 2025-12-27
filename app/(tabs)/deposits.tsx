@@ -10,7 +10,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useBills } from '@/contexts/BillsContext';
-import { useRecurringDeposits } from '@/hooks/useRecurringDeposits';
+// import { useRecurringDeposits } from '@/hooks/useRecurringDeposits';
 import { useDepositInstances, DepositInstance } from '@/contexts/DepositsContext';
 import TabScreenHeader from '@/components/TabScreenHeader';
 import { Deposit, WeeklyDepositGroup } from '@/types';
@@ -24,7 +24,9 @@ import { generateRecurringDepositInstances, formatDateForDB } from '@/utils/depo
 
 export default function DepositsScreen() {
   const { deleteDeposit } = useBills();
-  const { recurringDeposits, loadRecurringDeposits } = useRecurringDeposits();
+  // const { recurringDeposits, loadRecurringDeposits } = useRecurringDeposits();
+  const recurringDeposits: any[] = [];
+  const loadRecurringDeposits = async () => ({ data: [] });
   const { allDepositInstances, loading, refreshDeposits } = useDepositInstances();
   const [weeklyGroups, setWeeklyGroups] = useState<WeeklyDepositGroup[]>([]);
   const [unknownDeposits, setUnknownDeposits] = useState<DepositInstance[]>([]);
