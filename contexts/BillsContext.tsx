@@ -151,10 +151,15 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
 
       if (billsError) throw billsError;
 
-      // Debug: Log first bill to see what fields we're getting
-      if (billsData && billsData.length > 0) {
-        console.log('[BillsContext] Sample bill from view:', billsData[0]);
-      }
+      // Debug: Log all bills with their names and next_due_date
+      console.log('[BillsContext] Bills fetched from DB:', 
+        billsData?.map(b => ({ 
+          name: b.name, 
+          next_due_date: b.next_due_date,
+          deferred_flag: b.deferred_flag,
+          deferred_months: b.deferred_months
+        })) || []
+      );
 
       // Fetch all payments for these bills
       const { data: paymentsData, error: paymentsError } = await supabase

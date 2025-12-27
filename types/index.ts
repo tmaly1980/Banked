@@ -14,7 +14,6 @@ export interface Bill {
   priority: 'low' | 'medium' | 'high';
   loss_risk_flag: boolean;
   deferred_flag: boolean;
-  deferred_note?: string | null;
   notes?: string;
   urgent_note?: string | null;
   created_at: string;

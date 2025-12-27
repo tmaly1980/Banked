@@ -11,7 +11,6 @@ export interface Bill {
   priority: 'low' | 'medium' | 'high';
   loss_risk_flag: boolean;
   deferred_flag: boolean;
-  deferred_note?: string | null;
   alert_flag?: boolean;
   urgent_note?: string | null;
   is_variable?: boolean;
@@ -26,6 +25,8 @@ export interface Bill {
   next_due_date?: string;
   days_until_due?: number;
   is_overdue?: boolean;
+  is_deferred_active?: boolean;
+  deferred_months?: string[];
   last_payment_date?: string;
   total_paid?: number;
   // Current billing period payment tracking
@@ -49,7 +50,6 @@ export class BillModel {
   priority: 'low' | 'medium' | 'high';
   loss_risk_flag: boolean;
   deferred_flag: boolean;
-  deferred_note?: string | null;
   alert_flag?: boolean;
   urgent_note?: string | null;
   is_variable?: boolean;
@@ -65,6 +65,8 @@ export class BillModel {
   next_due_date?: string;
   days_until_due?: number;
   is_overdue?: boolean;
+  is_deferred_active?: boolean;
+  deferred_months?: string[];
   last_payment_date?: string;
   total_paid_from_db?: number;
   // Current billing period payment tracking
@@ -102,6 +104,8 @@ export class BillModel {
     this.next_due_date = bill.next_due_date;
     this.days_until_due = bill.days_until_due;
     this.is_overdue = bill.is_overdue;
+    this.is_deferred_active = bill.is_deferred_active;
+    this.deferred_months = bill.deferred_months;
     this.last_payment_date = bill.last_payment_date;
     this.total_paid_from_db = bill.total_paid;
     // Current billing period payment tracking

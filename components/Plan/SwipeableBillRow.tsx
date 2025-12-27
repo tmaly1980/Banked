@@ -8,7 +8,8 @@ interface SwipeableBillRowProps {
   billAmount: number;
   runningTotal: number;
   isDeferred: boolean;
-  onSwipeOpen: () => void;
+  onSwipeOpen?: () => void;
+  onDollarPress: () => void;
 }
 
 export default function SwipeableBillRow({
@@ -17,6 +18,7 @@ export default function SwipeableBillRow({
   runningTotal,
   isDeferred,
   onSwipeOpen,
+  onDollarPress,
 }: SwipeableBillRowProps) {
   const translateX = useRef(new Animated.Value(0)).current;
   const SWIPE_THRESHOLD = -60;
@@ -37,7 +39,7 @@ export default function SwipeableBillRow({
             toValue: SWIPE_THRESHOLD,
             useNativeDriver: true,
           }).start();
-          onSwipeOpen();
+          if (onSwipeOpen) onSwipeOpen();
         } else {
           Animated.spring(translateX, {
             toValue: 0,
@@ -50,9 +52,13 @@ export default function SwipeableBillRow({
 
   return (
     <View style={styles.container}>
-      <View style={styles.hiddenContent}>
+      <TouchableOpacity 
+        style={styles.hiddenContent}
+        onPress={onDollarPress}
+        activeOpacity={0.7}
+      >
         <Ionicons name="logo-usd" size={24} color="white" />
-      </View>
+      </TouchableOpacity>
       
       <Animated.View
         style={[styles.visibleContent, { transform: [{ translateX }] }]}
@@ -60,10 +66,10 @@ export default function SwipeableBillRow({
       >
         <View style={styles.entryInfo}>
           <View style={styles.billNameContainer}>
-            {isDeferred && (
-              <Ionicons name="hand-right" size={16} color="#e67e22" style={styles.deferredIcon} />
-            )}
             <Text style={styles.entryDescription}>{billName}</Text>
+            {isDeferred && (
+              <Ionicons name="pause-circle-outline" size={16} color="#95a5a6" style={styles.deferredIcon} />
+            )}
           </View>
           <Text style={[styles.entryAmount, styles.billAmount]}>
             {formatDollar(-billAmount, true)}
@@ -96,7 +102,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 16,
   },
   entryInfo: {
     flex: 1,
@@ -110,12 +115,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   deferredIcon: {
-    marginRight: 8,
+    marginLeft: 8,
   },
   entryDescription: {
     fontSize: 16,
     color: '#2c3e50',
-    flex: 1,
   },
   entryAmount: {
     fontSize: 16,

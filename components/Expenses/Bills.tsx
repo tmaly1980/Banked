@@ -25,7 +25,7 @@ interface BillsProps {
 }
 
 export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loading }: BillsProps) {
-  const [laterExpanded, setLaterExpanded] = useState(true);
+  const [undatedExpanded, setUndatedExpanded] = useState(true);
   const [showInlineForm, setShowInlineForm] = useState(false);
   const [inlineBillDate, setInlineBillDate] = useState<string>('');
   const [inlineBillDay, setInlineBillDay] = useState<number | undefined>(undefined);
@@ -44,7 +44,7 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
       try {
         const saved = await AsyncStorage.getItem('bills_later_expanded');
         if (saved !== null) {
-          setLaterExpanded(JSON.parse(saved));
+          setUndatedExpanded(JSON.parse(saved));
         }
       } catch (error) {
         console.error('Failed to load accordion state:', error);
@@ -54,9 +54,9 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
   }, []);
 
   // Save accordion state when it changes
-  const toggleLaterExpanded = async () => {
-    const newState = !laterExpanded;
-    setLaterExpanded(newState);
+  const toggleUndatedExpanded = async () => {
+    const newState = !undatedExpanded;
+    setUndatedExpanded(newState);
     try {
       await AsyncStorage.setItem('bills_later_expanded', JSON.stringify(newState));
     } catch (error) {
@@ -180,6 +180,16 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
     return '';
   };
 
+  const isBillDeferredForMonth = (bill: BillModel): boolean => {
+    if (!bill.deferred_months || bill.deferred_months.length === 0 || !bill.next_due_date) {
+      return false;
+    }
+    // Get the month-year of the bill's next_due_date
+    const [year, month] = bill.next_due_date.split('-');
+    const billMonthYear = `${year}-${month}`;
+    return bill.deferred_months.includes(billMonthYear);
+  };
+
   const getBillStatus = (bill: BillModel): string => {
     if (bill.isOverdue) return 'Overdue';
     if (bill.isPaid) return 'Paid';
@@ -198,6 +208,7 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
                               bill.amount !== null &&
                               bill.remaining_amount < bill.amount;
     const isOverdue = bill.is_overdue;
+    const isDeferred = isBillDeferredForMonth(bill);
     
     // For variable bills:
     // - First instance (current/overdue): use minimum due
@@ -236,6 +247,9 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
       >
         <View style={styles.dateContainer}>
           <Text style={[styles.billDate, isOverdue && styles.overdueText, bill.alert_flag && { fontWeight: '700' }]}>{bill.alert_flag} {formatBillDate(bill)}</Text>
+          {isDeferred && (
+            <Ionicons name="pause-circle-outline" size={16} color="#95a5a6" style={styles.statusIcon} />
+          )}
           {isOverdue && (
             <Ionicons name="time-outline" size={16} color="#e74c3c" style={styles.statusIcon} />
           )}
@@ -244,7 +258,7 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
           )}
         </View>
         <View style={styles.billNameContainer}>
-          <Text style={[styles.billName, isOverdue && styles.overdueText, bill.alert_flag && { fontWeight: '700' }]} numberOfLines={1}>{bill.name}</Text>
+          <Text style={[styles.billName, isDeferred && { color: '#95a5a6' }, isOverdue && styles.overdueText, bill.alert_flag && { fontWeight: '700' }]} numberOfLines={1}>{bill.name}</Text>
           {bill.urgent_note && (
             <View style={styles.urgentNoteContainer}>
               <MaterialCommunityIcons name="alert-outline" size={14} color="#e67e22" />
@@ -254,6 +268,7 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
         </View>
         <Text style={[
           styles.billAmount,
+          isDeferred && { color: '#95a5a6' },
           hasPartialPayment && styles.billAmountPartial,
           isOverdue && styles.overdueText,
           bill.alert_flag && { fontWeight: '700' }
@@ -332,23 +347,23 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
         </View>
       )}
 
-      {/* Later Bills (Accordion) */}
+      {/* Undated Bills (Accordion) */}
       {groupedBills.later.length > 0 && (
         <View style={styles.section}>
           <TouchableOpacity
             style={styles.accordionHeader}
-            onPress={toggleLaterExpanded}
+            onPress={toggleUndatedExpanded}
           >
             <Text style={styles.sectionTitle}>
-              Later ({groupedBills.later.length})
+              Undated ({groupedBills.later.length})
             </Text>
             <Ionicons
-              name={laterExpanded ? 'chevron-down' : 'chevron-forward'}
+              name={undatedExpanded ? 'chevron-down' : 'chevron-forward'}
               size={24}
               color="#2c3e50"
             />
           </TouchableOpacity>
-          {laterExpanded && groupedBills.later.map(renderBillRow)}
+          {undatedExpanded && groupedBills.later.map(renderBillRow)}
         </View>
       )}
       </ScrollView>

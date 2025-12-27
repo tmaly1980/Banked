@@ -46,6 +46,14 @@ latest_statements AS (
   WHERE bs.user_id = auth.uid()
   ORDER BY bs.bill_id, bs.statement_date DESC
 ),
+bill_deferments_agg AS (
+  SELECT 
+    bd.bill_id,
+    ARRAY_AGG(bd.month_year ORDER BY bd.month_year) as deferred_months
+  FROM bill_deferments bd
+  WHERE bd.user_id = auth.uid()
+  GROUP BY bd.bill_id
+),
 bill_instances AS (
   -- One-time bills - single instance
   SELECT 
@@ -58,7 +66,6 @@ bill_instances AS (
     b.priority,
     b.loss_risk_flag,
     b.deferred_flag,
-    b.deferred_note,
     b.is_variable,
     b.urgent_note,
     b.category_id,
@@ -74,12 +81,14 @@ bill_instances AS (
     ls.statement_balance,
     ls.statement_minimum_due,
     ls.updated_balance,
+    bd.deferred_months,
     b.due_date::DATE as instance_due_date,
     'one_time' as instance_type
   FROM bills b
   LEFT JOIN bill_payment_summary bp ON b.id = bp.bill_id
   LEFT JOIN current_period_payments cpp ON b.id = cpp.bill_id
   LEFT JOIN latest_statements ls ON b.id = ls.bill_id
+  LEFT JOIN bill_deferments_agg bd ON b.id = bd.bill_id
   WHERE b.user_id = auth.uid()
     AND b.due_date IS NOT NULL
 
@@ -96,7 +105,6 @@ bill_instances AS (
     b.priority,
     b.loss_risk_flag,
     b.deferred_flag,
-    b.deferred_note,
     b.is_variable,
     b.urgent_note,
     b.category_id,
@@ -112,6 +120,7 @@ bill_instances AS (
     ls.statement_balance,
     ls.statement_minimum_due,
     ls.updated_balance,
+    bd.deferred_months,
     make_date(
       EXTRACT(YEAR FROM CURRENT_DATE)::int,
       EXTRACT(MONTH FROM CURRENT_DATE)::int,
@@ -122,6 +131,7 @@ bill_instances AS (
   LEFT JOIN bill_payment_summary bp ON b.id = bp.bill_id
   LEFT JOIN current_period_payments cpp ON b.id = cpp.bill_id
   LEFT JOIN latest_statements ls ON b.id = ls.bill_id
+  LEFT JOIN bill_deferments_agg bd ON b.id = bd.bill_id
   WHERE b.user_id = auth.uid()
     AND b.due_day IS NOT NULL
     AND (b.start_month_year IS NULL OR b.start_month_year <= TO_CHAR(CURRENT_DATE, 'YYYY-MM'))
@@ -142,7 +152,6 @@ bill_instances AS (
     b.priority,
     b.loss_risk_flag,
     b.deferred_flag,
-    b.deferred_note,
     b.is_variable,
     b.urgent_note,
     b.category_id,
@@ -158,6 +167,7 @@ bill_instances AS (
     ls.statement_balance,
     ls.statement_minimum_due,
     ls.updated_balance,
+    bd.deferred_months,
     make_date(
       EXTRACT(YEAR FROM CURRENT_DATE + INTERVAL '1 month')::int,
       EXTRACT(MONTH FROM CURRENT_DATE + INTERVAL '1 month')::int,
@@ -167,6 +177,7 @@ bill_instances AS (
   FROM bills b
   LEFT JOIN bill_payment_summary bp ON b.id = bp.bill_id
   LEFT JOIN latest_statements ls ON b.id = ls.bill_id
+  LEFT JOIN bill_deferments_agg bd ON b.id = bd.bill_id
   WHERE b.user_id = auth.uid()
     AND b.due_day IS NOT NULL
     AND (b.start_month_year IS NULL OR b.start_month_year <= TO_CHAR(CURRENT_DATE + INTERVAL '1 month', 'YYYY-MM'))
@@ -185,7 +196,6 @@ bill_instances AS (
     b.priority,
     b.loss_risk_flag,
     b.deferred_flag,
-    b.deferred_note,
     b.is_variable,
     b.urgent_note,
     b.category_id,
@@ -201,12 +211,14 @@ bill_instances AS (
     ls.statement_balance,
     ls.statement_minimum_due,
     ls.updated_balance,
+    bd.deferred_months,
     NULL::DATE as instance_due_date,
     'undated' as instance_type
   FROM bills b
   LEFT JOIN bill_payment_summary bp ON b.id = bp.bill_id
   LEFT JOIN current_period_payments cpp ON b.id = cpp.bill_id
   LEFT JOIN latest_statements ls ON b.id = ls.bill_id
+  LEFT JOIN bill_deferments_agg bd ON b.id = bd.bill_id
   WHERE b.user_id = auth.uid()
     AND b.due_date IS NULL
     AND b.due_day IS NULL
@@ -221,7 +233,6 @@ SELECT
   bi.priority,
   bi.loss_risk_flag,
   bi.deferred_flag,
-  bi.deferred_note,
   bi.is_variable,
   bi.urgent_note,
   bi.category_id,
@@ -234,6 +245,7 @@ SELECT
   bi.statement_balance,
   bi.statement_minimum_due,
   bi.updated_balance,
+  bi.deferred_months,
   bi.instance_due_date as next_due_date,
   CURRENT_DATE - bi.instance_due_date as days_until_due,
   bi.instance_due_date < CURRENT_DATE as is_overdue,
@@ -248,7 +260,6 @@ SELECT
   END as remaining_amount
 FROM bill_instances bi
 ORDER BY 
-  CASE WHEN bi.deferred_flag THEN 1 ELSE 0 END,
   CASE WHEN bi.instance_due_date IS NULL THEN 1 ELSE 0 END,
   bi.instance_due_date ASC,
   bi.priority DESC,

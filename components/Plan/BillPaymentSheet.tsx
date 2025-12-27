@@ -25,7 +25,6 @@ interface BillPaymentSheetProps {
   billAmount: number;
   isVariable: boolean;
   isDeferred: boolean;
-  deferredNote?: string | null;
   nextDueDate?: Date;
   onClose: () => void;
   onSuccess: () => void;
@@ -38,7 +37,6 @@ export default function BillPaymentSheet({
   billAmount,
   isVariable,
   isDeferred,
-  deferredNote,
   nextDueDate,
   onClose,
   onSuccess,
@@ -54,7 +52,8 @@ export default function BillPaymentSheet({
   const [additionalFees, setAdditionalFees] = useState('');
   
   // Defer form fields
-  const [deferNote, setDeferNote] = useState('');
+  const [deferReason, setDeferReason] = useState('');
+  const [deferMonthYear, setDeferMonthYear] = useState('');
 
   useEffect(() => {
     if (visible && billId) {
@@ -63,14 +62,15 @@ export default function BillPaymentSheet({
       setPaymentAmount(billAmount.toString());
       setPaymentDate(format(new Date(), 'yyyy-MM-dd'));
       setAdditionalFees('');
-      setDeferNote(deferredNote || '');
+      setDeferReason('');
       
-      // Set default applied month
+      // Set default defer month-year and applied month to current month
       const now = new Date();
       const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      setDeferMonthYear(currentMonthYear);
       setAppliedMonthYear(currentMonthYear);
     }
-  }, [visible, billId, billAmount, isDeferred, deferredNote]);
+  }, [visible, billId, billAmount, isDeferred]);
 
   const handleMakePayment = async () => {
     if (!billId || !user) return;
@@ -105,15 +105,25 @@ export default function BillPaymentSheet({
     
     setLoading(true);
     try {
+      // Insert into bill_deferments table
       const { error } = await supabase
-        .from('bills')
-        .update({
-          deferred_flag: true,
-          deferred_note: deferNote,
-        })
-        .eq('id', billId);
+        .from('bill_deferments')
+        .insert({
+          bill_id: billId,
+          user_id: user.id,
+          month_year: deferMonthYear,
+          reason: deferReason || null,
+        });
 
       if (error) throw error;
+
+      // Update deferred_flag on bills table
+      const { error: updateError } = await supabase
+        .from('bills')
+        .update({ deferred_flag: true })
+        .eq('id', billId);
+
+      if (updateError) throw updateError;
 
       onSuccess();
       onClose();
@@ -130,15 +140,22 @@ export default function BillPaymentSheet({
     
     setLoading(true);
     try {
+      // Delete all deferments for this bill
       const { error } = await supabase
-        .from('bills')
-        .update({
-          deferred_flag: false,
-          deferred_note: null,
-        })
-        .eq('id', billId);
+        .from('bill_deferments')
+        .delete()
+        .eq('bill_id', billId)
+        .eq('user_id', user.id);
 
       if (error) throw error;
+
+      // Update deferred_flag on bills table
+      const { error: updateError } = await supabase
+        .from('bills')
+        .update({ deferred_flag: false })
+        .eq('id', billId);
+
+      if (updateError) throw updateError;
 
       onSuccess();
       onClose();
@@ -204,16 +221,31 @@ export default function BillPaymentSheet({
               {isDeferMode ? (
                 // Defer Mode
                 <View style={styles.deferContent}>
-                  <Text style={styles.label}>Deferred Notes</Text>
-                  <TextInput
-                    style={styles.textArea}
-                    value={deferNote}
-                    onChangeText={setDeferNote}
-                    placeholder="Add notes about why this payment is deferred..."
-                    multiline
-                    numberOfLines={6}
-                    textAlignVertical="top"
-                  />
+                  <View style={styles.inputGroup}>
+                    <MonthYearInput
+                      label="Defer For Month"
+                      value={deferMonthYear}
+                      onChangeValue={setDeferMonthYear}
+                      preselectedDate={nextDueDate}
+                      showClearButton={false}
+                    />
+                    <Text style={styles.helpText}>
+                      Bill will be excluded from calculations for this month
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Reason (Optional)</Text>
+                    <TextInput
+                      style={styles.textArea}
+                      value={deferReason}
+                      onChangeText={setDeferReason}
+                      placeholder="Why are you deferring this bill?"
+                      multiline
+                      numberOfLines={6}
+                      textAlignVertical="top"
+                    />
+                  </View>
                 </View>
               ) : (
                 // Payment Mode

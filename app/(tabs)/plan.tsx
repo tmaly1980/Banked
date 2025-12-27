@@ -235,10 +235,12 @@ export default function PlanScreen() {
       // Add bill entries
       if (billsByDate[date]) {
         billsByDate[date].forEach((bill) => {
-          const isDeferred = bill.deferred_flag || false;
+          // Check if bill is deferred for this month
+          const billMonthYear = format(parseISO(date), 'yyyy-MM');
+          const isDeferred = bill.deferred_months?.includes(billMonthYear) || false;
           const displayAmount = -bill.amount;
           
-          // Only subtract from running total if NOT deferred
+          // Only subtract from running total if NOT deferred for this month
           if (!isDeferred) {
             runningTotal -= bill.amount;
           }
@@ -415,8 +417,10 @@ export default function PlanScreen() {
 
   const getOverdueSummary = () => {
     const totalOverdue = overdueBills.reduce((sum, bill) => {
-      // Skip deferred bills
-      if (bill.deferred_flag) return sum;
+      // Check if bill is deferred for current month
+      const currentMonthYear = format(new Date(), 'yyyy-MM');
+      const isDeferred = bill.deferred_months?.includes(currentMonthYear) || false;
+      if (isDeferred) return sum;
       
       let billAmount: number;
       if (bill.is_variable) {
@@ -512,7 +516,9 @@ export default function PlanScreen() {
                         billAmount = bill.remaining_amount || bill.amount || 0;
                       }
 
-                      const isDeferred = bill.deferred_flag || false;
+                      // Check if bill is deferred for current month
+                      const currentMonthYear = format(new Date(), 'yyyy-MM');
+                      const isDeferred = bill.deferred_months?.includes(currentMonthYear) || false;
                       if (!isDeferred) {
                         runningBalance -= billAmount;
                       }
@@ -524,7 +530,7 @@ export default function PlanScreen() {
                           billAmount={billAmount}
                           runningTotal={runningBalance}
                           isDeferred={isDeferred}
-                          onSwipeOpen={() => {
+                          onDollarPress={() => {
                             setSelectedBill(bill);
                             setPaymentSheetVisible(true);
                           }}
@@ -594,7 +600,7 @@ export default function PlanScreen() {
                                 billAmount={Math.abs(entry.amount)}
                                 runningTotal={entry.runningTotal}
                                 isDeferred={entry.isDeferred || false}
-                                onSwipeOpen={() => {
+                                onDollarPress={() => {
                                   setSelectedBill(entry.billData);
                                   setPaymentSheetVisible(true);
                                 }}
@@ -641,7 +647,6 @@ export default function PlanScreen() {
             }
             isVariable={selectedBill.is_variable || false}
             isDeferred={selectedBill.deferred_flag || false}
-            deferredNote={selectedBill.deferred_note}
             nextDueDate={selectedBill.next_due_date ? new Date(selectedBill.next_due_date) : undefined}
             onClose={() => {
               setPaymentSheetVisible(false);
