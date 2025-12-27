@@ -494,12 +494,14 @@ export default function PlanScreen() {
                 style={styles.dayHeader}
               >
                 <View style={styles.dayHeaderContent}>
-                  <Text style={[styles.dayLabel, styles.overdueLabel]}>Overdue</Text>
+                  <View style={styles.dayLabelContainer}>
+                    <Text style={[styles.dayLabel, styles.overdueLabel]}>Overdue</Text>
+                  </View>
                   {overdueCollapsed && (() => {
                     const summary = getOverdueSummary();
                     return (
                       <View style={styles.summaryRow}>
-                        <Text style={styles.summaryBalance}>{formatDollar(accountBalance)}</Text>
+                        <Text style={styles.summaryIncome}></Text>
                         <Text style={styles.summaryExpense}>{formatDollar(-summary.netExpenses, true)}</Text>
                         <Text style={styles.summaryBalance}>{formatDollar(summary.finalBalance)}</Text>
                       </View>
@@ -719,15 +721,14 @@ const styles = StyleSheet.create({
   },
   dayHeaderContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     flex: 1,
-    marginRight: 8,
   },
   dayLabelContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 2,
   },
   deferredDayIcon: {
     marginLeft: 4,
@@ -740,29 +741,28 @@ const styles = StyleSheet.create({
   summaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 2,
   },
   summaryIncome: {
     fontSize: 14,
     fontWeight: '600',
     color: '#2ecc71',
-    minWidth: 70,
+    flex: 1,
     textAlign: 'right',
   },
   summaryExpense: {
     fontSize: 14,
     fontWeight: '600',
     color: '#e74c3c',
-    minWidth: 70,
+    flex: 1,
     textAlign: 'right',
-    marginLeft: 12,
   },
   summaryBalance: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#3498db',
-    minWidth: 80,
+    flex: 1,
     textAlign: 'right',
-    marginLeft: 12,
   },
   entriesContainer: {
     paddingHorizontal: 16,
