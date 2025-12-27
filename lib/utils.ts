@@ -151,8 +151,6 @@ export const groupBillsByWeek = (bills: BillModel[]): WeeklyGroup[] => {
   const weeks = getNext6Weeks();
   
   bills.forEach(bill => {
-    if (bill.deferred_flag) return; // Skip deferred bills
-    
     // Use next_date which considers deferred payments
     const nextDate = bill.next_date;
     if (!nextDate) return;

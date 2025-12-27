@@ -117,14 +117,6 @@ export default function BillPaymentSheet({
 
       if (error) throw error;
 
-      // Update deferred_flag on bills table
-      const { error: updateError } = await supabase
-        .from('bills')
-        .update({ deferred_flag: true })
-        .eq('id', billId);
-
-      if (updateError) throw updateError;
-
       onSuccess();
       onClose();
     } catch (error) {
@@ -148,14 +140,6 @@ export default function BillPaymentSheet({
         .eq('user_id', user.id);
 
       if (error) throw error;
-
-      // Update deferred_flag on bills table
-      const { error: updateError } = await supabase
-        .from('bills')
-        .update({ deferred_flag: false })
-        .eq('id', billId);
-
-      if (updateError) throw updateError;
 
       onSuccess();
       onClose();

@@ -182,7 +182,6 @@ export default function BillFormModal({
         due_date: isRecurring ? null : (dueDate ? dateToTimestamp(dueDate) : null),
         due_day: isRecurring ? (dueDay ? parseInt(dueDay) : null) : null,
         category_id: categoryId || null,
-        deferred_flag: !hasDueDate,
         notes: notes.trim() || null,
         start_month_year: startMonthYear || null,
         end_month_year: endMonthYear || null,

@@ -1,6 +1,6 @@
 {
   "name": "banked",
-  "version": "0.1.1",
+  "version": "1.0.2",
   "main": "expo-router/entry",
   "overrides": {
     "react": "19.1.0"
@@ -12,6 +12,7 @@
     "ios": "expo run:ios",
     "ios:device": "expo run:ios --device",
     "web": "expo start --web",
+    "bump": "node scripts/bump-version.js",
     "eas:update": "eas update --branch production --message \"Production update\"",
     "eas:update:preview": "eas update --branch preview --message \"Preview update\"",
     "build:ios": "eas build --platform ios",

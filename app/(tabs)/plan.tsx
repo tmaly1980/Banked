@@ -115,7 +115,7 @@ export default function PlanScreen() {
       setOverdueBills(overdueData || []);
 
       // Process and combine data
-      const ledger = buildLedger(totalBalance, incomeData || [], billsData || []);
+      const ledger = buildLedger(totalBalance, incomeData || [], billsData || [], overdueData || []);
       setDayGroups(ledger);
       
       // Initialize all days as collapsed
@@ -130,14 +130,25 @@ export default function PlanScreen() {
     }
   };
 
-  const buildLedger = (startingBalance: number, income: any[], bills: any[]): DayGroup[] => {
+  const buildLedger = (startingBalance: number, income: any[], bills: any[], overdueBillsData: any[]): DayGroup[] => {
     const entries: { [date: string]: LedgerEntry[] } = {};
     const today = format(new Date(), 'yyyy-MM-dd');
     
-    // Calculate overdue total to adjust starting balance (exclude deferred bills)
-    const overdueTotal = overdueBills.reduce((sum, bill) => {
-      // Skip deferred bills
-      if (bill.deferred_flag) return sum;
+    console.log('[buildLedger] Starting balance:', startingBalance);
+    console.log('[buildLedger] Overdue bills count:', overdueBillsData.length);
+    console.log('[buildLedger] Overdue bills:', overdueBillsData.map(b => ({ name: b.name, amount: b.amount, remaining: b.remaining_amount, next_due_date: b.next_due_date, deferred_months: b.deferred_months })));
+    
+    // Calculate overdue total to adjust starting balance (exclude bills deferred for their overdue month)
+    const overdueTotal = overdueBillsData.reduce((sum, bill) => {
+      // Check if bill is deferred for its overdue month
+      if (bill.next_due_date && bill.deferred_months) {
+        const [year, month] = bill.next_due_date.split('-');
+        const billMonthYear = `${year}-${month}`;
+        if (bill.deferred_months.includes(billMonthYear)) {
+          console.log('[buildLedger] Skipping bill deferred for', billMonthYear, ':', bill.name);
+          return sum;
+        }
+      }
       
       let billAmount: number;
       if (bill.is_variable) {
@@ -149,13 +160,18 @@ export default function PlanScreen() {
       } else {
         billAmount = bill.remaining_amount || bill.amount || 0;
       }
+      console.log('[buildLedger] Adding overdue bill:', bill.name, 'amount:', billAmount);
       return sum + billAmount;
     }, 0);
     
+    console.log('[buildLedger] Total overdue:', overdueTotal);
+    
+    // Start with balance after overdue (if any), otherwise use account balance
     let runningTotal = startingBalance - overdueTotal;
+    
+    console.log('[buildLedger] Initial running total:', runningTotal, '(', startingBalance, '-', overdueTotal, ')');
 
-    // Add starting balance as first entry for today (after overdue adjustment)
-    // BUT only if there are no overdue bills (overdue card already shows balance)
+    // Only show account balance entry if there are NO overdue items
     if (!entries[today]) {
       entries[today] = [];
     }
@@ -569,12 +585,12 @@ export default function PlanScreen() {
                       </View>
                       {isCollapsed && summary && (
                         <View style={styles.summaryRow}>
-                          {summary.netIncome > 0 && (
-                            <Text style={styles.summaryIncome}>{formatDollar(summary.netIncome, true)}</Text>
-                          )}
-                          {summary.netExpenses > 0 && (
-                            <Text style={styles.summaryExpense}>{formatDollar(-summary.netExpenses, true)}</Text>
-                          )}
+                          <Text style={styles.summaryIncome}>
+                            {summary.netIncome > 0 ? formatDollar(summary.netIncome, true) : ''}
+                          </Text>
+                          <Text style={styles.summaryExpense}>
+                            {summary.netExpenses > 0 ? formatDollar(-summary.netExpenses, true) : ''}
+                          </Text>
                           <Text style={styles.summaryBalance}>{formatDollar(summary.finalBalance)}</Text>
                         </View>
                       )}
@@ -723,23 +739,30 @@ const styles = StyleSheet.create({
   },
   summaryRow: {
     flexDirection: 'row',
-    gap: 12,
     alignItems: 'center',
   },
   summaryIncome: {
     fontSize: 14,
     fontWeight: '600',
     color: '#2ecc71',
+    minWidth: 70,
+    textAlign: 'right',
   },
   summaryExpense: {
     fontSize: 14,
     fontWeight: '600',
     color: '#e74c3c',
+    minWidth: 70,
+    textAlign: 'right',
+    marginLeft: 12,
   },
   summaryBalance: {
     fontSize: 14,
     fontWeight: 'bold',
     color: '#3498db',
+    minWidth: 80,
+    textAlign: 'right',
+    marginLeft: 12,
   },
   entriesContainer: {
     paddingHorizontal: 16,

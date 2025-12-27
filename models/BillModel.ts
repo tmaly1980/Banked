@@ -88,7 +88,6 @@ export class BillModel {
     this.due_day = bill.due_day;
     this.priority = bill.priority;
     this.loss_risk_flag = bill.loss_risk_flag;
-    this.deferred_flag = bill.deferred_flag;
     this.alert_flag = bill.alert_flag;
     this.urgent_note = bill.urgent_note;
     this.is_variable = bill.is_variable;
