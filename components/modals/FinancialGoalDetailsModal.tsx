@@ -225,7 +225,7 @@ export default function FinancialGoalDetailsModal({
               <DateInput
                 label=""
                 value={paidDate}
-                onChangeDate={setPaidDate}
+                onChange={setPaidDate}
                 placeholder="Select date"
               />
             </View>

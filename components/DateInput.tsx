@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 interface DateInputProps {
   label: string;
   value: string;
-  onChangeDate: (date: string) => void;
+  onChange: (date: string) => void;
   placeholder?: string;
   required?: boolean;
 }
@@ -22,7 +22,7 @@ interface DateInputProps {
 export default function DateInput({
   label,
   value,
-  onChangeDate,
+  onChange,
   placeholder = 'MM/DD/YYYY',
   required = false,
 }: DateInputProps) {
@@ -71,19 +71,19 @@ export default function DateInput({
     // Only update parent if we have a complete date
     if (cleaned.length === 8) {
       const storageDate = formatStorageDate(formatted);
-      onChangeDate(storageDate);
+      onChange(storageDate);
     }
   };
 
   const handleCalendarSelect = (day: any) => {
-    onChangeDate(day.dateString);
+    onChange(day.dateString);
     setDisplayValue(formatDisplayDate(day.dateString));
     setShowCalendar(false);
   };
 
   const handleClear = () => {
     setDisplayValue('');
-    onChangeDate('');
+    onChange('');
   };
 
   // Initialize and sync display value from prop

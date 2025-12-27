@@ -199,3 +199,16 @@ export interface IncomeSource {
   created_at: string;
   updated_at: string;
 }
+
+export interface PlannedExpense {
+  id: string;
+  user_id: string;
+  name: string;
+  budgeted_amount: number;
+  funded_amount: number;
+  planned_date: string;
+  is_scheduled: boolean;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}

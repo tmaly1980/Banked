@@ -13,13 +13,14 @@ import TabScreenHeader from '@/components/TabScreenHeader';
 import SwipeableBillRow from '@/components/Plan/SwipeableBillRow';
 import BillPaymentSheet from '@/components/Plan/BillPaymentSheet';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePlannedExpenses } from '@/contexts/PlannedExpensesContext';
 import { supabase } from '@/lib/supabase';
 import { formatDollar } from '@/lib/utils';
 import { format, parseISO, addDays, startOfDay } from 'date-fns';
 
 interface LedgerEntry {
   date: string;
-  type: 'balance' | 'income' | 'bill' | 'time_off';
+  type: 'balance' | 'income' | 'bill' | 'time_off' | 'planned_expense';
   description: string;
   amount: number;
   runningTotal: number;
@@ -27,6 +28,7 @@ interface LedgerEntry {
   billData?: any;
   isDeferred?: boolean;
   timeOffData?: any;
+  plannedExpenseData?: any;
 }
 
 interface IncomeBreakdown {
@@ -49,6 +51,7 @@ interface DayGroup {
 
 export default function PlanScreen() {
   const { user } = useAuth();
+  const { plannedExpenses, loadPlannedExpenses } = usePlannedExpenses();
   const [loading, setLoading] = useState(false);
   const [dayGroups, setDayGroups] = useState<DayGroup[]>([]);
   const [overdueBills, setOverdueBills] = useState<any[]>([]);
@@ -61,6 +64,7 @@ export default function PlanScreen() {
   const [timeOffList, setTimeOffList] = useState<any[]>([]);
 
   useEffect(() => {
+    loadPlannedExpenses();
     loadLedgerData();
   }, [user]);
 
@@ -131,7 +135,7 @@ export default function PlanScreen() {
       setTimeOffList(timeOffData || []);
 
       // Process and combine data
-      const ledger = buildLedger(totalBalance, incomeData || [], billsData || [], overdueData || [], timeOffData || []);
+      const ledger = buildLedger(totalBalance, incomeData || [], billsData || [], overdueData || [], timeOffData || [], plannedExpenses);
       setDayGroups(ledger);
     } catch (error) {
       console.error('Error loading ledger data:', error);
@@ -140,17 +144,26 @@ export default function PlanScreen() {
     }
   };
 
-  const buildLedger = (startingBalance: number, income: any[], bills: any[], overdueBillsData: any[], timeOffData: any[]): DayGroup[] => {
+  const buildLedger = (startingBalance: number, income: any[], bills: any[], overdueBillsData: any[], timeOffData: any[], plannedExpensesData: any[]): DayGroup[] => {
     const entries: { [date: string]: LedgerEntry[] } = {};
     const today = format(new Date(), 'yyyy-MM-dd');
     
     console.log('[buildLedger] Starting balance:', startingBalance);
     console.log('[buildLedger] Overdue bills count:', overdueBillsData.length);
     console.log('[buildLedger] Overdue bills:', overdueBillsData.map(b => ({ name: b.name, amount: b.amount, remaining: b.remaining_amount, next_due_date: b.next_due_date, deferred_months: b.deferred_months })));
+    console.log('[buildLedger] Planned expenses count:', plannedExpensesData.length);
+    console.log('[buildLedger] Planned expenses:', plannedExpensesData.map(e => ({ name: e.name, budgeted: e.budgeted_amount, funded: e.funded_amount, date: e.planned_date, scheduled: e.is_scheduled })));
     
     // Calculate overdue total to adjust starting balance (exclude bills deferred for their overdue month)
     const overdueTotal = overdueBillsData.reduce((sum, bill) => {
-      // Check if bill is deferred for its overdue month
+      // Skip bills with active deferral unless they have a payment
+      const hasPayment = bill.partial_payment && bill.partial_payment > 0;
+      if (bill.is_deferred_active && !hasPayment) {
+        console.log('[buildLedger] Skipping bill with active deferral (no payment):', bill.name);
+        return sum;
+      }
+      
+      // Legacy: Check if bill is deferred for its overdue month using old month_year system
       if (bill.next_due_date && bill.deferred_months) {
         const [year, month] = bill.next_due_date.split('-');
         const billMonthYear = `${year}-${month}`;
@@ -229,6 +242,12 @@ export default function PlanScreen() {
       const date = bill.next_due_date || bill.due_date;
       if (!date) return; // Skip bills without due dates
       
+      // Skip bills with active deferral unless they have a payment
+      const hasPayment = bill.partial_payment && bill.partial_payment > 0;
+      if (bill.is_deferred_active && !hasPayment) {
+        return; // Skip bills with active deferral and no payment
+      }
+      
       // Calculate the amount to use:
       // 1. For variable bills: use actual current period payment if exists, otherwise minimum due
       // 2. For fixed bills: use remaining amount (considers partial payments)
@@ -257,8 +276,27 @@ export default function PlanScreen() {
       });
     });
 
+    // Aggregate planned expenses by planned_date
+    const plannedExpensesByDate: { [date: string]: any[] } = {};
+    plannedExpensesData.forEach((expense) => {
+      const date = expense.planned_date;
+      if (!date) return; // Skip expenses without dates
+      
+      // Only include scheduled expenses with budgeted amount > 0
+      if (expense.is_scheduled && expense.budgeted_amount > 0) {
+        if (!plannedExpensesByDate[date]) {
+          plannedExpensesByDate[date] = [];
+        }
+        plannedExpensesByDate[date].push({
+          ...expense,
+          name: expense.name,
+          amount: expense.budgeted_amount,
+        });
+      }
+    });
+
     // Get all unique dates and sort
-    const allDates = new Set([today, ...Object.keys(incomeByDate), ...Object.keys(billsByDate), ...Object.keys(timeOffByDate)]);
+    const allDates = new Set([today, ...Object.keys(incomeByDate), ...Object.keys(billsByDate), ...Object.keys(timeOffByDate), ...Object.keys(plannedExpensesByDate)]);
     const sortedDates = Array.from(allDates).sort();
 
     // Build entries for each date
@@ -304,6 +342,23 @@ export default function PlanScreen() {
           });
         });
       }
+
+      // Add planned expense entries
+      if (plannedExpensesByDate[date]) {
+        plannedExpensesByDate[date].forEach((expense) => {
+          const displayAmount = -expense.amount;
+          runningTotal -= expense.amount;
+          
+          entries[date].push({
+            date,
+            type: 'planned_expense',
+            description: expense.name,
+            amount: displayAmount,
+            runningTotal,
+            plannedExpenseData: expense,
+          });
+        });
+      }
     });
 
     // Group by day, combining consecutive income-only days, and inserting time off cards between dates
@@ -318,9 +373,10 @@ export default function PlanScreen() {
       const hasOnlyIncome = dayEntries.every(e => e.type === 'income' || e.type === 'balance');
       const hasIncome = dayEntries.some(e => e.type === 'income');
       const hasBills = dayEntries.some(e => e.type === 'bill');
+      const hasPlannedExpenses = dayEntries.some(e => e.type === 'planned_expense');
 
-      // If this day has only income (no bills), add to current group or start new one
-      if (hasIncome && !hasBills) {
+      // If this day has only income (no bills or planned expenses), add to current group or start new one
+      if (hasIncome && !hasBills && !hasPlannedExpenses) {
         if (!currentIncomeGroup) {
           currentIncomeGroup = { startDate: date, dates: [date], entries: { [date]: dayEntries } };
         } else {
@@ -474,6 +530,8 @@ export default function PlanScreen() {
         netIncome += entry.amount;
       } else if (entry.type === 'bill' && !entry.isDeferred) {
         netExpenses += Math.abs(entry.amount);
+      } else if (entry.type === 'planned_expense') {
+        netExpenses += Math.abs(entry.amount);
       }
     });
     
@@ -618,19 +676,35 @@ export default function PlanScreen() {
               <Text style={styles.emptyText}>No bills or income scheduled</Text>
             </View>
           ) : (
-            dayGroups.map((day, dayIndex) => {
+            dayGroups
+              .filter(day => {
+                // Always show time off cards
+                if (day.isTimeOff) return true;
+                // Only show day cards that have income, bills, or planned expenses
+                return day.entries.some(entry => entry.type === 'income' || entry.type === 'bill' || entry.type === 'planned_expense');
+              })
+              .map((day, dayIndex) => {
               // Handle time off cards separately
               if (day.isTimeOff && day.timeOffData) {
                 const startDate = parseISO(day.timeOffData.start_date);
                 const endDate = parseISO(day.timeOffData.end_date);
-                const numDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                
+                // Format date range: "Jan 7 - 9" or "Jan 29 - Feb 3" if different months
+                const startMonth = format(startDate, 'MMM');
+                const endMonth = format(endDate, 'MMM');
+                const startDay = format(startDate, 'd');
+                const endDay = format(endDate, 'd');
+                
+                const dateRange = startMonth === endMonth 
+                  ? `${startMonth} ${startDay} - ${endDay}`
+                  : `${startMonth} ${startDay} - ${endMonth} ${endDay}`;
                 
                 return (
                   <View key={dayIndex} style={styles.timeOffCard}>
                     <View style={styles.timeOffCardHeader}>
+                      <Text style={styles.timeOffCardDateRange}>{dateRange}</Text>
+                      <Ionicons name="moon-outline" size={20} color="#f39c12" style={styles.timeOffCardIcon} />
                       <Text style={styles.timeOffCardName}>{day.timeOffData.name}</Text>
-                      <Ionicons name="calendar-outline" size={20} color="#f39c12" style={styles.timeOffCardIcon} />
-                      <Text style={styles.timeOffCardDays}>({numDays} {numDays === 1 ? 'day' : 'days'})</Text>
                     </View>
                   </View>
                 );
@@ -640,21 +714,16 @@ export default function PlanScreen() {
               const summary = isCollapsed ? getDaySummary(day) : null;
               const hasDeferredBill = day.entries.some(entry => entry.isDeferred);
               
-              // Check if any bills on this day fall within time off periods
-              const hasTimeOffBills = day.entries.some(entry => {
-                if (entry.type === 'bill') {
-                  return timeOffList.some(timeOff => {
-                    const start = parseISO(timeOff.start_date);
-                    const end = parseISO(timeOff.end_date);
-                    const current = parseISO(entry.date);
-                    return current >= start && current <= end;
-                  });
-                }
-                return false;
+              // Check if this day falls within any time off period
+              const isWithinTimeOff = timeOffList.some(timeOff => {
+                const start = parseISO(timeOff.start_date);
+                const end = parseISO(timeOff.end_date);
+                const current = parseISO(day.date);
+                return current >= start && current <= end;
               });
               
               return (
-                <View key={dayIndex} style={[styles.dayCard, hasTimeOffBills && styles.timeOffDayBorder]}>
+                <View key={dayIndex} style={[styles.dayCard, isWithinTimeOff && styles.timeOffDayBorder]}>
                   <TouchableOpacity 
                     onPress={() => toggleDay(day.date)}
                     style={styles.dayHeader}
@@ -710,6 +779,19 @@ export default function PlanScreen() {
                                   setPaymentSheetVisible(true);
                                 }}
                               />
+                            );
+                          }
+                          if (entry.type === 'planned_expense') {
+                            return (
+                              <View key={entryIndex} style={styles.entryRow}>
+                                <View style={styles.entryInfo}>
+                                  <Text style={[styles.entryDescription, styles.plannedExpenseText]}>{entry.description}</Text>
+                                  <Text style={[styles.entryAmount, styles.plannedExpenseAmount]}>
+                                    {formatDollar(entry.amount, true)}
+                                  </Text>
+                                </View>
+                                <Text style={styles.runningTotal}>{formatDollar(entry.runningTotal)}</Text>
+                              </View>
                             );
                           }
                           return (
@@ -782,7 +864,6 @@ const styles = StyleSheet.create({
   },
   dayCard: {
     backgroundColor: 'white',
-    borderRadius: 12,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -888,6 +969,20 @@ const styles = StyleSheet.create({
   billAmount: {
     color: '#e74c3c',
   },
+  plannedExpenseContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  plannedExpenseIcon: {
+    marginRight: 6,
+  },
+  plannedExpenseText: {
+    color: '#8b5cf6',
+  },
+  plannedExpenseAmount: {
+    color: '#8b5cf6',
+  },
   runningTotal: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -907,8 +1002,8 @@ const styles = StyleSheet.create({
   timeOffCard: {
     backgroundColor: '#fff9f0',
     borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#f39c12',
+    borderWidth: 4,
+    borderColor: '#f39c12',
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -922,19 +1017,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
   },
-  timeOffCardName: {
+  timeOffCardDateRange: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#e67e22',
   },
   timeOffCardIcon: {
     marginLeft: 8,
+    marginRight: 8,
   },
-  timeOffCardDays: {
+  timeOffCardName: {
+    flex: 1,
     fontSize: 18,
     fontWeight: 'bold',
     color: '#e67e22',
-    marginLeft: 'auto',
+    textAlign: 'right',
   },
   timeOffDayBorder: {
     borderLeftWidth: 4,

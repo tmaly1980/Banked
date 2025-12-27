@@ -425,7 +425,7 @@ export default function FinancialGoalFormModal({
             <DateInput
               label="Due Date (Optional)"
               value={dueDate}
-              onChangeDate={setDueDate}
+              onChange={setDueDate}
               placeholder="MM/DD/YYYY"
             />
 

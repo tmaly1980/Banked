@@ -69,7 +69,7 @@ export default function PaymentForm({
             <DateInput
               label="Payment Date"
               value={paymentDate}
-              onChangeDate={onPaymentDateChange}
+              onChange={onPaymentDateChange}
             />
           </View>
         </View>

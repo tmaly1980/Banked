@@ -27,6 +27,10 @@ export interface Bill {
   is_overdue?: boolean;
   is_deferred_active?: boolean;
   deferred_months?: string[];
+  deferred_month_year?: string;
+  decide_by_date?: string;
+  loss_date?: string;
+  deferment_reason?: string;
   last_payment_date?: string;
   total_paid?: number;
   // Current billing period payment tracking
@@ -67,6 +71,10 @@ export class BillModel {
   is_overdue?: boolean;
   is_deferred_active?: boolean;
   deferred_months?: string[];
+  deferred_month_year?: string;
+  decide_by_date?: string;
+  loss_date?: string;
+  deferment_reason?: string;
   last_payment_date?: string;
   total_paid_from_db?: number;
   // Current billing period payment tracking

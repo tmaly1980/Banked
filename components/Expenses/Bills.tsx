@@ -15,6 +15,7 @@ import { formatDollar } from '@/lib/utils';
 import { format, isAfter, isBefore, startOfDay, addDays } from 'date-fns';
 import DayOrDateInput from '@/components/DayOrDateInput';
 import BillDatePicker from '@/components/BillDatePicker';
+import DeferredBillsAccordion from '@/components/Bills/DeferredBillsAccordion';
 
 interface BillsProps {
   bills: BillModel[];
@@ -137,8 +138,20 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
     const overdue: BillModel[] = [];
     const upcoming: BillModel[] = [];
     const later: BillModel[] = [];
+    const deferred: BillModel[] = [];
 
     bills.forEach(bill => {
+      // Always add actively deferred bills to deferred section
+      if (bill.is_deferred_active) {
+        deferred.push(bill);
+        // If bill has a current period payment, also show in normal sections
+        const hasPayment = bill.partial_payment && bill.partial_payment > 0;
+        if (!hasPayment) {
+          return; // Only in deferred section
+        }
+        // Fall through to also add to normal sections if has payment
+      }
+
       // Check overdue first, regardless of other flags
       if (bill.is_overdue) {
         overdue.push(bill);
@@ -167,7 +180,7 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
       upcomingByMonth[monthKey].push(bill);
     });
 
-    return { overdue, upcoming, upcomingByMonth, later };
+    return { overdue, upcoming, upcomingByMonth, later, deferred };
   }, [bills]);
 
   const formatBillDate = (bill: BillModel): string => {
@@ -367,6 +380,14 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
         </View>
       )}
       </ScrollView>
+
+      {/* Deferred Bills Accordion - Fixed to bottom */}
+      <DeferredBillsAccordion
+        deferredBills={groupedBills.deferred}
+        onViewBill={onBillPress}
+        onEditBill={onBillPress}
+        onDeleteBill={onBillPress}
+      />
       
       <BillDatePicker
         visible={showDatePicker}

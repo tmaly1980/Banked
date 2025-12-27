@@ -162,13 +162,13 @@ const AddRecurringDepositForm = forwardRef<RecurringDepositFormRef, AddRecurring
       <DateInput
         label="Start Date"
         value={startDate}
-        onChangeDate={setStartDate}
+        onChange={setStartDate}
       />
 
       <DateInput
         label="End Date (Optional)"
         value={endDate}
-        onChangeDate={setEndDate}
+        onChange={setEndDate}
       />
 
       <View style={styles.inputGroup}>

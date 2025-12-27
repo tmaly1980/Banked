@@ -18,6 +18,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 
+type PaymentMode = 'pay' | 'partial' | 'defer';
+
 interface BillPaymentSheetProps {
   visible: boolean;
   billId: string | null;
@@ -42,7 +44,7 @@ export default function BillPaymentSheet({
   onSuccess,
 }: BillPaymentSheetProps) {
   const { user } = useAuth();
-  const [isDeferMode, setIsDeferMode] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('pay');
   const [loading, setLoading] = useState(false);
   
   // Payment form fields
@@ -52,23 +54,27 @@ export default function BillPaymentSheet({
   const [additionalFees, setAdditionalFees] = useState('');
   
   // Defer form fields
-  const [deferReason, setDeferReason] = useState('');
   const [deferMonthYear, setDeferMonthYear] = useState('');
+  const [decideByDate, setDecideByDate] = useState('');
+  const [lossDate, setLossDate] = useState('');
+  const [deferReason, setDeferReason] = useState('');
 
   useEffect(() => {
     if (visible && billId) {
       // Reset form
-      setIsDeferMode(isDeferred);
+      setPaymentMode(isDeferred ? 'defer' : 'pay');
       setPaymentAmount(billAmount.toString());
       setPaymentDate(format(new Date(), 'yyyy-MM-dd'));
       setAdditionalFees('');
       setDeferReason('');
+      setDecideByDate('');
+      setLossDate('');
       
-      // Set default defer month-year and applied month to current month
+      // Set default applied month and defer month to current month
       const now = new Date();
       const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      setDeferMonthYear(currentMonthYear);
       setAppliedMonthYear(currentMonthYear);
+      setDeferMonthYear(currentMonthYear);
     }
   }, [visible, billId, billAmount, isDeferred]);
 
@@ -79,7 +85,7 @@ export default function BillPaymentSheet({
     try {
       const amount = parseFloat(paymentAmount) + parseFloat(additionalFees || '0');
       
-      const { error } = await supabase.from('bill_payments').insert({
+      const { error: paymentError } = await supabase.from('bill_payments').insert({
         bill_id: billId,
         user_id: user.id,
         amount,
@@ -88,13 +94,59 @@ export default function BillPaymentSheet({
         is_paid: true,
       });
 
-      if (error) throw error;
+      if (paymentError) throw paymentError;
+
+      // Note: Don't auto-reset deferrals - user must manually remove via swipe
 
       onSuccess();
       onClose();
     } catch (error) {
       console.error('Error making payment:', error);
       alert('Failed to make payment');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePartialWithDefer = async () => {
+    if (!billId || !user) return;
+    
+    setLoading(true);
+    try {
+      const amount = parseFloat(paymentAmount) + parseFloat(additionalFees || '0');
+      
+      // Make the partial payment
+      const { error: paymentError } = await supabase.from('bill_payments').insert({
+        bill_id: billId,
+        user_id: user.id,
+        amount,
+        payment_date: paymentDate,
+        applied_month_year: appliedMonthYear,
+        is_paid: true,
+      });
+
+      if (paymentError) throw paymentError;
+
+      // Create the deferment for remaining balance
+      const { error: deferError } = await supabase
+        .from('bill_deferments')
+        .insert({
+          bill_id: billId,
+          user_id: user.id,
+          month_year: deferMonthYear,
+          decide_by_date: decideByDate,
+          loss_date: lossDate || null,
+          reason: deferReason || null,
+          is_active: true,
+        });
+
+      if (deferError) throw deferError;
+
+      onSuccess();
+      onClose();
+    } catch (error) {
+      console.error('Error making partial payment with defer:', error);
+      alert('Failed to process payment and deferral');
     } finally {
       setLoading(false);
     }
@@ -112,7 +164,10 @@ export default function BillPaymentSheet({
           bill_id: billId,
           user_id: user.id,
           month_year: deferMonthYear,
+          decide_by_date: decideByDate,
+          loss_date: lossDate || null,
           reason: deferReason || null,
+          is_active: true,
         });
 
       if (error) throw error;
@@ -132,10 +187,10 @@ export default function BillPaymentSheet({
     
     setLoading(true);
     try {
-      // Delete all deferments for this bill
+      // Set is_active to false for all deferments for this bill
       const { error } = await supabase
         .from('bill_deferments')
-        .delete()
+        .update({ is_active: false })
         .eq('bill_id', billId)
         .eq('user_id', user.id);
 
@@ -148,6 +203,26 @@ export default function BillPaymentSheet({
       alert('Failed to remove deferred status');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (paymentMode === 'pay') {
+      handleMakePayment();
+    } else if (paymentMode === 'partial') {
+      handlePartialWithDefer();
+    } else {
+      handleDeferPayment();
+    }
+  };
+
+  const isFormValid = () => {
+    if (paymentMode === 'pay') {
+      return paymentAmount && paymentDate && appliedMonthYear;
+    } else if (paymentMode === 'partial') {
+      return paymentAmount && paymentDate && appliedMonthYear && deferMonthYear && decideByDate;
+    } else {
+      return deferMonthYear && decideByDate;
     }
   };
 
@@ -180,41 +255,67 @@ export default function BillPaymentSheet({
               </View>
             </View>
 
-            {/* Toggle Buttons */}
-            <View style={styles.toggleContainer}>
+            {/* Tab Buttons */}
+            <View style={styles.tabContainer}>
               <TouchableOpacity
-                style={[styles.toggleButton, !isDeferMode && styles.toggleButtonActive]}
-                onPress={() => setIsDeferMode(false)}
+                style={[styles.tabButton, paymentMode === 'pay' && styles.tabButtonActive]}
+                onPress={() => setPaymentMode('pay')}
               >
-                <Text style={[styles.toggleText, !isDeferMode && styles.toggleTextActive]}>
-                  Make Payment
+                <Text style={[styles.tabText, paymentMode === 'pay' && styles.tabTextActive]}>
+                  Pay
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.toggleButton, isDeferMode && styles.toggleButtonActive]}
-                onPress={() => setIsDeferMode(true)}
+                style={[styles.tabButton, paymentMode === 'partial' && styles.tabButtonActive]}
+                onPress={() => setPaymentMode('partial')}
               >
-                <Text style={[styles.toggleText, isDeferMode && styles.toggleTextActive]}>
-                  Defer Payment
+                <Text style={[styles.tabText, paymentMode === 'partial' && styles.tabTextActive]}>
+                  Partial Pay+Defer
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tabButton, paymentMode === 'defer' && styles.tabButtonActive]}
+                onPress={() => setPaymentMode('defer')}
+              >
+                <Text style={[styles.tabText, paymentMode === 'defer' && styles.tabTextActive]}>
+                  Defer
                 </Text>
               </TouchableOpacity>
             </View>
 
             {/* Content */}
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-              {isDeferMode ? (
-                // Defer Mode
+              {paymentMode === 'defer' ? (
+                // Defer Only Mode
                 <View style={styles.deferContent}>
+                  <View style={styles.inputRow}>
+                    <View style={styles.halfInputGroup}>
+                      <MonthYearInput
+                        label="Defer For Month"
+                        value={deferMonthYear}
+                        onChangeValue={setDeferMonthYear}
+                        preselectedDate={nextDueDate}
+                        showClearButton={false}
+                      />
+                    </View>
+
+                    <View style={styles.halfInputGroup}>
+                      <DateInput
+                        label="Decide By"
+                        value={decideByDate}
+                        onChange={setDecideByDate}
+                      />
+                    </View>
+                  </View>
+
                   <View style={styles.inputGroup}>
-                    <MonthYearInput
-                      label="Defer For Month"
-                      value={deferMonthYear}
-                      onChangeValue={setDeferMonthYear}
-                      preselectedDate={nextDueDate}
-                      showClearButton={false}
+                    <DateInput
+                      label="Loss Date (Optional)"
+                      value={lossDate}
+                      onChange={setLossDate}
                     />
                     <Text style={styles.helpText}>
-                      Bill will be excluded from calculations for this month
+                      Date when utility or service will be shut off
                     </Text>
                   </View>
                   
@@ -226,13 +327,13 @@ export default function BillPaymentSheet({
                       onChangeText={setDeferReason}
                       placeholder="Why are you deferring this bill?"
                       multiline
-                      numberOfLines={6}
+                      numberOfLines={4}
                       textAlignVertical="top"
                     />
                   </View>
                 </View>
               ) : (
-                // Payment Mode
+                // Payment Mode (Pay or Partial Pay+Defer)
                 <View style={styles.paymentForm}>
                   <View style={styles.inputRow}>
                     <View style={styles.halfInputGroup}>
@@ -248,7 +349,7 @@ export default function BillPaymentSheet({
                       <DateInput
                         label="Payment Date"
                         value={paymentDate}
-                        onChangeDate={setPaymentDate}
+                        onChange={setPaymentDate}
                       />
                     </View>
                   </View>
@@ -274,6 +375,58 @@ export default function BillPaymentSheet({
                       />
                     </View>
                   </View>
+
+                  {/* Show defer fields only in Partial mode */}
+                  {paymentMode === 'partial' && (
+                    <>
+                      <View style={styles.divider} />
+                      <Text style={styles.sectionTitle}>Defer Remaining Balance</Text>
+                      
+                      <View style={styles.inputRow}>
+                        <View style={styles.halfInputGroup}>
+                          <MonthYearInput
+                            label="Defer For Month"
+                            value={deferMonthYear}
+                            onChangeValue={setDeferMonthYear}
+                            preselectedDate={nextDueDate}
+                            showClearButton={false}
+                          />
+                        </View>
+
+                        <View style={styles.halfInputGroup}>
+                          <DateInput
+                            label="Decide By"
+                            value={decideByDate}
+                            onChange={setDecideByDate}
+                          />
+                        </View>
+                      </View>
+
+                      <View style={styles.inputGroup}>
+                        <DateInput
+                          label="Loss Date (Optional)"
+                          value={lossDate}
+                          onChange={setLossDate}
+                        />
+                        <Text style={styles.helpText}>
+                          Date when utility or service will be shut off
+                        </Text>
+                      </View>
+
+                      <View style={styles.inputGroup}>
+                        <Text style={styles.label}>Reason (Optional)</Text>
+                        <TextInput
+                          style={styles.textArea}
+                          value={deferReason}
+                          onChangeText={setDeferReason}
+                          placeholder="Why are you deferring the remaining balance?"
+                          multiline
+                          numberOfLines={3}
+                          textAlignVertical="top"
+                        />
+                      </View>
+                    </>
+                  )}
                 </View>
               )}
             </ScrollView>
@@ -281,15 +434,22 @@ export default function BillPaymentSheet({
             {/* Footer Button */}
             <View style={styles.footer}>
               <TouchableOpacity
-                style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                onPress={isDeferMode ? handleDeferPayment : handleMakePayment}
-                disabled={loading}
+                style={[
+                  styles.submitButton,
+                  (!isFormValid() || loading) && styles.submitButtonDisabled
+                ]}
+                onPress={handleSubmit}
+                disabled={!isFormValid() || loading}
               >
                 {loading ? (
                   <ActivityIndicator color="white" />
                 ) : (
                   <Text style={styles.submitButtonText}>
-                    {isDeferMode ? 'Save Deferred Status' : 'Save Payment'}
+                    {paymentMode === 'defer' 
+                      ? 'Save Deferred Status' 
+                      : paymentMode === 'partial'
+                      ? 'Save Payment & Defer'
+                      : 'Save Payment'}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -373,8 +533,32 @@ const styles = StyleSheet.create({
   toggleTextActive: {
     color: 'white',
   },
+  tabContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    gap: 8,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    alignItems: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: '#3498db',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#7f8c8d',
+  },
+  tabTextActive: {
+    color: 'white',
+  },
   content: {
-    maxHeight: 400,
+    maxHeight: 500,
     paddingHorizontal: 20,
   },
   deferContent: {
@@ -382,6 +566,9 @@ const styles = StyleSheet.create({
   },
   paymentForm: {
     paddingVertical: 16,
+  },
+  inputGroup: {
+    marginBottom: 20,
   },
   label: {
     fontSize: 14,
@@ -397,7 +584,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#2c3e50',
     backgroundColor: 'white',
-    minHeight: 120,
+    minHeight: 80,
   },
   inputRow: {
     flexDirection: 'row',
@@ -411,6 +598,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#95a5a6',
     marginTop: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#ecf0f1',
+    marginVertical: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2c3e50',
+    marginBottom: 16,
   },
   footer: {
     paddingHorizontal: 20,

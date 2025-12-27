@@ -200,7 +200,7 @@ export default function GigFormModal({ visible, gig, onClose, defaultStartDate, 
                 <DateInput
                   label=""
                   value={endDate}
-                  onChangeDate={setEndDate}
+                  onChange={setEndDate}
                   placeholder="MM/DD/YYYY"
                   required={true}
                 />

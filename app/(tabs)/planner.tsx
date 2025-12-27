@@ -844,7 +844,7 @@ export default function PlannerScreen() {
                   <DateInput
                     label="Due Date (optional)"
                     value={priorityForm.dueDate}
-                    onChangeDate={(date) => setPriorityForm({ ...priorityForm, dueDate: date })}
+                    onChange={(date) => setPriorityForm({ ...priorityForm, dueDate: date })}
                     placeholder="MM/DD/YYYY"
                   />
                 </View>

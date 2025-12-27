@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { BillsProvider } from '@/contexts/BillsContext';
 import { DepositsProvider } from '@/contexts/DepositsContext';
 import { IncomeProvider } from '@/contexts/IncomeContext';
+import { PlannedExpensesProvider } from '@/contexts/PlannedExpensesContext';
 import { ToastProvider } from '@/components/CustomToast';
 
 function RootLayoutNav() {
@@ -44,9 +45,11 @@ export default function RootLayout() {
           <BillsProvider>
             <DepositsProvider>
               <IncomeProvider>
-                <ToastProvider>
-                  <RootLayoutNav />
-                </ToastProvider>
+                <PlannedExpensesProvider>
+                  <ToastProvider>
+                    <RootLayoutNav />
+                  </ToastProvider>
+                </PlannedExpensesProvider>
               </IncomeProvider>
             </DepositsProvider>
           </BillsProvider>

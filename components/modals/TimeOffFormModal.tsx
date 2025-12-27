@@ -202,7 +202,7 @@ export default function TimeOffFormModal({
                 <DateInput
                   label="Start Date *"
                   value={startDate ? startDate.toISOString().split('T')[0] : ''}
-                  onChangeDate={(dateStr) => setStartDate(dateStr ? new Date(dateStr) : null)}
+                  onChange={(dateStr) => setStartDate(dateStr ? new Date(dateStr) : null)}
                   placeholder="MM/DD/YYYY"
                 />
               </View>
@@ -211,7 +211,7 @@ export default function TimeOffFormModal({
                 <DateInput
                   label="End Date *"
                   value={endDate ? endDate.toISOString().split('T')[0] : ''}
-                  onChangeDate={(dateStr) => setEndDate(dateStr ? new Date(dateStr) : null)}
+                  onChange={(dateStr) => setEndDate(dateStr ? new Date(dateStr) : null)}
                   placeholder="MM/DD/YYYY"
                 />
               </View>

@@ -170,7 +170,7 @@ export default function AddPaycheckModal({
             <DateInput
               label="Date"
               value={date}
-              onChangeDate={setDate}
+              onChange={setDate}
               placeholder="Select date"
               required
             />

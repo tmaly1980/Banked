@@ -383,7 +383,7 @@ export default function IncomeRuleFormModal({
               <DateInput
                 label="Start Date *"
                 value={startDate}
-                onChangeDate={setStartDate}
+                onChange={setStartDate}
                 required
               />
             </View>

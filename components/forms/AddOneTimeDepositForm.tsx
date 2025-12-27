@@ -101,7 +101,7 @@ const AddOneTimeDepositForm = forwardRef<OneTimeDepositFormRef, AddOneTimeDeposi
         <DateInput
           label="Date"
           value={date}
-          onChangeDate={setDate}
+          onChange={setDate}
         />
 
         <View style={styles.inputGroup}>

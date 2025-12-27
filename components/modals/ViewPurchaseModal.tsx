@@ -740,7 +740,7 @@ export default function ViewPurchaseModal({
                   <DateInput
                     label="Purchase Date"
                     value={purchaseDate}
-                    onChangeDate={setPurchaseDate}
+                    onChange={setPurchaseDate}
                     placeholder="MM/DD/YYYY"
                   />
                 </View>

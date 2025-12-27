@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BillModel } from '@/models/BillModel';
-import { format } from 'date-fns';
+import { format, startOfDay, addDays, differenceInDays } from 'date-fns';
 import { formatDollar, getBillDueDate } from '@/lib/utils';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -45,6 +45,31 @@ export default function DeferredBillsAccordion({
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsExpanded(!isExpanded);
   };
+
+  // Calculate status counts based on decide_by_date
+  const statusInfo = useMemo(() => {
+    const today = startOfDay(new Date());
+    let decisionOverdueCount = 0;
+    let decideSoonCount = 0;
+
+    deferredBills.forEach(bill => {
+      const decideBy = bill.decide_by_date ? startOfDay(new Date(bill.decide_by_date)) : null;
+      
+      if (decideBy) {
+        const daysUntil = differenceInDays(decideBy, today);
+        
+        if (daysUntil < 0) {
+          // Decision date passed - overdue
+          decisionOverdueCount++;
+        } else if (daysUntil <= 7) {
+          // Next 7 days
+          decideSoonCount++;
+        }
+      }
+    });
+
+    return { decisionOverdueCount, decideSoonCount };
+  }, [deferredBills]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -86,6 +111,20 @@ export default function DeferredBillsAccordion({
             color="#6c757d" 
           />
           <Text style={styles.headerTitle}>Deferred</Text>
+          
+          {/* Status Indicators */}
+          {statusInfo.decisionOverdueCount > 0 && (
+            <View style={styles.statusBadge}>
+              <Ionicons name="alert-circle" size={16} color="#e74c3c" />
+              <Text style={styles.statusBadgeTextRed}>{statusInfo.decisionOverdueCount}</Text>
+            </View>
+          )}
+          {statusInfo.decideSoonCount > 0 && (
+            <View style={styles.statusBadge}>
+              <Ionicons name="alert-circle" size={16} color="#3498db" />
+              <Text style={styles.statusBadgeTextBlue}>{statusInfo.decideSoonCount}</Text>
+            </View>
+          )}
         </View>
         <Text style={styles.headerCount}>
           ({deferredBills.length}) {formatDollar(totalDeferred)}
@@ -185,11 +224,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#2c3e50',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: '#f8f9fa',
+  },
+  statusBadgeTextRed: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#e74c3c',
+  },
+  statusBadgeTextBlue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#3498db',
   },
   headerCount: {
     fontSize: 14,

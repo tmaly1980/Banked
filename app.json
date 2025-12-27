@@ -3,11 +3,11 @@
     "name": "Banked",
     "slug": "banked",
     "owner": "tmaly1980",
-    "version": "1.0.4",
+    "version": "1.0.7",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "banked",
-    "runtimeVersion": "1.0.4",
+    "runtimeVersion": "1.0.7",
     "assetBundlePatterns": [
       "**/*"
     ],

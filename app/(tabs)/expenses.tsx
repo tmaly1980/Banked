@@ -15,19 +15,22 @@ import { BillModel } from '@/models/BillModel';
 import { formatDollar } from '@/lib/utils';
 import Bills from '@/components/Expenses/Bills';
 import Budget from '@/components/Expenses/Budget';
-import Projects from '@/components/Expenses/Projects';
+import PlannedExpenses from '@/components/Expenses/PlannedExpenses';
 import Purchases from '@/components/Expenses/Purchases';
 import BillFormModal from '@/components/modals/BillFormModal';
-import FloatingActionButton from '@/components/FloatingActionButton';
+import PlannedExpenseFormModal from '@/components/modals/PlannedExpenseFormModal';
+import { usePlannedExpenses } from '@/contexts/PlannedExpensesContext';
 
-type TabSection = 'bills' | 'budget' | 'projects' | 'purchases';
+type TabSection = 'bills' | 'budget' | 'planned_expenses' | 'purchases';
 
 export default function ExpensesScreen() {
   const { bills, loading, refreshData, createBill } = useBills();
+  const { refreshData: refreshPlannedExpenses } = usePlannedExpenses();
   const [activeTab, setActiveTab] = useState<TabSection>('bills');
   const [selectedBill, setSelectedBill] = useState<BillModel | null>(null);
   const [billDetailsVisible, setBillDetailsVisible] = useState(false);
   const [billFormVisible, setBillFormVisible] = useState(false);
+  const [plannedExpenseFormVisible, setPlannedExpenseFormVisible] = useState(false);
 
   const handleBillPress = (bill: BillModel) => {
     setSelectedBill(bill);
@@ -54,10 +57,33 @@ export default function ExpensesScreen() {
     }
   };
 
+  const handleAddButtonPress = () => {
+    if (activeTab === 'bills') {
+      setSelectedBill(null);
+      setBillFormVisible(true);
+    } else if (activeTab === 'planned_expenses') {
+      setPlannedExpenseFormVisible(true);
+    }
+  };
+
+  const shouldShowAddButton = activeTab === 'bills' || activeTab === 'planned_expenses';
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
-        <TabScreenHeader title="Expenses" />
+        <TabScreenHeader 
+          title="Expenses" 
+          rightContent={
+            shouldShowAddButton ? (
+              <TouchableOpacity 
+                style={styles.addButton}
+                onPress={handleAddButtonPress}
+              >
+                <Text style={styles.addButtonText}>Add</Text>
+              </TouchableOpacity>
+            ) : null
+          }
+        />
 
         {/* Top Navigation Bar */}
         <View style={styles.tabBar}>
@@ -78,11 +104,11 @@ export default function ExpensesScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'projects' && styles.activeTab]}
-            onPress={() => setActiveTab('projects')}
+            style={[styles.tab, activeTab === 'planned_expenses' && styles.activeTab]}
+            onPress={() => setActiveTab('planned_expenses')}
           >
-            <Text style={[styles.tabText, activeTab === 'projects' && styles.activeTabText]}>
-              Projects
+            <Text style={[styles.tabText, activeTab === 'planned_expenses' && styles.activeTabText]}>
+              Planned
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -112,11 +138,8 @@ export default function ExpensesScreen() {
               <Text style={styles.placeholderText}>Budget tracking coming soon</Text>
             </View>
           )}
-          {activeTab === 'projects' && (
-            <View style={styles.placeholderContainer}>
-              <Ionicons name="construct-outline" size={64} color="#bdc3c7" />
-              <Text style={styles.placeholderText}>Projects coming soon</Text>
-            </View>
+          {activeTab === 'planned_expenses' && (
+            <PlannedExpenses />
           )}
           {activeTab === 'purchases' && (
             <View style={styles.placeholderContainer}>
@@ -156,18 +179,14 @@ export default function ExpensesScreen() {
           editingBill={selectedBill}
         />
 
-        {/* Floating Action Button for Bills */}
-        <FloatingActionButton
-          options={[
-            {
-              label: 'Add Bill',
-              icon: 'add',
-              onPress: () => {
-                setSelectedBill(null);
-                setBillFormVisible(true);
-              },
-            },
-          ]}
+        {/* Planned Expense Form Modal */}
+        <PlannedExpenseFormModal
+          visible={plannedExpenseFormVisible}
+          onClose={() => setPlannedExpenseFormVisible(false)}
+          onSuccess={() => {
+            refreshPlannedExpenses();
+            setPlannedExpenseFormVisible(false);
+          }}
         />
       </View>
     </SafeAreaView>
@@ -224,5 +243,16 @@ const styles = StyleSheet.create({
     color: '#7f8c8d',
     marginTop: 16,
     textAlign: 'center',
+  },
+  addButton: {
+    backgroundColor: '#10b981',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -198,7 +198,7 @@ export default function EditExpenseBudgetModal({
               <DateInput
                 label=""
                 value={effectiveFrom}
-                onChangeDate={setEffectiveFrom}
+                onChange={setEffectiveFrom}
                 placeholder="Select date"
               />
             </View>
@@ -209,7 +209,7 @@ export default function EditExpenseBudgetModal({
               <DateInput
                 label=""
                 value={effectiveTo}
-                onChangeDate={setEffectiveTo}
+                onChange={setEffectiveTo}
                 placeholder="Leave blank for ongoing"
               />
             </View>
