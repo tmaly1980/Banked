@@ -19,13 +19,14 @@ import { format, parseISO, addDays, startOfDay } from 'date-fns';
 
 interface LedgerEntry {
   date: string;
-  type: 'balance' | 'income' | 'bill';
+  type: 'balance' | 'income' | 'bill' | 'time_off';
   description: string;
   amount: number;
   runningTotal: number;
   billId?: string;
   billData?: any;
   isDeferred?: boolean;
+  timeOffData?: any;
 }
 
 interface IncomeBreakdown {
@@ -42,6 +43,8 @@ interface DayGroup {
   entries: LedgerEntry[];
   isIncomeOnly?: boolean;
   incomeBreakdown?: IncomeBreakdown[]; // For combined days
+  isTimeOff?: boolean;
+  timeOffData?: any;
 }
 
 export default function PlanScreen() {
@@ -55,6 +58,7 @@ export default function PlanScreen() {
   const [allCollapsed, setAllCollapsed] = useState(true);
   const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
   const [selectedBill, setSelectedBill] = useState<any>(null);
+  const [timeOffList, setTimeOffList] = useState<any[]>([]);
 
   useEffect(() => {
     loadLedgerData();
@@ -114,15 +118,21 @@ export default function PlanScreen() {
 
       setOverdueBills(overdueData || []);
 
+      // Load time off
+      const { data: timeOffData, error: timeOffError } = await supabase
+        .from('time_off')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('end_date', format(today, 'yyyy-MM-dd'))
+        .order('start_date', { ascending: true });
+
+      if (timeOffError) throw timeOffError;
+
+      setTimeOffList(timeOffData || []);
+
       // Process and combine data
-      const ledger = buildLedger(totalBalance, incomeData || [], billsData || [], overdueData || []);
+      const ledger = buildLedger(totalBalance, incomeData || [], billsData || [], overdueData || [], timeOffData || []);
       setDayGroups(ledger);
-      
-      // Initialize all days as collapsed
-      const allDates = new Set(ledger.map(day => day.date));
-      setCollapsedDays(allDates);
-      setAllCollapsed(true);
-      setOverdueCollapsed(true);
     } catch (error) {
       console.error('Error loading ledger data:', error);
     } finally {
@@ -130,7 +140,7 @@ export default function PlanScreen() {
     }
   };
 
-  const buildLedger = (startingBalance: number, income: any[], bills: any[], overdueBillsData: any[]): DayGroup[] => {
+  const buildLedger = (startingBalance: number, income: any[], bills: any[], overdueBillsData: any[], timeOffData: any[]): DayGroup[] => {
     const entries: { [date: string]: LedgerEntry[] } = {};
     const today = format(new Date(), 'yyyy-MM-dd');
     
@@ -165,6 +175,27 @@ export default function PlanScreen() {
     }, 0);
     
     console.log('[buildLedger] Total overdue:', overdueTotal);
+    
+    // Create time off lookup map by date
+    const timeOffByDate: { [date: string]: any[] } = {};
+    const endDate = addDays(new Date(), 30);
+    
+    timeOffData.forEach((timeOff) => {
+      const startDate = parseISO(timeOff.start_date);
+      const endDateEntry = parseISO(timeOff.end_date);
+      
+      let currentDate = startDate < new Date() ? new Date() : startDate;
+      const finalDate = endDateEntry < endDate ? endDateEntry : endDate;
+      
+      while (currentDate <= finalDate) {
+        const dateStr = format(currentDate, 'yyyy-MM-dd');
+        if (!timeOffByDate[dateStr]) {
+          timeOffByDate[dateStr] = [];
+        }
+        timeOffByDate[dateStr].push(timeOff);
+        currentDate = addDays(currentDate, 1);
+      }
+    });
     
     // Start with balance after overdue (if any), otherwise use account balance
     let runningTotal = startingBalance - overdueTotal;
@@ -227,7 +258,7 @@ export default function PlanScreen() {
     });
 
     // Get all unique dates and sort
-    const allDates = new Set([today, ...Object.keys(incomeByDate), ...Object.keys(billsByDate)]);
+    const allDates = new Set([today, ...Object.keys(incomeByDate), ...Object.keys(billsByDate), ...Object.keys(timeOffByDate)]);
     const sortedDates = Array.from(allDates).sort();
 
     // Build entries for each date
@@ -275,9 +306,12 @@ export default function PlanScreen() {
       }
     });
 
-    // Group by day, combining consecutive income-only days
+    // Group by day, combining consecutive income-only days, and inserting time off cards between dates
     const dayGroups: DayGroup[] = [];
     let currentIncomeGroup: { startDate: string; dates: string[]; entries: { [date: string]: LedgerEntry[] } } | null = null;
+    
+    // Track which time off periods we've already added
+    const addedTimeOffPeriods = new Set<string>();
 
     sortedDates.forEach((date, index) => {
       const dayEntries = entries[date];
@@ -365,6 +399,23 @@ export default function PlanScreen() {
           currentIncomeGroup = null;
         }
 
+        // Check if we need to insert a time off card before this date
+        if (timeOffByDate[date]) {
+          timeOffByDate[date].forEach((timeOff) => {
+            const periodKey = `${timeOff.start_date}-${timeOff.end_date}`;
+            if (!addedTimeOffPeriods.has(periodKey)) {
+              addedTimeOffPeriods.add(periodKey);
+              dayGroups.push({
+                date: timeOff.start_date,
+                dayLabel: `Time Off: ${timeOff.name}`,
+                entries: [],
+                isTimeOff: true,
+                timeOffData: timeOff,
+              });
+            }
+          });
+        }
+        
         // Add current day as regular card
         dayGroups.push({
           date,
@@ -568,12 +619,42 @@ export default function PlanScreen() {
             </View>
           ) : (
             dayGroups.map((day, dayIndex) => {
+              // Handle time off cards separately
+              if (day.isTimeOff && day.timeOffData) {
+                const startDate = parseISO(day.timeOffData.start_date);
+                const endDate = parseISO(day.timeOffData.end_date);
+                const numDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                
+                return (
+                  <View key={dayIndex} style={styles.timeOffCard}>
+                    <View style={styles.timeOffCardHeader}>
+                      <Text style={styles.timeOffCardName}>{day.timeOffData.name}</Text>
+                      <Ionicons name="calendar-outline" size={20} color="#f39c12" style={styles.timeOffCardIcon} />
+                      <Text style={styles.timeOffCardDays}>({numDays} {numDays === 1 ? 'day' : 'days'})</Text>
+                    </View>
+                  </View>
+                );
+              }
+              
               const isCollapsed = collapsedDays.has(day.date);
               const summary = isCollapsed ? getDaySummary(day) : null;
               const hasDeferredBill = day.entries.some(entry => entry.isDeferred);
               
+              // Check if any bills on this day fall within time off periods
+              const hasTimeOffBills = day.entries.some(entry => {
+                if (entry.type === 'bill') {
+                  return timeOffList.some(timeOff => {
+                    const start = parseISO(timeOff.start_date);
+                    const end = parseISO(timeOff.end_date);
+                    const current = parseISO(entry.date);
+                    return current >= start && current <= end;
+                  });
+                }
+                return false;
+              });
+              
               return (
-                <View key={dayIndex} style={styles.dayCard}>
+                <View key={dayIndex} style={[styles.dayCard, hasTimeOffBills && styles.timeOffDayBorder]}>
                   <TouchableOpacity 
                     onPress={() => toggleDay(day.date)}
                     style={styles.dayHeader}
@@ -822,5 +903,41 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#7f8c8d',
+  },
+  timeOffCard: {
+    backgroundColor: '#fff9f0',
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#f39c12',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  timeOffCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  timeOffCardName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#e67e22',
+  },
+  timeOffCardIcon: {
+    marginLeft: 8,
+  },
+  timeOffCardDays: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#e67e22',
+    marginLeft: 'auto',
+  },
+  timeOffDayBorder: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#f39c12',
   },
 });

@@ -61,7 +61,10 @@ export default function SwipeableBillRow({
       </TouchableOpacity>
       
       <Animated.View
-        style={[styles.visibleContent, { transform: [{ translateX }] }]}
+        style={[
+          styles.visibleContent,
+          { transform: [{ translateX }] },
+        ]}
         {...panResponder.panHandlers}
       >
         <View style={styles.entryInfo}>
