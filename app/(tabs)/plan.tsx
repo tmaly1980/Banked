@@ -111,19 +111,35 @@ export default function PlanScreen() {
       const { data: billsData, error: billsError } = await supabase
         .from('user_bills_view')
         .select('*')
+        .eq('user_id', user.id)
         .eq('is_upcoming', true);
 
       if (billsError) throw billsError;
+
+      // Filter out bills that are currently deferred
+      const filteredBills = (billsData || []).filter(bill => {
+        if (!bill.active_deferred_months || !bill.next_due_date) return true;
+        const billMonthYear = bill.next_due_date.substring(0, 7); // YYYY-MM
+        return !bill.active_deferred_months.includes(billMonthYear);
+      });
 
       // Load overdue bills separately
       const { data: overdueData, error: overdueError } = await supabase
         .from('user_bills_view')
         .select('*')
+        .eq('user_id', user.id)
         .eq('is_overdue', true);
 
       if (overdueError) throw overdueError;
 
-      setOverdueBills(overdueData || []);
+      // Filter out overdue bills that are currently deferred
+      const filteredOverdue = (overdueData || []).filter(bill => {
+        if (!bill.active_deferred_months || !bill.next_due_date) return true;
+        const billMonthYear = bill.next_due_date.substring(0, 7); // YYYY-MM
+        return !bill.active_deferred_months.includes(billMonthYear);
+      });
+
+      setOverdueBills(filteredOverdue);
 
       // Refresh deferred bills using hook
       await refreshDeferredBills();

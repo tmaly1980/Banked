@@ -111,6 +111,7 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
       const { data, error } = await supabase
         .from('user_bills_view')
         .select('*')
+        .eq('user_id', user.id)
         .eq('is_overdue', true);
 
       if (error) {
@@ -147,7 +148,8 @@ export const BillsProvider = ({ children }: { children: ReactNode }) => {
       // Use user_bills_view for calculated fields
       const { data: billsData, error: billsError } = await supabase
         .from('user_bills_view')
-        .select('*');
+        .select('*')
+        .eq('user_id', user.id);
 
       if (billsError) throw billsError;
 

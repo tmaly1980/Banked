@@ -140,16 +140,17 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
     const later: BillModel[] = [];
 
     bills.forEach(bill => {
-      // Check overdue first, regardless of other flags
-      if (bill.is_overdue) {
-        overdue.push(bill);
-      } else if (!bill.next_due_date) {
+      if (!bill.next_due_date) {
         // Bills without dates go to "Later"
         later.push(bill);
       } else {
-        // Check if bill is from today through end of next month
         const nextDueDate = startOfDay(new Date(bill.next_due_date));
-        if (nextDueDate <= endOfNextMonth) {
+        
+        // A bill is only overdue if it's BEFORE today (not including today)
+        if (nextDueDate < today) {
+          overdue.push(bill);
+        } else if (nextDueDate <= endOfNextMonth) {
+          // Bills due today through end of next month
           upcoming.push(bill);
         } else {
           later.push(bill);
@@ -166,6 +167,20 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
         upcomingByMonth[monthKey] = [];
       }
       upcomingByMonth[monthKey].push(bill);
+    });
+
+    // Sort bills within each month by date
+    Object.keys(upcomingByMonth).forEach(monthKey => {
+      upcomingByMonth[monthKey].sort((a, b) => {
+        if (!a.next_due_date || !b.next_due_date) return 0;
+        return a.next_due_date.localeCompare(b.next_due_date);
+      });
+    });
+
+    // Sort overdue bills by date (oldest first)
+    overdue.sort((a, b) => {
+      if (!a.next_due_date || !b.next_due_date) return 0;
+      return a.next_due_date.localeCompare(b.next_due_date);
     });
 
     return { overdue, upcoming, upcomingByMonth, later };
@@ -232,6 +247,13 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
   };
 
   const renderBillRow = (bill: BillModel) => {
+    console.log(`[Bill Data] ${bill.name}:`, {
+      next_due_date: bill.next_due_date,
+      active_deferred_months: bill.active_deferred_months,
+      decide_by_dates: bill.decide_by_dates,
+      loss_dates: bill.loss_dates
+    });
+    
     const hasPartialPayment = bill.remaining_amount !== undefined && 
                               bill.remaining_amount > 0 &&
                               bill.amount !== null &&
@@ -240,11 +262,23 @@ export default function Bills({ bills, onBillPress, onAddBill, onRefresh, loadin
     const isDeferred = isBillDeferredForMonth(bill);
     
     // Check if this bill's month is in the active_deferred_months list
+    // OR if the previous month was deferred (showing "pushed forward" state)
     const isActiveDeferral = bill.active_deferred_months && bill.next_due_date && (() => {
       const [billYear, billMonth] = bill.next_due_date.split('-');
       const billMonthYear = `${billYear}-${billMonth}`;
-      const result = bill.active_deferred_months.includes(billMonthYear);
-      console.log(`[Deferral Debug] ${bill.name}: active_deferred_months=${JSON.stringify(bill.active_deferred_months)}, next_due_date=${bill.next_due_date}, billMonthYear=${billMonthYear}, result=${result}`);
+      
+      // Check if current month is deferred
+      if (bill.active_deferred_months.includes(billMonthYear)) {
+        return true;
+      }
+      
+      // Check if previous month was deferred (bill pushed to this month)
+      const billDate = new Date(parseInt(billYear), parseInt(billMonth) - 1, 1);
+      const prevMonthDate = new Date(billDate.getFullYear(), billDate.getMonth() - 1, 1);
+      const prevMonthYear = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth() + 1).padStart(2, '0')}`;
+      
+      const result = bill.active_deferred_months.includes(prevMonthYear);
+      console.log(`[Deferral Debug] ${bill.name}: active_deferred_months=${JSON.stringify(bill.active_deferred_months)}, next_due_date=${bill.next_due_date}, billMonthYear=${billMonthYear}, prevMonthYear=${prevMonthYear}, result=${result}`);
       return result;
     })();
     
